@@ -19,13 +19,13 @@
 #
 # NOT an upward search: that resolves a nested project to its parent's config.
 if [ -f "project.yaml" ] || [ -d ".claude" ]; then
-  CCGS_ROOT="$PWD"
+  CCSS_ROOT="$PWD"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "${CLAUDE_PROJECT_DIR}" ]; then
-  CCGS_ROOT="$CLAUDE_PROJECT_DIR"
+  CCSS_ROOT="$CLAUDE_PROJECT_DIR"
 else
-  CCGS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  CCSS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
 fi
-[ -n "$CCGS_ROOT" ] && cd "$CCGS_ROOT" 2>/dev/null || true
+[ -n "$CCSS_ROOT" ] && cd "$CCSS_ROOT" 2>/dev/null || true
 
 # post-compact.sh — fires after conversation compaction
 # Reminds Claude to restore session state from the file-backed checkpoint.

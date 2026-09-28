@@ -1,0 +1,519 @@
+# API contract — [Product Name]
+#
+# Source template: .claude/docs/templates/openapi-skeleton.yaml (copied by /api-design Phase 4 to
+# docs/api/openapi.yaml). Rules referenced below live in docs/api/api-guidelines.md.
+# Security Engineer Review (SE-SECURITY-REVIEW): [APPROVED YYYY-MM-DD | CONCERNS (accepted) YYYY-MM-DD | REVISED YYYY-MM-DD | [SE-SECURITY-REVIEW] skipped — <Mode> mode]
+#
+# How to use this skeleton:
+# - Keep `components`: the security schemes, the RFC 9457 Problem schema, the pagination and
+#   idempotency parameters, and the shared error responses and headers. Operations reference them.
+# - The `/goals` paths are a worked example from Moa (savings goals). Replace them with the
+#   resources approved in /api-design Phase 3, or delete them — never ship an example operation.
+# - Replace every [bracketed] placeholder before the contract is written. After every edit the file
+#   must parse as YAML and validate as OpenAPI 3.1 (validate-data-files checks docs/api/**).
+# - Descriptions are single-line double-quoted strings (use \n for a line break). The hooks fall back
+#   to a line-based structural check when PyYAML is not installed, and that check reads each line alone.
+# - Conventions: `x-data-classification` marks fields the data model classifies PII or Sensitive-PII
+#   (values: Public | Internal | Confidential | PII | Sensitive-PII); `x-requirements` lists the
+#   TR-IDs an operation implements. Unmarked is not "Internal" — /api-design checks fields against
+#   docs/data/data-model.md.
+# - Example values are synthetic. No real personal data, tokens or keys (validate-commit blocks secrets).
+# - Add the production server when its URL is decided; keep credentials out of every URL.
+
+openapi: 3.1.1
+jsonSchemaDialect: "https://spec.openapis.org/oas/3.1/dialect/base"
+
+info:
+  title: "[Product Name] API"
+  version: "0.1.0"
+  summary: "[One line: what this API lets its clients do]"
+  description: "[Who calls this API (web, iOS, Android, admin console, partners) and what it covers.]\n\nConventions (details in docs/api/api-guidelines.md):\n- Errors are RFC 9457 problem details (application/problem+json) with a stable `code`.\n- Lists use cursor pagination (`cursor`, `limit`) and return `data` plus `page`.\n- Unsafe requests that clients may retry send an `Idempotency-Key` header.\n- Instants are RFC 3339 in UTC (2026-11-04T00:30:00Z).\n- Money is an integer in minor units plus an ISO 4217 code; KRW has no minor unit (10000 = 10,000 won)."
+  contact:
+    name: "[Owning team]"
+    email: "api-team@example.com"
+
+servers:
+  - url: "http://localhost:3000/v1"
+    description: "Local development"
+  - url: "https://api.staging.example.com/v1"
+    description: "Staging"
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: goals
+    description: "Example (Moa): savings goals owned by the caller."
+
+paths:
+  /goals:
+    get:
+      tags: [goals]
+      operationId: listGoals
+      summary: "List the savings goals of the caller"
+      description: "Returns only goals owned by the caller (object-level authorization). Sorted by `createdAt` descending, ties broken by `id`."
+      x-requirements: [TR-goals-001]
+      security:
+        - bearerAuth: ["goals:read"]
+      parameters:
+        - $ref: "#/components/parameters/Cursor"
+        - $ref: "#/components/parameters/Limit"
+        - $ref: "#/components/parameters/AcceptLanguage"
+        - name: status
+          in: query
+          required: false
+          description: "Filter by status. Unknown values are rejected with 400."
+          schema:
+            type: string
+            enum: [active, paused, completed, archived]
+      responses:
+        "200":
+          description: "One page of goals."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GoalList"
+              examples:
+                firstPage:
+                  summary: "First page with more results"
+                  value:
+                    data:
+                      - id: "goal_01JBZK4Q7X2M9V5T3R8N6P0H1C"
+                        name: "Jeju trip"
+                        targetAmount: { amount: 1500000, currency: "KRW" }
+                        savedAmount: { amount: 420000, currency: "KRW" }
+                        targetDate: "2027-03-31"
+                        status: active
+                        createdAt: "2026-10-02T01:15:00Z"
+                        updatedAt: "2026-11-04T00:30:00Z"
+                    page:
+                      nextCursor: "eyJjIjoiMjAyNi0xMC0wMlQwMToxNTowMFoiLCJpIjoiZ29hbF8wMUpCWks0UTdYIn0"
+                      hasMore: true
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    post:
+      tags: [goals]
+      operationId: createGoal
+      summary: "Create a savings goal for the caller"
+      description: "Idempotent with `Idempotency-Key`. A retry with the same key and body returns the original response; the same key with a different body returns 422; a retry while the first request is still in flight returns 409. The goal limit of the plan is enforced server-side."
+      x-requirements: [TR-goals-002]
+      security:
+        - bearerAuth: ["goals:write"]
+      parameters:
+        - $ref: "#/components/parameters/IdempotencyKey"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateGoalRequest"
+            examples:
+              jejuTrip:
+                value:
+                  name: "Jeju trip"
+                  targetAmount: { amount: 1500000, currency: "KRW" }
+                  targetDate: "2027-03-31"
+      responses:
+        "201":
+          description: "Goal created."
+          headers:
+            Location:
+              description: "URL of the created goal."
+              schema:
+                type: string
+                format: uri-reference
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "422":
+          $ref: "#/components/responses/UnprocessableContent"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /goals/{goalId}:
+    parameters:
+      - $ref: "#/components/parameters/GoalId"
+    get:
+      tags: [goals]
+      operationId: getGoal
+      summary: "Get one goal of the caller"
+      description: "Returns 404 when the goal does not exist or belongs to another user."
+      x-requirements: [TR-goals-001]
+      security:
+        - bearerAuth: ["goals:read"]
+      responses:
+        "200":
+          description: "The goal."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+    patch:
+      tags: [goals]
+      operationId: updateGoal
+      summary: "Change the name, target amount or target date of one goal of the caller"
+      description: "Partial update with JSON Merge Patch semantics (RFC 7396). Protected fields such as `savedAmount`, `status` and the owner cannot be set through this operation."
+      x-requirements: [TR-goals-003]
+      security:
+        - bearerAuth: ["goals:write"]
+      requestBody:
+        required: true
+        content:
+          application/merge-patch+json:
+            schema:
+              $ref: "#/components/schemas/UpdateGoalRequest"
+      responses:
+        "200":
+          description: "The updated goal."
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Goal"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "422":
+          $ref: "#/components/responses/UnprocessableContent"
+        "429":
+          $ref: "#/components/responses/TooManyRequests"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: "Short-lived access token issued to first-party apps (web, iOS, Android) after sign-in with email, Kakao, Naver or Apple. Refresh tokens rotate and are never sent to this API. Requirement arrays list the scopes an operation needs (OpenAPI 3.1 allows role or scope names for non-OAuth schemes); the scope catalog is in docs/api/api-guidelines.md."
+    partnerOAuth:
+      type: oauth2
+      description: "Server-to-server access for partners. Keep this scheme only when `api` is in platform.surfaces (an externally consumed API); delete it otherwise."
+      flows:
+        clientCredentials:
+          tokenUrl: "https://auth.staging.example.com/oauth/token"
+          scopes:
+            "partner:reports.read": "Read aggregated partner reports"
+
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: "Opaque cursor from `page.nextCursor` of the previous page. Omit for the first page."
+      schema:
+        type: string
+        maxLength: 512
+    Limit:
+      name: limit
+      in: query
+      required: false
+      description: "Page size. Values above the maximum are rejected with 400, never silently capped."
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: "Client-generated unique key (UUID or ULID) for one logical request. Stored with a request fingerprint for the retention window stated in docs/api/api-guidelines.md (Idempotency Keys)."
+      schema:
+        type: string
+        minLength: 16
+        maxLength: 64
+      example: "7b9f3c52-9d7e-4d8a-b0a4-5f1e2c3d4a6b"
+    AcceptLanguage:
+      name: Accept-Language
+      in: header
+      required: false
+      description: "Preferred locale (BCP 47) for server-generated text only. Enum values and `code` are never localized."
+      schema:
+        type: string
+      example: "ko-KR"
+    GoalId:
+      name: goalId
+      in: path
+      required: true
+      description: "Opaque goal ID. Ownership is checked on every call."
+      schema:
+        type: string
+        pattern: "^goal_[0-9A-HJKMNP-TV-Z]{26}$"
+
+  headers:
+    RetryAfter:
+      description: "Seconds to wait before retrying (RFC 9110)."
+      schema:
+        type: integer
+        minimum: 0
+    Deprecation:
+      description: "When the operation was deprecated, as a structured-field date (RFC 9745), for example @1793491200 (2026-11-01T00:00:00Z). Sent on every response of a deprecated operation."
+      schema:
+        type: string
+        pattern: "^@[0-9]+$"
+    Sunset:
+      description: "When the operation stops working, as an HTTP-date (RFC 8594), for example Sat, 01 May 2027 00:00:00 GMT. After it the operation returns 410 with a problem body."
+      schema:
+        type: string
+
+  responses:
+    BadRequest:
+      description: "Malformed request (unparseable body, unknown query parameter, limit out of range)."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: "Missing, expired or invalid access token."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: "Authenticated, but the scope or role of the caller does not allow this operation."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: "The resource does not exist or is not visible to the caller."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: "State conflict, or a request with the same Idempotency-Key is still in flight."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnprocessableContent:
+      description: "Well-formed but invalid (field validation, business rule, Idempotency-Key reused with a different body)."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+          examples:
+            goalLimitReached:
+              value:
+                type: "https://api.example.com/problems/goal-limit-reached"
+                title: "Goal limit reached"
+                status: 422
+                detail: "The Free plan allows 3 active goals."
+                instance: "/v1/goals"
+                code: "GOAL_LIMIT_REACHED"
+                traceId: "4bf92f3577b34da6a3ce929d0e0e4736"
+            validation:
+              value:
+                type: "https://api.example.com/problems/validation-failed"
+                title: "Validation failed"
+                status: 422
+                code: "VALIDATION_FAILED"
+                errors:
+                  - pointer: "/targetAmount/amount"
+                    code: "MUST_BE_POSITIVE"
+                    detail: "targetAmount.amount must be greater than 0."
+    TooManyRequests:
+      description: "Rate limit exceeded."
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    InternalError:
+      description: "Unexpected server error. The body never contains stack traces, SQL or internal hostnames."
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    ServiceUnavailable:
+      description: "Temporarily unavailable (maintenance, or a dependency such as the payment gateway is down)."
+      headers:
+        Retry-After:
+          $ref: "#/components/headers/RetryAfter"
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    Problem:
+      type: object
+      description: "Problem details for HTTP APIs (RFC 9457). `type` identifies the problem class and is stable; clients branch on `code`, never on `title` or `detail`. Extension members are allowed."
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: "about:blank"
+        title:
+          type: string
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          description: "Stable machine-readable error code (SCREAMING_SNAKE), documented per operation."
+          pattern: "^[A-Z][A-Z0-9_]*$"
+        traceId:
+          type: string
+          description: "Trace identifier for support. Never a secret, never personal data."
+        errors:
+          type: array
+          description: "Field-level validation errors."
+          items:
+            $ref: "#/components/schemas/FieldError"
+      additionalProperties: true
+
+    FieldError:
+      type: object
+      required: [pointer, code]
+      properties:
+        pointer:
+          type: string
+          description: "JSON Pointer (RFC 6901) to the offending request field."
+        code:
+          type: string
+          pattern: "^[A-Z][A-Z0-9_]*$"
+        detail:
+          type: string
+
+    PageInfo:
+      type: object
+      required: [hasMore]
+      properties:
+        nextCursor:
+          type: [string, "null"]
+          description: "Cursor for the next page; null on the last page."
+        hasMore:
+          type: boolean
+
+    Money:
+      type: object
+      description: "Integer amount in the minor unit of the currency (ISO 4217 exponent). KRW has no minor unit (10000 = 10,000 won); USD uses cents (1999 = 19.99 dollars). Never a float."
+      required: [amount, currency]
+      properties:
+        amount:
+          type: integer
+          format: int64
+        currency:
+          type: string
+          pattern: "^[A-Z]{3}$"
+          examples: ["KRW"]
+
+    Goal:
+      type: object
+      required: [id, name, targetAmount, savedAmount, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          description: "Opaque ID (prefixed ULID)."
+          x-data-classification: Internal
+          examples: ["goal_01JBZK4Q7X2M9V5T3R8N6P0H1C"]
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+          description: "User-entered label. Free text may contain personal information."
+          x-data-classification: PII
+        targetAmount:
+          $ref: "#/components/schemas/Money"
+          x-data-classification: PII
+        savedAmount:
+          $ref: "#/components/schemas/Money"
+          x-data-classification: PII
+        targetDate:
+          type: [string, "null"]
+          format: date
+          description: "Business date in the Asia/Seoul calendar; null when the goal is open-ended."
+          x-data-classification: PII
+        status:
+          type: string
+          enum: [active, paused, completed, archived]
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    GoalList:
+      type: object
+      required: [data, page]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: "#/components/schemas/Goal"
+        page:
+          $ref: "#/components/schemas/PageInfo"
+
+    CreateGoalRequest:
+      type: object
+      required: [name, targetAmount]
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+          x-data-classification: PII
+        targetAmount:
+          $ref: "#/components/schemas/Money"
+          x-data-classification: PII
+        targetDate:
+          type: [string, "null"]
+          format: date
+          x-data-classification: PII
+
+    UpdateGoalRequest:
+      type: object
+      minProperties: 1
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+          x-data-classification: PII
+        targetAmount:
+          $ref: "#/components/schemas/Money"
+          x-data-classification: PII
+        targetDate:
+          type: [string, "null"]
+          format: date
+          x-data-classification: PII

@@ -14,7 +14,7 @@
 #
 # ONE EXCEPTION, and it is deliberate. `check` stays silent on an absent
 # LITERAL path, because a caller may name an optional input on every run
-# (/design-review does exactly this with the entity registry) and reporting it
+# (/prd-review does exactly this with the entity registry) and reporting it
 # would block a legitimate skip. That silence is a false negative only if a
 # caller passes a literal path it believes must exist — so callers name
 # optional inputs and nothing else.
@@ -97,7 +97,7 @@ norm_path() {
 # and `check` must NOT treat them alike:
 #
 #   a literal path that is absent   -> an optional input the caller named on
-#                                      purpose. /design-review passes
+#                                      purpose. /prd-review passes
 #                                      design/registry/entities.yaml on every
 #                                      run and documents that an absent
 #                                      registry "doesn't appear in the output

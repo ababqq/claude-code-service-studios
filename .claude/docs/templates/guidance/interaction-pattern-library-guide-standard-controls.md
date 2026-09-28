@@ -4,43 +4,56 @@
 
 ## Standard Control Patterns
 
+State tables use four input methods — **keyboard**, **pointer** (mouse,
+trackpad), **touch** and **screen reader** — and a **Feedback** column for haptics
+(iOS, Android) and screen-reader announcements. Colors, durations and easing come
+from the design language (`design/brand/design-language.md` — `## 2. Color System`,
+`## 7. Motion & Feedback`); the values below are worked examples. Implementation
+notes name common stacks; follow the project's own stack reference in
+`docs/stack-reference/` where it differs. Examples use **Moa**, a subscription
+savings app (web, iOS, Android).
+
 ---
 
 #### Button (Primary)
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: The single most important action on a screen. "Start Game,"
-"Confirm," "Accept," "Buy." There should be at most one Primary button visible
-at a time. It is the answer to "what does the player most likely want to do here?"
+**When to Use**: The single most important action on a screen. "Create goal,"
+"Continue," "Start Plus," "Save." There should be at most one Primary button
+visible at a time. It answers "what does the user most likely want to do here?"
 **When NOT to Use**: Alternative or secondary actions; destructive actions that
-require confirmation before the consequence is irreversible; any action that is
-not the primary intent of the screen.
+require confirmation before an irreversible consequence; any action that is not
+the primary intent of the screen.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Full-opacity fill, primary color from art-bible. Label centered. | — | — | — | — |
-| Hovered (mouse) | Brightness +15%, subtle scale 1.03x, cursor changes to pointer | Mouse over element | Transition from Default | 80ms ease-out | [UI hover sound — see Sound Standards] |
-| Focused (keyboard/gamepad) | Focus ring visible (2px, offset 3px, high contrast color). Same brightness as Hovered. | Tab / D-pad navigation | Transition from Default | 80ms ease-out | [UI focus sound — same as hover] |
-| Pressed | Scale 0.97x, brightness -10% | Click / Enter / A (Xbox) / Cross (PS) | Action fires on press-up, not press-down. Scale on press-down. | 60ms ease-in for press; 80ms ease-out on release | [UI confirm sound] |
-| Disabled | 40% opacity, no pointer cursor, no hover state | — | No response | — | — |
-| Loading (post-press) | Replace label with spinner. Button remains at pressed scale, disabled state. | — | Prevents double-submission | Duration of async operation | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Full-opacity fill, `color.action.primary`. Label centered. | — | — | — | — |
+| Hovered (pointer) | Fill shifts to the hover token; cursor becomes a pointer | Pointer over element | Transition from Default | 80ms ease-out | — |
+| Focused (keyboard) | Focus ring visible (2px, offset 2px, `color.border.focus`, 3:1 against adjacent colors) | Tab | Transition from Default | 80ms ease-out | Screen reader: "[Label], button" |
+| Pressed | Fill darkens; optional scale 0.98 | Click / Enter / Space / tap | Action fires on release (pointer, touch) or keydown (Enter). Scale on press. | 60ms ease-in press; 80ms ease-out release | Haptic: light impact on iOS/Android for commit actions only |
+| Disabled | 40% opacity, no pointer cursor, no hover state | — | No response | — | Screen reader: "dimmed" / "disabled" |
+| Loading (post-press) | Label replaced by a spinner plus visually hidden "Saving…"; width stays fixed | — | Prevents double submission | Duration of the request | Screen reader: announce completion or error |
 
 **Accessibility**:
-- Keyboard: Tab to focus, Enter or Space to activate. Must be reachable from any other interactive element on screen via Tab sequence.
-- Gamepad: D-pad or left stick to navigate focus to button. A (Xbox) / Cross (PS) to activate. Focus must be placed on Primary button by default when screen opens.
-- Screen reader: Button must expose accessible name matching visible label. Role: "button." State: "dimmed" when disabled. Activation announcement: "[Label] button — [result of action, if known]."
-- Colorblind: Do not rely on color alone to distinguish Primary from Secondary. Primary uses higher visual weight (fill vs. outline, or larger size) in addition to color differentiation.
-- Minimum touch target: 44x44pt (iOS HIG) / 48x48dp (Android). Apply even on PC if touch support is possible.
+- Keyboard: Tab to focus, Enter or Space to activate. Reachable in the screen's
+  logical tab order.
+- Touch: minimum target 44 × 44 pt (iOS HIG) / 48 × 48 dp (Material); on the web
+  at least 24 × 24 CSS px (WCAG 2.2 SC 2.5.8) — use 44 px for primary actions.
+- Screen reader: accessible name matches the visible label (SC 2.5.3 Label in
+  Name). Role: button. Disabled state exposed. Prefer a disabled state with a
+  reason shown nearby over a silently disabled button.
+- Color: Primary is distinguished from Secondary by weight (fill vs outline),
+  not by hue alone.
 
-**Implementation Notes**:
-[Godot: Extend `Button` control. Override `_draw()` for custom states rather than
-modifying themes mid-state. Use `focus_mode = FOCUS_ALL` to ensure keyboard
-focusability. Set `mouse_default_cursor_shape = CURSOR_POINTING_HAND`. For the
-scale animation, use a Tween on the `scale` property of the button's parent
-Control — scaling the Button itself can clip children.]
+**Implementation Notes**: [Web: a native `<button type="button|submit">` — never a
+clickable `div`; disable double submit with the loading state, not by removing
+the button. SwiftUI: `Button` with `.buttonStyle` from the component library;
+`.disabled()` exposes state automatically. Compose: `Button` with the theme's
+colors; `enabled = false` for disabled. React Native: `Pressable` with
+`accessibilityRole="button"` and `accessibilityState={{ disabled, busy }}`.]
 
 ---
 
@@ -48,30 +61,29 @@ Control — scaling the Button itself can clip children.]
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: Alternative or cancel action. "Back," "Cancel," "Skip," "Maybe
-Later." Lower visual weight than Primary — it should recede visually, not compete.
+**When to Use**: Alternative or cancel action. "Back," "Cancel," "Skip,"
+"Maybe later." Lower visual weight than Primary — it recedes rather than competes.
 **When NOT to Use**: Destructive actions (use Button (Destructive)). The most
 important action on the screen (use Button (Primary)).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Outlined style (border only, transparent fill), secondary color. Slightly smaller or lower weight than Primary. | — | — | — | — |
-| Hovered | Background fill appears at 15% opacity. Border brightens. Scale 1.02x. | Mouse over | Transition from Default | 80ms ease-out | [UI hover sound — softer variant than Primary] |
-| Focused | Focus ring, same specification as Primary. | Tab / D-pad | Transition from Default | 80ms ease-out | [UI focus sound] |
-| Pressed | Scale 0.97x, fill opacity increases to 30% | Click / Enter / B (Xbox) / Circle (PS) on focused state | Action fires on press-up | 60ms ease-in | [UI cancel/back sound] |
-| Disabled | 40% opacity | — | No response | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Outlined (border only, transparent fill) or tonal fill | — | — | — | — |
+| Hovered (pointer) | Background fill appears at low opacity; border strengthens | Pointer over | Transition from Default | 80ms ease-out | — |
+| Focused (keyboard) | Focus ring, same specification as Primary | Tab | Transition from Default | 80ms ease-out | Screen reader: "[Label], button" |
+| Pressed | Fill opacity increases | Click / Enter / Space / tap | Action fires on release | 60ms ease-in | — |
+| Disabled | 40% opacity | — | No response | — | State exposed |
 
-**Accessibility**: Same requirements as Button (Primary). Accessible name must
-match visible label. In a dialog with Primary and Secondary buttons, the Secondary
-button typically maps to the platform "cancel" input (B / Circle / Escape) as well
-as direct focus activation.
+**Accessibility**: Same requirements as Button (Primary). In a dialog with
+Primary and Secondary buttons, Esc maps to the Secondary (cancel) action.
 
-**Implementation Notes**: [Same as Button (Primary). Where a Primary and Secondary
-appear together, ensure Secondary is always positioned consistently — right/bottom
-of Primary on horizontal layouts, or below Primary on vertical layouts. Consistency
-across screens is more important than per-screen aesthetic preference.]
+**Implementation Notes**: [Same as Button (Primary). Position Secondary
+consistently across the product: on the web to the left of Primary in a
+right-aligned button row; on mobile full-width, stacked below Primary. Follow
+the platform order where the design language's `## 8. Platform Adaptation` says so
+— consistency across screens matters more than per-screen preference.]
 
 ---
 
@@ -79,32 +91,48 @@ across screens is more important than per-screen aesthetic preference.]
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: Any action that is irreversible and causes loss of player data or
-significant progress: "Delete Save File," "Reset All Settings," "Leave Match,"
-"Discard Changes." The visual treatment signals danger before the player presses.
-**When NOT to Use**: Actions that can be undone, or actions that are merely
-consequential but reversible.
+**When to Use**: Any action that is irreversible or ends something the user pays
+for or relies on: "Delete account," "Cancel subscription," "Remove payment
+method," "Delete goal," "Discard changes." The visual treatment signals the
+consequence before the user presses.
+**When NOT to Use**: Actions that can be undone (prefer doing them immediately
+with an Undo snackbar), or actions that are consequential but reversible.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Outlined or filled with destructive color (typically a desaturated red — confirm colorblind compatibility in accessibility-requirements). Label may include a warning icon. | — | — | — | — |
-| Hovered / Focused | Same behavior as Button (Primary) hover/focus but with destructive color | — | — | 80ms | [UI hover sound] |
-| Pressed (first press) | Does NOT execute the action. Instead, opens Confirmation Dialog pattern (see below). The button itself shows a brief pulse animation. | Click / Enter | Trigger Confirmation Dialog | 100ms pulse | [UI warning sound — distinct from standard confirm] |
-| — | Confirmation Dialog handles the actual execution | — | — | — | — |
-| Disabled | 40% opacity | — | No response | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Outlined or filled with `color.feedback.danger`; label names the action. Optional warning icon. | — | — | — | — |
+| Hovered / Focused | Same behavior as Button (Primary) with the danger color | Pointer / Tab | — | 80ms | Screen reader: "[Label], button" plus the consequence description |
+| Pressed (first press) | Does NOT execute the action. Opens the Confirmation Dialog pattern. | Click / Enter / Space / tap | Trigger Confirmation Dialog | 100ms | Haptic: warning on iOS/Android |
+| — | The Confirmation Dialog handles the actual execution | — | — | — | — |
+| Disabled | 40% opacity | — | No response | — | State exposed |
 
 > **Critical rule**: A Button (Destructive) NEVER executes its action directly.
-> It always triggers a Confirmation Dialog. There are no exceptions. A player
-> who presses it by accident must always have one more opportunity to back out.
-> Games that skip confirmation on destructive actions generate the most visible
-> negative community sentiment of any UX failure type. See: every "accidentally
-> deleted save file" complaint on any game forum.
+> It always triggers a Confirmation Dialog. A user who presses it by accident must
+> always get one more chance to back out. "I deleted my account by mistake" and
+> "I cancelled my subscription without meaning to" are the support tickets and
+> store reviews this rule prevents.
 
-**Accessibility**: Screen reader must announce the destructive nature: "[Label] button — this action cannot be undone." In addition to accessible name, use the `description` property if available to add the warning text.
+**Service-specific rules**:
+- **Delete account**: re-authenticate (password, passkey or a fresh one-time code)
+  before the confirmation; state what is deleted, what is kept and for how long
+  (retention required by law, e.g. payment records), and whether an active
+  subscription is cancelled with it.
+- **Cancel subscription**: show when access ends ("Plus stays active until
+  October 31") and what happens to data; offer alternatives (downgrade, pause) at
+  most once, without obstructing the path. Making cancellation harder than
+  sign-up is a dark pattern and, in several markets, a legal risk.
 
-**Implementation Notes**: [Destructive button triggers a separate Confirmation Dialog scene. Pass the action callback to the dialog — the button itself does not hold the execution logic. This separation prevents accidental execution if the confirmation dialog has a bug.]
+**Accessibility**: The consequence is part of the accessible description:
+"Delete account, button — this cannot be undone." Use `aria-describedby` on the
+web, `accessibilityHint` on iOS, a semantics description on Android.
+
+**Implementation Notes**: [The destructive button passes the action to the
+Confirmation Dialog; it does not hold the execution logic itself, so a bug in the
+dialog cannot execute the action accidentally. The server enforces the same rule:
+a destructive endpoint requires an explicit confirmation token or a recent
+re-authentication, never only a client-side dialog.]
 
 ---
 
@@ -112,35 +140,41 @@ consequential but reversible.
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: Binary on/off settings where both states are equally valid and
-the current state must be visible at a glance. "Subtitles: On/Off," "Aim Assist:
-On/Off," "Notifications: On/Off."
-**When NOT to Use**: Selections from more than two options (use Dropdown). Actions
-that happen once rather than representing a persistent state (use Button). Cases
-where the consequence of toggling is complex enough to need explanation (show
-a description field alongside).
+**When to Use**: Binary on/off settings that take effect immediately and whose
+current state must be visible at a glance. "Push notifications: On/Off,"
+"Dark mode: On/Off," "Face ID sign-in: On/Off," "Marketing messages: On/Off."
+**When NOT to Use**: Selections from more than two options (use Dropdown or a
+segmented control). One-off actions (use Button). Settings that take effect only
+after a Save button (use a checkbox in a form). Consent that must be recorded with
+its date and version — a marketing-consent toggle still needs the consent record
+on the server.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Off / Default | Track: muted fill. Thumb: leftmost position. Label: "Off" or state label. | — | — | — | — |
-| Hovered | Track brightens 10%. Cursor: pointer. | Mouse over | Transition | 60ms | [UI hover sound] |
-| Focused | Focus ring around entire toggle element (track + thumb). | Tab / D-pad | — | 60ms | [UI focus sound] |
-| Pressed / Activated | Thumb slides to right side. Track fill changes to active color. Label changes to "On" or active state label. State persists. | Click / Enter / A / Cross | Toggle state change. Fire onChange event. Persist value. | 150ms ease-in-out for slide | [Toggle ON sound] |
-| Pressed / Deactivated | Thumb slides to left. Track reverts to muted fill. | Same inputs | Toggle state change | 150ms ease-in-out | [Toggle OFF sound — subtly different from ON] |
-| Disabled | 40% opacity. No interaction. Current state still visible. | — | No response | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Off / Default | Track: muted fill. Thumb: leading edge. | — | — | — | — |
+| Hovered (pointer) | Track brightens slightly. Cursor: pointer. | Pointer over | Transition | 60ms | — |
+| Focused (keyboard) | Focus ring around the whole toggle (track + thumb) | Tab | — | 60ms | Screen reader: "[Label], switch, off" |
+| Activated | Thumb slides to the trailing edge; track fill becomes the active color | Click / Space / tap | State changes and persists (optimistic, with rollback on failure) | 150ms ease-in-out | Haptic: selection; screen reader announces "on" |
+| Deactivated | Thumb slides back; track reverts | Same inputs | State change | 150ms ease-in-out | Haptic: selection |
+| Pending (server-backed) | Toggle shows the new state; a small progress indicator appears after 500ms | — | Rolls back with an inline error if the request fails | Until response | Error announced |
+| Disabled | 40% opacity. Current state still visible. | — | No response | — | State exposed |
 
 **Accessibility**:
-- Keyboard/Gamepad: Space or Enter to toggle. Avoid requiring directional inputs (left/right) to toggle — some users cannot predict that behavior.
-- Screen reader: Role: "switch." State: "on" or "off" — the accessible name should NOT include the state (the screen reader announces state separately). Correct: accessible name "Subtitles," state "on." Incorrect: accessible name "Subtitles On."
-- The toggle label (not just the visual thumb position) must change to show current state for players who cannot reliably distinguish left from right positions.
+- Keyboard: Space toggles; a switch built on a `<button>` also toggles with
+  Enter. Do not require arrow keys.
+- Screen reader: role "switch". The accessible name does NOT include the state —
+  the state is announced separately. Correct: name "Push notifications", state
+  "on". Incorrect: name "Push notifications on".
+- The state is visible without relying on thumb position or color alone — the
+  design language defines a check mark or a state label for the on track.
 
-**Implementation Notes**: [Godot: Use a custom Control or a CheckButton. The
-built-in CheckButton provides accessibility role but uses a checkbox-style visual;
-a custom slide-toggle animation may be needed for the target art style. Ensure
-the slide animation is skipped when motion reduction mode is active — in that
-case, snap to final state instantly.]
+**Implementation Notes**: [Web: `<button role="switch" aria-checked>` or
+`<input type="checkbox" role="switch">`, with a visible `<label>`. SwiftUI:
+`Toggle`. Compose: `Switch` inside a row with `Modifier.toggleable(role =
+Role.Switch)` so the whole row is the target. When reduced motion is requested,
+snap to the final state instead of sliding.]
 
 ---
 
@@ -148,36 +182,38 @@ case, snap to final state instantly.]
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: Selecting a value from a continuous range where approximate values
-are acceptable and the range and relative position matter. Volume (0–100%), brightness,
-text size. The visual representation of position is itself useful information.
-**When NOT to Use**: Precise value entry (use Input Field). Selection from a short
-discrete list (use Dropdown). Binary state (use Toggle).
+**When to Use**: Choosing a value from a continuous range where approximate values
+are acceptable and the relative position itself is informative. In-app text size
+preview, image crop zoom, a price-range filter paired with numeric inputs.
+**When NOT to Use**: Exact values — especially money. A savings amount or a
+transfer amount is an Input Field, never a slider. Short discrete lists (use a
+segmented control or Dropdown). Binary state (use Toggle).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Track (full width). Fill (left of thumb, shows current value). Thumb (draggable handle). Current value label (right of track or above thumb). | — | — | — | — |
-| Hovered | Thumb enlarges slightly (1.2x). Track brightens. | Mouse over | — | 60ms | — |
-| Focused | Focus ring on thumb. Track brightens. | Tab / D-pad | — | 60ms | [UI focus sound] |
-| Dragging (mouse) | Thumb follows cursor. Fill updates in real time. Value label updates in real time. | Click + drag on thumb | Continuous value update. Fire onChange continuously. | Real time | [Slider adjust sound — subtle, loops while dragging] |
-| Keyboard / D-pad adjust | Thumb moves one step (5% of range per press, or 1 discrete unit). | Left/Right arrows or Left/Right D-pad while focused | Step value change. Fire onChange per step. | Instant | [Slider step sound — one click per step] |
-| Keyboard fast adjust | Larger step (25% of range). | Page Up / Page Down while focused | Large step value change | Instant | [Same step sound] |
-| Released | Value locks. onChange fires final value. | Mouse release | — | — | — |
-| Disabled | 40% opacity. No interaction. Value visible. | — | No response | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Track, fill up to the thumb, thumb, current value label | — | — | — | — |
+| Hovered (pointer) | Thumb enlarges slightly | Pointer over | — | 60ms | — |
+| Focused (keyboard) | Focus ring on the thumb | Tab | — | 60ms | Screen reader: "[Label], slider, [value]" |
+| Dragging (pointer, touch) | Thumb follows; fill and value label update live | Drag | onChange fires continuously; commit on release | Real time | Haptic: selection tick at each step (mobile) |
+| Keyboard step | Thumb moves one step | Arrow keys | Step change; fires onChange | Instant | Screen reader announces the new value |
+| Keyboard large step | Larger step (10% of the range) | Page Up / Page Down | Large step | Instant | Announces value |
+| Min / Max | Thumb at the end | Home / End | Jump to bound | Instant | Announces value |
+| Disabled | 40% opacity, value visible | — | No response | — | State exposed |
 
 **Accessibility**:
-- Keyboard: Left/Right arrows to adjust by small step. Page Up/Page Down for large step. Home/End to jump to min/max.
-- Screen reader: Role: "slider." Accessible name: the label (e.g., "Music Volume"). Current value announced on every change: "Music Volume, 80 percent." Min/max values announced on first focus.
-- All sliders must show a numeric value alongside the visual position. Relying only on track fill position excludes players who cannot perceive relative position.
+- Every slider shows its numeric value; relative position alone excludes users who
+  cannot perceive it.
+- Screen reader: role "slider", value announced on every change; min and max
+  exposed. On iOS/Android, swipe up/down adjusts by one step.
+- Dragging must not be the only way to set the value (WCAG 2.2 SC 2.5.7 Dragging
+  Movements): keyboard steps, and for ranges a paired numeric input.
 
-**Implementation Notes**: [Godot `HSlider`: set `step` to appropriate increment.
-Override keyboard input to add Page Up/Down support via `_input()`. Bind the
-`value_changed` signal to update the displayed numeric label. When motion reduction
-mode is enabled, ensure value label updates are the sole feedback — do not suppress
-them. Rumble feedback on gamepad slider adjustment is a nice enhancement for
-accessibility.]
+**Implementation Notes**: [Web: `<input type="range">` styled, or an accessible
+slider primitive with `aria-valuenow/min/max/valuetext` (valuetext carries units:
+"200%"). SwiftUI: `Slider` with `.accessibilityValue`. Compose: `Slider` with
+`steps` and semantics `stateDescription`.]
 
 ---
 
@@ -185,36 +221,41 @@ accessibility.]
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: Selection from a discrete list of 3-15 options where only the
-selected value needs to be visible at rest. Display resolution, language, window
-mode, input preset. The closed state shows only the current selection.
-**When NOT to Use**: Binary choices (use Toggle). More than ~15 options (use a
-full List pattern or a scrollable Select). When comparing options matters as much
-as selecting one (show options visibly, e.g., as a horizontal selector or list).
+**When to Use**: Choosing one option from a discrete list of about 3–15 options
+where only the selected value needs to be visible at rest. Language, country,
+notification frequency, the day of the month for an auto-debit.
+**When NOT to Use**: Binary choices (use Toggle). Two or three options that users
+compare (use a segmented control or radio group — options stay visible). Long
+lists such as banks or card issuers (use a searchable list or a bottom sheet with
+search; Korean bank pickers commonly show a logo grid of the most-used banks plus
+search).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Closed / Default | Label (left). Current value (right). Chevron-down icon (far right). | — | — | — | — |
-| Hovered | Row background fills at 10% opacity | Mouse over | — | 60ms | — |
-| Focused (closed) | Focus ring on entire row. | Tab / D-pad | — | 60ms | [UI focus sound] |
-| Opening | Dropdown list appears below (or above if near screen bottom). List items visible. Previously selected item highlighted. Focus moves to selected item inside list. | Click / Enter / A / Cross | Open list | 100ms ease-out (expand) | [UI expand sound] |
-| List item hovered/focused | List item highlights | Mouse / D-pad | — | 60ms | [UI hover sound] |
-| List item selected | List closes. Closed state shows new value. onChange event fires. | Click / Enter / A / Cross on item | Select value, close list | 80ms ease-in (collapse) | [UI confirm sound] |
-| Dismissed without selecting | List closes. Value unchanged. | Escape / B / Circle / click outside | Dismiss | 80ms | [UI cancel sound] |
-| Disabled | 40% opacity. No interaction. | — | — | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Closed / Default | Label, current value, chevron-down icon | — | — | — | — |
+| Hovered (pointer) | Row background tint | Pointer over | — | 60ms | — |
+| Focused (keyboard) | Focus ring on the control | Tab | — | 60ms | Screen reader: "[Label], [value], collapsed" |
+| Opening | List opens below (or above near the viewport bottom); selected option highlighted; focus moves into the list. Mobile: a bottom sheet or the native picker. | Click / Enter / Space / Alt+Down / tap | Open list | 100ms ease-out | Screen reader: "expanded" |
+| Option active | Option highlighted | Arrow keys / pointer | — | 60ms | Screen reader: "[Option], 3 of 12" |
+| Option selected | List closes; control shows the new value; onChange fires | Enter / click / tap | Select and close | 80ms | Haptic: selection (mobile) |
+| Dismissed | List closes; value unchanged; focus returns to the control | Esc / click outside / swipe down (sheet) | Dismiss | 80ms | — |
+| Disabled | 40% opacity | — | — | — | State exposed |
 
 **Accessibility**:
-- Keyboard: Up/Down arrows navigate list items while open. Enter selects. Escape dismisses. First letter of an option jumps focus to first matching item.
-- Screen reader: Role: "combobox." Accessible name: the field label. Expanded/collapsed state announced. Current value announced when focused. Each list item announces its value and position: "English, 1 of 12."
-- The dropdown list must never obscure the current item or the control that opened it — this is a common failure on small screens.
+- Keyboard: Up/Down move through options; Enter selects; Esc dismisses; typing a
+  character jumps to the first matching option (typeahead).
+- Screen reader: a native `<select>` or the ARIA combobox/listbox pattern; the
+  expanded state and the option position are announced.
+- The open list never covers the control that opened it on small screens — use a
+  bottom sheet instead.
 
-**Implementation Notes**: [Godot: Custom implementation using a `Button` (the
-closed state) and a `PopupMenu` or a `VBoxContainer` revealed by animation. Native
-`OptionButton` provides accessibility but limited visual customization. Ensure
-the popup positions itself above the control if it would be clipped by the screen
-bottom. Close the popup on `_input` detecting click outside its rect.]
+**Implementation Notes**: [Web: prefer the native `<select>` for simple lists (it
+gives mobile browsers their native picker); use an accessible combobox primitive
+only when options need rich content or search. SwiftUI: `Picker` with the menu
+style, or a sheet for long lists. Compose: `ExposedDropdownMenuBox`, or a
+`ModalBottomSheet` with a list.]
 
 ---
 
@@ -222,33 +263,40 @@ bottom. Close the popup on `_input` detecting click outside its rect.]
 
 **Category**: Layout / Input
 **Status**: Draft
-**When to Use**: A single selectable row in a vertically scrollable list. Achievements,
-quest log entries, settings categories, save file slots. The list is the container;
-this is the row within it.
-**When NOT to Use**: Grid layouts where items exist in two dimensions (use Grid Item).
-Non-selectable content rows (remove hover/focus states and the pressed state).
+**When to Use**: One row in a vertical list: a transaction in the savings history,
+a notification in the inbox, a settings row, a goal in the goal list. The list is
+the container; this is the row.
+**When NOT to Use**: Two-dimensional layouts (use Grid Item). Non-interactive
+rows (remove the hover, focus and pressed states). Dense, multi-column,
+sortable data for operators (use the Data Table pattern in
+`.claude/docs/templates/guidance/interaction-pattern-library-guide-service-specific.md`).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Full-width row. Icon (optional, left). Primary label. Secondary label / metadata (right or below primary). Chevron (right, if navigates deeper). | — | — | — | — |
-| Hovered | Row background at 12% opacity highlight. | Mouse over | — | 60ms | — |
-| Focused | Focus ring on row OR row background at 20% opacity (consistent with platform convention). | D-pad / Tab | — | 60ms | [UI focus sound] |
-| Selected (persistent) | Row background at 25% opacity. May show a selection indicator (left border, checkmark). Distinct from focused state — a row can be selected but not focused. | — | Rendered state | — | — |
-| Pressed / Activated | Brief brightness flash, then navigates or performs action | Click / Enter / A / Cross | Navigation or action | 80ms flash | [UI confirm sound] |
-| Disabled | 40% opacity. No interaction. | — | — | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Full-width row: leading icon or avatar (optional), primary text, secondary text, trailing value or chevron | — | — | — | — |
+| Hovered (pointer) | Row background tint | Pointer over | — | 60ms | — |
+| Focused (keyboard) | Focus ring on the row | Tab or arrow keys (within a listbox) | — | 60ms | Screen reader reads the row as one item |
+| Pressed | Brief highlight (ripple on Android, highlight on iOS), then navigates or acts | Click / Enter / tap | Navigation or action | 80ms | — |
+| Selected (persistent) | Selection indicator (check, leading bar) distinct from focus | — | Rendered state | — | Screen reader: "selected" |
+| Swipe actions (mobile, optional) | Revealed actions (e.g. "Mark as read," "Delete") | Swipe | Reveal; full swipe executes non-destructive actions only | 150ms | Haptic at the commit threshold |
+| Disabled | 40% opacity | — | — | — | State exposed |
 
 **Accessibility**:
-- Keyboard/Gamepad: Up/Down arrows or D-pad to move between list items. The list must handle focus cycling — reaching the bottom should stop (not wrap) unless wrapping is explicitly designed.
-- Screen reader: Role: "listitem." Parent list role: "list." Accessible name: primary label content. Metadata (secondary label) is optionally included in the description. Position announced: "Quest Log, 3 of 12."
-- Minimum row height: 44pt / 48dp for touch. For controller-primary platforms, 56px rows are more comfortable.
+- The row is read as one item: "Auto-debit, September 25, 50,000 won, completed"
+  — not four separate elements. Merge descendants on native platforms.
+- Swipe actions are also available without swiping: a context menu, a long-press
+  menu or custom accessibility actions (VoiceOver actions rotor, TalkBack actions).
+- Row height at least 48 dp / 44 pt on touch.
 
-**Implementation Notes**: [Godot: Use a `VBoxContainer` inside a `ScrollContainer`.
-Each row is a custom `Control` or `PanelContainer` with a `_gui_input` override.
-For keyboard navigation inside the scroll container, implement custom focus
-traversal — Godot's default Tab navigation does not scroll the container to keep
-focused items in view. Use `ensure_control_visible()` on the scroll container.]
+**Implementation Notes**: [Web: a `<ul>` of `<li>` with one `<a>` or `<button>`
+covering the row; avoid nested interactive elements. SwiftUI: `List` rows with
+`.accessibilityElement(children: .combine)` and `.swipeActions` plus
+`.accessibilityAction`. Compose: `LazyColumn` items with `Modifier.clickable` and
+`semantics(mergeDescendants = true)`; `SwipeToDismissBox` with
+`customActions`. Long lists are virtualized (react-window or TanStack Virtual,
+`LazyColumn`, `FlashList`).]
 
 ---
 
@@ -256,36 +304,37 @@ focused items in view. Use `ensure_control_visible()` on the scroll container.]
 
 **Category**: Layout / Input
 **Status**: Draft
-**When to Use**: A selectable cell in a two-dimensional grid. Inventory slots,
-ability select, crafting ingredient selection, character portrait selection. The
-grid is the container; this is the cell.
-**When NOT to Use**: Single-column content (use List Item). Non-selectable display
-cells (remove interactive states).
+**When to Use**: A selectable cell in a two-dimensional grid: goal cards on the
+home screen, a template gallery ("Travel," "Emergency fund," "New phone"), a photo
+picker, a bank-logo grid.
+**When NOT to Use**: Single-column content (use List Item). Tabular data with
+columns that mean the same thing in every row (use Data Table).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Empty | Empty slot visual (subtle border or dashed outline). Different from disabled. | — | — | — | — |
-| Populated | Item icon fills cell. Stack count (bottom right, if applicable). Quality indicator (border color or icon overlay). | — | — | — | — |
-| Hovered | Brightness +15%. Tooltip appears after 400ms delay. | Mouse over | — | 60ms | — |
-| Focused | Focus ring (2px, offset 2px). Same brightness as hovered. Tooltip appears after 400ms delay or immediately on gamepad. | D-pad navigation | — | 60ms | [UI focus sound] |
-| Selected (persistent) | Distinct border (thicker, contrasting color). May show selection checkmark. | Click / Enter / A / Cross | Select item. Can coexist with focused state on a different cell. | Instant | [UI select sound] |
-| Pressed | Brief scale 0.95x, then executes action | Double-click / Enter / A / Cross | Action (equip, use, inspect — defined by context) | 80ms | [UI confirm sound] |
-| Locked | Padlock overlay icon on populated content. No hover/focus states. | — | No interaction | — | — |
-| Drag source | Cell dims (50% opacity), drag preview appears at cursor. | Click + drag (mouse only) | Begin drag operation | Instant | [UI grab sound] |
-| Drop target (valid) | Cell brightens, accepting color indicator | Item dragged over | — | 60ms | — |
-| Drop target (invalid) | Red tint or shake animation | Item dragged over invalid slot | — | 60ms | [UI error sound] |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Card or tile: image or icon, title, supporting text or value | — | — | — | — |
+| Hovered (pointer) | Elevation or border change; optional quick actions appear | Pointer over | — | 80ms | — |
+| Focused (keyboard) | Focus ring on the card | Tab / arrow keys (grid pattern) | — | 60ms | Screen reader: card title and key value |
+| Pressed | Brief highlight, then opens the detail | Click / Enter / tap | Navigate | 80ms | — |
+| Selected (multi-select) | Check badge + border; distinct from focus | Space / tap in select mode | Toggle selection | Instant | Screen reader: "selected"; count announced |
+| Reordering | Card lifts; neighbors shift | Long-press + drag (touch), drag (pointer) | Reorder | 150ms | Haptic on lift and drop |
+| Empty slot | Dashed outline with "Add goal" | — | Opens creation | — | — |
+| Locked (plan-gated) | Lock badge with the plan name ("Plus") | — | Opens the upgrade explanation, not an error | — | Screen reader: "[Title], requires Plus" |
 
 **Accessibility**:
-- Keyboard/Gamepad: D-pad or arrow keys navigate cells. The grid must communicate its dimensions to screen readers. Row/column position announced.
-- Screen reader: Role: "gridcell." Parent role: "grid." Accessible name: item name (or "empty slot" for empty cells). State: "selected" when selected, "dimmed" when locked. Position: "row 2, column 3."
-- Tooltips must be reachable by keyboard — they must appear when the cell is focused, not only when hovered.
+- Reordering by drag has a non-drag alternative (SC 2.5.7): "Move up / Move down"
+  actions or a reorder mode with buttons.
+- Card content is one accessible element with one action; secondary actions are
+  separate buttons with their own names.
+- If arrow-key navigation is offered, the grid role and position are exposed.
 
-**Implementation Notes**: [Godot: `GridContainer` with fixed column count. Each
-cell is a custom `Control`. Implement custom D-pad navigation by overriding
-`_gui_input` and calculating the cell to the left/right/above/below based on
-index and column count. `GridContainer` does not provide this natively.]
+**Implementation Notes**: [Web: a list of cards (`<ul>`) with a single link per
+card is usually better than an ARIA grid; use the grid pattern only for true 2D
+keyboard navigation. Reordering: an accessible drag-and-drop library with
+keyboard support (e.g. dnd-kit). SwiftUI: `LazyVGrid` with `.draggable` /
+`.dropDestination` plus accessibility actions. Compose: `LazyVerticalGrid`.]
 
 ---
 
@@ -294,40 +343,40 @@ index and column count. `GridContainer` does not provide this natively.]
 **Category**: Feedback / Layout
 **Status**: Draft
 **When to Use**: A decision or acknowledgment that must be resolved before the
-player can continue. The dialog is blocking — background content is dimmed and
-non-interactive. "Are you sure?", "Your progress will be saved.", error states.
-**When NOT to Use**: Non-blocking notifications (use Toast / Notification). Information
-that can wait until the player is ready (add it to a persistent help system instead).
-Dialogs that should allow the player to continue playing behind them.
+user can continue: "Your session is about to expire," "Leave without saving?",
+a blocking error. Background content is inert.
+**When NOT to Use**: Non-blocking information (use Toast / Notification or an
+inline message). Long forms or multi-step tasks (use a full screen or, on mobile,
+a sheet). Marketing interruptions.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Opening | Background overlay animates from 0 to 60% opacity. Dialog panel scales from 0.9 to 1.0. Dialog enters from center (not from an edge). | Triggered by code | Focus moves to first interactive element in dialog (or the Primary button) | 200ms ease-out | [UI modal open sound] |
-| Active | Background non-interactive. Dialog has all input focus. Player cannot interact with background. | Keyboard / gamepad navigates within dialog only | — | — | — |
-| Dismissing (confirmed) | Dialog panel scales to 1.1 then fades. Overlay fades to 0%. | Primary button pressed | Execute action, return focus to trigger element | 180ms | [UI confirm sound] |
-| Dismissing (cancelled) | Dialog panel scales to 0.9 then fades. Overlay fades to 0%. | Secondary button / Escape / B / Circle | No action, return focus to trigger element | 150ms | [UI cancel sound] |
-| Cannot dismiss | If the dialog represents a blocking error, do not provide a cancel path. Provide only resolution options. | — | — | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Opening | Scrim fades in; dialog fades and scales from 0.96 to 1.0 in the center (mobile: may be a bottom sheet) | Triggered by code or user action | Focus moves to the dialog title or first control | 200ms ease-out | Screen reader: dialog title announced |
+| Active | Background inert; focus trapped in the dialog | Tab / Shift+Tab cycle inside | — | — | — |
+| Confirmed | Dialog closes | Primary button | Execute action; focus returns to the trigger | 150ms | — |
+| Cancelled | Dialog closes | Secondary button / Esc / scrim click (if allowed) / system back | No action; focus returns to the trigger | 150ms | — |
+| Not dismissible | No cancel path; only resolution options | — | — | — | — |
 
-> **Focus trap rule**: While a modal dialog is open, Tab and D-pad navigation
-> must cycle within the dialog's interactive elements only. It must not be possible
-> to navigate focus outside the dialog to the background content. This is both
-> an accessibility requirement (WCAG 2.1 SC 2.1.2) and a UX integrity requirement.
-> When the dialog closes, focus must return to the element that triggered it,
-> not to the top of the page.
+> **Focus trap rule**: While a modal dialog is open, Tab and Shift+Tab cycle only
+> within the dialog, and assistive technology cannot reach the background. When
+> the dialog closes, focus returns to the element that opened it — not to the top
+> of the page. (WCAG 2.2 SC 2.4.3 Focus Order; the dialog must not become a
+> keyboard trap — SC 2.1.2 — because Esc or a close button always leaves it.)
 
 **Accessibility**:
-- Screen reader: Dialog container role: "dialog." Accessible name: dialog title (required — every dialog must have a title, even if visually hidden). On open, screen reader announces dialog title and first focusable element. Focus trap active.
-- Keyboard: Escape key always maps to the cancel/dismiss action (same as Secondary button or close button). Enter always maps to the primary/confirm action.
-- Motion reduction: Scale animation replaced with instant appear/disappear. Overlay fade retained at 100ms (faster).
+- Role dialog (or alertdialog for urgent decisions); an accessible name from the
+  visible title — every dialog has a title.
+- Esc triggers cancel; system back (Android) and swipe-down on an iOS sheet do the
+  same.
+- Reduced motion: no scale; fade only.
 
-**Implementation Notes**: [Godot: Implement as a `CanvasLayer` with a high layer
-value (100+) to ensure it renders above all game content. The background overlay
-is a full-screen `ColorRect` at 60% black opacity. Use `grab_focus()` on the
-dialog's primary button after the open animation completes. Override `_input()` to
-implement the focus trap — intercept Tab navigation and reroute to the dialog's
-focusable elements.]
+**Implementation Notes**: [Web: the native `<dialog>` element with `showModal()`
+gives focus trapping, the inert background and Esc for free; otherwise an
+accessible dialog primitive. Set `inert` on the rest of the page for custom
+dialogs. SwiftUI: `.alert` / `.confirmationDialog` for simple decisions,
+`.sheet` for content. Compose: `AlertDialog` / `ModalBottomSheet`.]
 
 ---
 
@@ -335,33 +384,38 @@ focusable elements.]
 
 **Category**: Feedback / Layout
 **Status**: Draft
-**When to Use**: The specific case of confirming a destructive action. Always
-triggered by Button (Destructive). Always has exactly two options: confirm (labeled
-with the specific action, not "OK") and cancel.
-**When NOT to Use**: Non-destructive confirmations. Errors or notifications that
-do not require a decision. Any dialog with more than two actions.
+**When to Use**: Confirming a destructive or money-moving action. Always triggered
+by Button (Destructive) or by the final step of a payment. Exactly two actions:
+confirm (labelled with the specific action) and cancel.
+**When NOT to Use**: Non-destructive confirmations ("Are you sure you want to
+save?" — just save). Errors that need no decision. Dialogs with more than two
+actions.
 
-> **Label rule**: The confirm button must be labeled with the specific action,
-> not a generic "OK" or "Yes." "Delete Save File" not "OK." "Leave Match" not
-> "Yes." This reduces mistakes for players who have difficulty reading the dialog
-> content quickly. The pattern comes from Apple HIG and is validated by decades
-> of usability research.
+> **Label rule**: The confirm button names the action — "Delete account," "Cancel
+> subscription," "Remove card" — never "OK" or "Yes." A user skimming the dialog
+> should be able to tell what the button does from the button alone.
 
 **Structure**:
-- Title: Brief, action-describing. "Delete save file?" not "Are you sure?"
-- Body: One sentence stating the consequence. "This cannot be undone."
-- Confirm button: Button (Primary) — labeled with the specific action. "Delete Save File."
-- Cancel button: Button (Secondary) — "Cancel."
-- Default focus: Cancel (safer default — reduces accidental destructive actions).
+- Title: the action as a question — "Cancel your Plus subscription?", not "Are you
+  sure?"
+- Body: the consequence in one or two sentences — "Plus stays active until
+  October 31. Your goals and history stay; auto-save rules beyond 3 goals pause."
+- Confirm button: Button (Destructive) — "Cancel subscription."
+- Cancel button: Button (Secondary) — "Keep Plus."
+- Default focus: the cancel button (the safer default).
+- High-stakes variants: account deletion adds re-authentication before this
+  dialog; bulk deletion in the admin console asks the operator to type the
+  record count or the word shown.
 
-**Accessibility**: Inherits all Modal Dialog accessibility. Additionally: screen
-reader announces "Alert dialog, [title]" to signal destructive context. Default
-focus on Cancel is a requirement, not a preference.
+**Accessibility**: Inherits Modal Dialog. Role alertdialog so screen readers
+announce the urgency; the body is the dialog's description; default focus on
+Cancel is a requirement, not a preference.
 
-**Implementation Notes**: [Confirmation Dialog is a specific instance of Modal
-Dialog — implement it as a subclass or as a parameterized scene. The default
-focus on Cancel is critical: set `grab_focus()` on the Cancel button, not the
-Confirm button, after open animation completes.]
+**Implementation Notes**: [Implement as a parameterized Modal Dialog (title,
+body, confirm label, destructive flag). The destructive action executes only in
+the confirm handler; the server independently validates the request. SwiftUI:
+`.confirmationDialog` with `role: .destructive` and `role: .cancel`. Compose:
+`AlertDialog` with the destructive color on the confirm button.]
 
 ---
 
@@ -369,35 +423,41 @@ Confirm button, after open animation completes.]
 
 **Category**: Feedback
 **Status**: Draft
-**When to Use**: Brief, non-blocking information that does not require a player
-decision. "Game saved." "Achievement unlocked." "Your inventory is full." The player
-can continue playing; the notification disappears on its own.
+**When to Use**: Brief, non-blocking confirmation that needs no decision: "Saved,"
+"Link copied," "Goal archived." On Android and the web a **snackbar** variant adds
+one action — "Undo" or "Retry."
 **When NOT to Use**: Information that requires a decision (use Modal Dialog).
-Errors that require the player to take action. Critical information that the player
-must not miss.
+Errors the user must act on to continue (use an inline message or a global
+banner — see the app shell's `## Notifications & Banners`). Anything the user
+must not miss — toasts are easy to miss by design.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Entering | Slides in from screen edge (typically bottom-right, away from primary action areas). Fades from 0 to 100% opacity. | Triggered by code | — | 200ms ease-out | [Sound matching notification type — see Sound Standards] |
-| Displayed | Full opacity. Optional: icon (left), title, body text (optional), dismiss button (X, optional). | Pointer hover pauses auto-dismiss timer | Pause auto-dismiss | — | — |
-| Auto-dismiss | Fades from 100 to 0% opacity, slides out | Timer expires (5 seconds default for one-line; 8 seconds for two-line) | Remove from queue | 200ms ease-in | — |
-| Manual dismiss | Fades and slides out immediately | Click/tap X button or swipe on touch | Remove | 150ms | [UI cancel sound, quiet] |
-| Queue overflow | New notification pushes oldest out early | New notification triggered while previous is displayed | FIFO queue, max 3 simultaneous | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Entering | Slides up from the bottom (above the tab bar on mobile) or appears top-right on wide web | Triggered by code | — | 200ms ease-out | Screen reader: message announced politely |
+| Displayed | Icon, message, optional action ("Undo"), optional close | Pointer hover or keyboard focus pauses the timer | Pause auto-dismiss | — | — |
+| Auto-dismiss | Fades out | Timer expires (4s default; 6s or more with an action; never under 4s) | Removed | 200ms ease-in | — |
+| Action | Performs Undo / Retry | Click / tap / keyboard | Execute; toast closes | — | Screen reader announces the result |
+| Manual dismiss | Closes | Close button / swipe | Removed | 150ms | — |
+| Queue | Next toast waits until the current one closes | New toast while one is shown | FIFO, one at a time on mobile | — | — |
 
 **Accessibility**:
-- Screen reader: Toasts must be read aloud without requiring focus. In HTML, this uses `role="status"` or `role="alert"`. In game UI, this requires the engine's accessibility notification system. Verify engine support in engine-reference docs.
-- Motion reduction: Slide animation replaced with fade only.
-- Toasts must never be the sole communication channel for information the player needs to act on. If the information requires action, use a persistent UI element in addition to the toast.
-- Auto-dismiss timer: 5 seconds is the minimum. Players with cognitive processing differences may need more time. Consider a setting to extend to 10 or 15 seconds.
+- Announced without moving focus: a polite live region (`role="status"`) on the
+  web; `UIAccessibility.post(notification: .announcement, …)` / the SwiftUI
+  announcement API on iOS; a live-region semantics node on Android (Compose
+  `liveRegion`), rather than the older imperative announcement call.
+- An action inside a toast must be reachable by keyboard and screen reader before
+  the toast disappears — pause the timer on focus, and make every action also
+  available elsewhere (the undo of a deletion also exists as "Restore" in the
+  archive).
+- Reduced motion: fade only.
 
-**Implementation Notes**: [Godot: Manage a queue of `PanelContainer` scenes in a
-`VBoxContainer` anchored to a screen corner. Each toast is instantiated, added to
-the container, then auto-removed after a timer. The container should be on a high
-`CanvasLayer` (50+) but below modal dialogs (100+). Animate using a `Tween` on
-`modulate.a` and `position.x`. When motion reduction is active, skip the position
-animation.]
+**Implementation Notes**: [Web: a single toast region mounted once in the app
+shell; a headless toast library with a live region. iOS has no system toast —
+build it in the component library. Android: `Snackbar` via `SnackbarHostState`
+in Compose. Keep toasts below dialogs and above content in the layering scale the
+design language defines.]
 
 ---
 
@@ -405,36 +465,36 @@ animation.]
 
 **Category**: Feedback
 **Status**: Draft
-**When to Use**: Contextual information that supplements a visible label. Item
-descriptions in inventory. Stat explanations on a character sheet. Setting
-descriptions in accessibility options. The player must be able to access this
-information or proceed without it.
-**When NOT to Use**: Information the player MUST read to complete an action — put
-that in the label or body text, not a tooltip. Tooltips are not discoverable
-on mobile touch without a hover state. On touch-only platforms, use an info button
-that opens a description modal instead.
+**When to Use**: Supplementary information about a visible element — the meaning
+of an icon-only button in the admin console, the definition of "auto-debit day,"
+how a fee is calculated.
+**When NOT to Use**: Information required to complete a task — put it in the label
+or helper text. Touch-first surfaces: there is no hover on a phone, so use an info
+button that opens a bottom sheet ("수수료 안내" — fee details) instead.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
 | Hidden | — | — | — | — | — |
-| Hover trigger | — | Mouse enters element | Begin 400ms delay timer | — | — |
-| Gamepad/keyboard trigger | — | Element receives focus | Begin 300ms delay timer (shorter because navigation is intentional) | — | — |
-| Appearing | Tooltip panel fades in and scales from 0.95 to 1.0. Positioned near element (prefer above, adjust if near screen edge). | Timer expires | Show tooltip | 120ms ease-out | — |
-| Displayed | Tooltip visible. Title (optional). Body text. Max width: 300px. Multiple lines allowed. | — | — | — | — |
-| Hiding | Tooltip fades out | Mouse leaves element / focus moves away | Hide tooltip | 80ms ease-in | — |
+| Hover trigger | — | Pointer enters the element | Start a 400ms delay | — | — |
+| Focus trigger | — | Element receives keyboard focus | Start a 300ms delay | — | — |
+| Appearing | Tooltip fades in near the element, flipping at viewport edges | Delay elapses | Show | 120ms ease-out | Screen reader reads it as the element's description |
+| Displayed | Short text, max width ~280px | Pointer can move onto the tooltip without it closing | Stays visible | — | — |
+| Hiding | Fades out | Pointer leaves / focus moves / Esc | Hide | 80ms ease-in | — |
 
 **Accessibility**:
-- Screen reader: Tooltip content must be accessible without hover. The accessible name of the parent element should include the most critical tooltip information. The full tooltip text is optionally in the `description` property. Screen reader reads tooltip content when element is focused.
-- The delay (300-400ms) prevents accidental tooltip display and is required — instant tooltips are disruptive in gamepad navigation.
-- Tooltip text must meet the same contrast requirements as body text (4.5:1 minimum).
+- Content on hover or focus is dismissible (Esc), hoverable and persistent
+  (WCAG 2.2 SC 1.4.13).
+- The tooltip text is the trigger's accessible description (`aria-describedby`);
+  for icon-only buttons, the accessible *name* is set on the button itself, not
+  only in the tooltip.
+- Contrast 4.5:1 like body text.
 
-**Implementation Notes**: [Godot: Attach a custom `TooltipControl` scene as a
-child of the trigger element. Show/hide with a `Timer` node. Position the tooltip
-using a `CanvasLayer` to ensure it appears above all other UI. For screen edges,
-detect if the tooltip rect extends beyond `get_viewport_rect()` and flip the
-position to the opposite side.]
+**Implementation Notes**: [Web: an accessible tooltip primitive, or the Popover
+API for richer content. iOS: `.help()` on iPad/Mac pointer; on iPhone use an info
+button with a popover or sheet. Android: `TooltipBox` for long-press on icon
+buttons; a bottom sheet for explanations.]
 
 ---
 
@@ -442,34 +502,36 @@ position to the opposite side.]
 
 **Category**: Feedback / Layout
 **Status**: Draft
-**When to Use**: Linear progress toward a defined endpoint. Loading screens (time
-to completion), XP fill toward next level, quest objectives with countable progress
-("3 of 10 enemies defeated"), download progress.
-**When NOT to Use**: Circular or radial progress (use a separate Radial Progress
-pattern if needed). Values that fluctuate up and down rapidly (use Health/Resource
-Bar pattern). Values with no defined endpoint.
+**When to Use**: Linear progress toward a defined end: progress toward a savings
+goal ("310,000원 of 500,000원"), onboarding steps (2 of 4), file upload progress.
+Moa's circular progress ring (flag `goals.v2-progress-ring`) follows the same
+rules.
+**When NOT to Use**: Values without an end point. Short waits under about one
+second (show nothing). Unknown-duration loading of content areas (use a skeleton —
+see Loading State in the navigation and feedback guidance).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Track (full width, background color). Fill (left to right, value color). Value label (percentage or N/M, outside or inside fill). | — | — | — | — |
-| Value increasing | Fill width animates to new value | Value changes | Smooth fill animation | 300ms ease-out | [Context-dependent — XP gain has a sound; loading has none] |
-| Value at maximum | Fill reaches full width. Optional: completion animation (pulse, glow). | Value reaches 100% | Completion event fires | 200ms | [Completion sound if appropriate] |
-| Value at zero | Fill hidden (zero width). Track still visible. | — | — | — | — |
-| Indeterminate (unknown duration) | Animated loop (fill segment moves left-to-right, repeat). Used for loading of unknown duration. | — | — | Infinite loop | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Track, fill, value label ("62%" and the amounts) | — | — | — | — |
+| Value increasing | Fill animates to the new value | Value changes | Smooth fill | 300ms ease-out | — |
+| Complete | Fill full; completion treatment (check, color) plus text ("Goal reached") | Value reaches 100% | Completion event | 200ms | Haptic: success (mobile); announced |
+| Indeterminate | Looping segment | Unknown duration | — | Loop | Screen reader: "in progress", no value |
+| Error (uploads) | Fill stops; error color plus an icon and a Retry action | Failure | — | — | Error announced |
 
 **Accessibility**:
-- Screen reader: Role: "progressbar." Accessible name: what is progressing (e.g., "Experience Points," "Loading"). Value: current numeric value AND percentage AND maximum. "Experience Points, 450 of 1000, 45 percent." Update on significant changes (not every pixel).
-- Do not rely only on fill color to communicate value. Include a numeric label.
-- Indeterminate progress bars: announce "Loading, in progress" — do not announce changes since the value is unknown.
-- Motion reduction: Indeterminate animation is replaced with a static "loading" indicator. Smooth fill animation is replaced with instant jump to new value.
+- Role progressbar with value, min and max; `aria-valuetext` carries the human
+  wording ("310,000 won of 500,000 won, 62 percent").
+- Announce significant milestones (every 25%, completion), not every change.
+- Never rely on fill color alone — the numeric label is always present.
+- Reduced motion: the value jumps instead of animating; indeterminate loops become
+  a static "in progress" indicator.
 
-**Implementation Notes**: [Godot: `ProgressBar` built-in with custom theming.
-For indeterminate mode, `ProgressBar` does not have a native indeterminate state
-in Godot 4.x — implement using a looping `Tween` on a fill element's position.
-Ensure the Tween is paused when motion reduction mode is active and a static
-indicator is shown instead.]
+**Implementation Notes**: [Web: `<progress>` or `role="progressbar"`. SwiftUI:
+`ProgressView(value:total:)` with `.accessibilityValue`. Compose:
+`LinearProgressIndicator(progress = { … })` / `CircularProgressIndicator` with
+`semantics { progressBarRangeInfo = … }`.]
 
 ---
 
@@ -477,39 +539,50 @@ indicator is shown instead.]
 
 **Category**: Input
 **Status**: Draft
-**When to Use**: Text entry. Player name on a new save, search within a list,
-remapping a key binding (special case — shows the key press, not typed text),
-entering a numeric value precisely.
-**When NOT to Use**: Selecting from known options (use Dropdown or List). On
-console-primary platforms, minimize text entry — it requires a virtual keyboard,
-which is high friction.
+**When to Use**: Free text or precise values: email, name, a savings amount, a
+phone number, a search query, a one-time code (see the OTP pattern in the
+service-specific guidance for the code-entry specifics).
+**When NOT to Use**: Choosing from known options (use Dropdown / Select or a
+list). Dates (use the Date & Time Picker pattern).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default | Field border, placeholder text (label-style, muted color), empty input area. | — | — | — | — |
-| Hovered | Border brightens slightly | Mouse over | — | 60ms | — |
-| Focused | Border brightens fully. Cursor (blinking, 530ms on/530ms off). Placeholder text hidden. | Tab / click | Open virtual keyboard on console/mobile | Instant | [UI focus sound] |
-| Typing | Characters appear. Cursor advances. | Keyboard input | Update field value | Immediate | [Subtle keystroke sound, optional] |
-| Value present | Field shows typed value. Placeholder hidden. Clear button appears (X, right of field) if value is non-empty. | — | — | — | — |
-| Character limit reached | No further input accepted. Optional: brief shake animation and limit indicator changes color. | Input at limit | Reject further characters | 200ms shake | [UI error sound, subtle] |
-| Clear | Field empties. Cursor returns. Clear button disappears. | Click X / gamepad clear input | Clear value | Instant | [UI cancel sound, subtle] |
-| Validation error | Border turns error color (red — ensure colorblind safe). Error message appears below field. | On submit or on blur | Show error | Instant | [UI error sound] |
-| Validated / correct | Border turns success color (green — ensure colorblind safe). Success icon optional. | On validation pass | — | Instant | — |
-| Disabled | 40% opacity, no interaction. Value still visible. | — | — | — | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Default | Visible label above the field; helper text below if needed; empty field | — | — | — | — |
+| Hovered (pointer) | Border strengthens | Pointer over | — | 60ms | — |
+| Focused | Border in the focus color, caret visible; mobile shows the right keyboard | Tab / click / tap | Keyboard opens (mobile) | Instant | Screen reader: "[Label], text field, [helper text]" |
+| Typing | Characters appear; formatting applied without moving the caret | Keyboard | Value updates | Immediate | — |
+| Value present | Clear button (×) where useful (search) | — | — | — | — |
+| Limit reached | Counter shows "20/20"; further input rejected | Input at limit | Reject | — | Screen reader: limit announced |
+| Error | Error border + icon + message below the field | On blur or submit (see Form & Inline Validation) | Show error | Instant | Error announced; `aria-invalid` |
+| Valid (where useful) | Success icon for fields users worry about (password rules met) | On validation | — | Instant | — |
+| Disabled / read-only | Disabled: 40% opacity; read-only: no border, text selectable | — | — | — | State exposed |
+
+**Service-specific field rules**:
+- **Amounts (KRW)**: numeric keyboard (`inputmode="numeric"`), thousands
+  separators while typing (`12,000`), the unit after the value (`원`), no decimal
+  places (KRW has no minor unit), quick-add chips ("+1만," "+5만," "+10만") next to
+  the field rather than a slider.
+- **Phone numbers (Korea)**: numeric keyboard, formatted `010-1234-5678` as typed,
+  stored in E.164 (`+821012345678`).
+- **Email**: `type="email"`, `autocomplete="email"`, no automatic capitalization.
+- **Never collect a resident registration number (주민등록번호)** unless a law
+  requires it — identity verification services return what is needed instead.
 
 **Accessibility**:
-- Keyboard: All standard text editing shortcuts (Home, End, Ctrl+A, Ctrl+C, Ctrl+V, Ctrl+Z).
-- Screen reader: Role: "textbox." Accessible name: field label (not placeholder text). Current value announced. Character limit announced when reached. Validation errors announced immediately on occurrence.
-- Placeholder text must not be used as the only label — a visible label above or beside the field is required. Placeholder text disappears when the player types, causing confusion for players with cognitive or memory impairments.
+- A visible label is required; the placeholder is an example, never the label
+  (WCAG 2.2 SC 3.3.2).
+- `autocomplete` values for personal data (SC 1.3.5).
+- Errors are text, linked to the field, announced (SC 3.3.1).
+- Paste is always allowed — including in password and code fields (SC 3.3.8).
 
-**Implementation Notes**: [Godot `LineEdit`: set `placeholder_text` for the hint
-but always include a visible `Label` node as the field's accessible name. Bind
-`text_changed` signal for real-time validation. Bind `text_submitted` for form
-submission on Enter. On console, `LineEdit.call("_popup_keyboard")` or use the OS
-virtual keyboard API — verify against engine-reference/godot/ for Godot 4.6
-console keyboard API specifics.]
+**Implementation Notes**: [Web: `<label for>` + `<input>`; `aria-describedby`
+pointing at helper and error text; format amounts with `Intl.NumberFormat('ko-KR')`
+without fighting the caret (format on a controlled value, keep the raw digits).
+SwiftUI: `TextField` with `.keyboardType(.numberPad)` and `.textContentType`.
+Compose: `OutlinedTextField` with `KeyboardOptions(keyboardType =
+KeyboardType.Number)` and a `VisualTransformation` for separators.]
 
 ---
 
@@ -517,37 +590,36 @@ console keyboard API specifics.]
 
 **Category**: Navigation
 **Status**: Draft
-**When to Use**: Dividing a single screen's content into discrete sections where
-only one section is visible at a time. Character sheet tabs (Stats / Equipment /
-Skills), settings tabs (Gameplay / Graphics / Audio / Accessibility). Maximum
-5-6 tabs before the pattern breaks down and a sidebar navigation should be
-considered instead.
-**When NOT to Use**: More than 6 tabs. Content that benefits from simultaneous
-visibility (use a layout pattern instead). Navigation between different screens
-(use Screen Push).
+**When to Use**: Switching between sibling views of one screen: History "All /
+Deposits / Withdrawals," Goal detail "Overview / Rules / History," admin user
+detail "Profile / Payments / Notifications." On iOS a segmented control is the
+native equivalent for 2–4 short options.
+**When NOT to Use**: Top-level app navigation (that is the app shell's tab bar —
+`design/ux/app-shell.md`). More than about 5 sections (use a list or a sidebar).
+Content users need to see side by side.
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Default (inactive tab) | Tab label. No active indicator. | — | — | — | — |
-| Active tab | Tab label. Active indicator (underline, fill, or contrasting background). Content area shows this tab's content. | — | — | — | — |
-| Hovered (inactive) | Tab background fills slightly | Mouse over | — | 60ms | — |
-| Focused (keyboard/gamepad) | Focus ring on tab label. | Tab key (within tab bar) or D-pad left/right on tab row | — | 60ms | [UI focus sound] |
-| Activated | Active indicator transitions to this tab. Content area transitions (fade or slide). | Click / Enter / A / Cross | Switch active tab. Content update. | 150ms ease | [UI tab switch sound] |
-| Gamepad shoulder button | — | L1/R1 (PS) or LB/RB (Xbox) | Switch to previous/next tab (standard platform convention) | 150ms | [UI tab switch sound] |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Inactive tab | Label (and optional count) | — | — | — | — |
+| Active tab | Label with an active indicator (underline, fill) and stronger weight | — | Panel shows this tab's content | — | Screen reader: "selected" |
+| Hovered (pointer) | Subtle background | Pointer over | — | 60ms | — |
+| Focused (keyboard) | Focus ring on the tab | Tab into the tab list; arrow keys move between tabs | — | 60ms | Screen reader: "[Label], tab, 2 of 3" |
+| Activated | Indicator moves; panel content switches | Click / tap / Enter / Space (or on arrow focus, if automatic activation) | Switch panel; URL or state updates | 150ms | Haptic: selection (mobile) |
+| Swipe (mobile, optional) | Panels swipe horizontally | Horizontal swipe | Switch tab | 250ms | — |
 
 **Accessibility**:
-- Keyboard: Arrow keys navigate between tabs within the tab bar (left/right). Tab key moves focus into the content area below. This follows the ARIA tab panel pattern.
-- Screen reader: Role: "tab" for individual tabs. Role: "tablist" for the container. Role: "tabpanel" for the content area. Active tab state: "selected." Accessible name: tab label. Tabpanel is labeled by its corresponding tab.
-- The active tab must be visually distinguishable by more than color alone (underline, fill pattern, or weight change in addition to color).
+- The ARIA tabs pattern: `tablist` / `tab` / `tabpanel`; Left/Right arrows move
+  between tabs, Tab moves into the panel; Home/End jump to the first/last tab.
+- The active tab is distinguishable by more than color (indicator shape, weight).
+- On the web, each tab that represents a meaningful view is reflected in the URL
+  (`?tab=deposits`) so back and refresh restore it.
 
-**Implementation Notes**: [Godot: `TabContainer` built-in. For custom visual
-styling, implement manually with a `HBoxContainer` of tab buttons and a
-`MarginContainer` for content. The shoulder button shortcut (LB/RB) must be
-implemented in the screen's `_input()` override — it is not built into Godot's
-tab system. Check platform conventions: Xbox uses LB/RB; PlayStation uses L1/R1;
-both are the same physical button, so a single binding works.]
+**Implementation Notes**: [Web: an accessible tabs primitive; choose automatic
+activation only when panels render instantly. SwiftUI: `Picker` with
+`.pickerStyle(.segmented)` for short options. Compose: `PrimaryTabRow` / `Tab`
+(Material 3) with a `HorizontalPager` when swipe is supported.]
 
 ---
 
@@ -555,35 +627,35 @@ both are the same physical button, so a single binding works.]
 
 **Category**: Layout
 **Status**: Draft
-**When to Use**: Content that exceeds the visible area of its container. Inventory
-lists, lore entry text, credits, long settings lists. The scroll indicator shows
-the player that more content exists.
-**When NOT to Use**: Content that can be paginated instead (pagination may be
-clearer for dense list navigation). Infinite scroll (always provide a loading
-state and an end state).
+**When to Use**: Content longer than its viewport: the savings history, the
+notifications inbox, terms and privacy texts, a long settings screen. The page
+itself is the default scroll container; nested scroll regions are the exception.
+**When NOT to Use**: Nested scroll areas inside a scrolling page on mobile (they
+trap touch scrolling). Data an operator needs to compare across pages (use Data
+Table pagination).
 
 **Interaction Specification**:
 
-| State | Visual | Input | Response | Duration | Audio |
-|-------|--------|-------|----------|----------|-------|
-| Content fits | No scrollbar visible (or always-visible scrollbar at full height, depending on art direction). | — | — | — | — |
-| Scrollable | Scrollbar appears (right edge). Scrollbar thumb size represents viewport vs. content ratio. | — | — | — | — |
-| Scrolling (mouse) | Content moves. Scrollbar thumb moves proportionally. | Mouse wheel | Scroll by 3 lines per wheel tick (configurable in OS) | Smooth | — |
-| Scrollbar drag | Content moves. Thumb follows pointer. | Click + drag scrollbar thumb | Scroll proportionally | Real time | — |
-| Keyboard scroll | Content moves one item height per keypress. | Up/Down arrows when container is focused and no child is focused | Scroll by one unit | Immediate | — |
-| Gamepad scroll | Content moves to keep focused item in view. | D-pad navigation to items beyond visible area | Auto-scroll to keep focused item visible | Smooth 150ms | — |
-| Scroll top / bottom | Content stops. Scrollbar thumb at end. | Content boundary reached | Stop scrolling | — | — |
-| Focus follows scroll | When a child element receives focus, scroll container ensures it is fully visible. | Any child receives focus | Scroll to reveal focused element | 200ms ease | — |
+| State | Visual | Input | Response | Duration | Feedback |
+|-------|--------|-------|----------|----------|----------|
+| Content fits | No scroll indicator | — | — | — | — |
+| Scrollable | Platform scroll indicator; optional fade edges | — | — | — | — |
+| Scrolling | Content moves | Wheel / trackpad / touch / keyboard (Space, Page Down, arrows) | Native scrolling | Native | — |
+| Focus follows | A focused element scrolls into view, clear of sticky headers and bottom bars | Tab to an off-screen element | Scroll into view | Smooth, or instant under reduced motion | — |
+| Scroll to top | Tapping the status bar (iOS) or re-tapping the active tab returns to the top | — | Scroll to top | Smooth | — |
+| Scroll restoration | Returning via back restores the previous position | Back navigation | Restore | Instant | — |
+| End reached | End-of-list state or the next page loads (see Pagination / Infinite Scroll) | — | — | — | — |
 
 **Accessibility**:
-- Keyboard/Gamepad: The scroll container itself should not require explicit scrollbar interaction — navigating list items inside it should auto-scroll to keep focused items in view.
-- Screen reader: The scroll container announces "scrollable" and the scroll position ("showing items 5 through 15 of 30"). This requires engine accessibility support — verify in engine-reference/godot/.
-- Fade edges (content fading at scroll boundaries to indicate more content exists) are a helpful visual affordance but must not be the only indicator that content exists beyond the visible area. Include a scrollbar.
+- A scrollable region that is not the page must be keyboard focusable
+  (`tabindex="0"` with a label) so keyboard users can scroll it.
+- Sticky headers and bottom bars never hide the focused element (WCAG 2.2 SC 2.4.11)
+  — use `scroll-padding` on the web.
+- Fade edges are only a hint; the scroll indicator stays.
 
-**Implementation Notes**: [Godot `ScrollContainer`: call `ensure_control_visible()`
-on the focused child whenever `gui_focus_changed` fires inside the container.
-Bind this via a recursive `connect` on the container's `gui_focus_changed` signal.
-For smooth scroll animation, use a `Tween` on `scroll_vertical` rather than
-setting it directly.]
+**Implementation Notes**: [Web: rely on document scrolling; restore scroll
+position on back (the router's scroll restoration); virtualize very long lists.
+SwiftUI: `ScrollView` / `List` with `ScrollViewReader` for programmatic scrolling.
+Compose: `LazyColumn` with `rememberLazyListState` saved across navigation.]
 
 ---

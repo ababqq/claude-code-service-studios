@@ -1,7 +1,7 @@
 # Agent Teams (experimental — opt-in)
 
-> On-demand reference. Demoted out of `coordination-rules.md` (an always-loaded
-> CLAUDE.md import) in v1.1 — read this when actually considering a team, not
+> On-demand reference, kept out of `coordination-rules.md` (an always-loaded
+> CLAUDE.md import) — read this when actually considering a team, not
 > on every turn.
 
 Multiple independent Claude Code *sessions* running simultaneously, coordinated
@@ -12,7 +12,7 @@ Requires the `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` environment variable.
 
 - Work spans multiple subsystems that will not touch the same files
 - Each workstream would take >30 minutes and benefits from true parallelism
-- A senior agent (technical-director, producer) needs to coordinate 3+ specialist
+- A senior agent (technical-director, delivery-manager) needs to coordinate 3+ specialist
   sessions working on different epics simultaneously
 
 ## Do not use agent teams when

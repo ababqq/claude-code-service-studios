@@ -1,140 +1,133 @@
-# Game Pitch: [Title]
+# Pitch: [Product Name]
 
-*Version: [Draft Number]*
-*Date: [Date]*
+> **Version**: [draft number]
+> **Date**: [YYYY-MM-DD]
+> **Audience**: [seed investors / accelerator / internal investment committee / partner]
+> **Source brief**: [`design/product/product-brief.md` or `design/product/one-pager.md`]
 
----
+> [The hook — one sentence that makes the reader want the next paragraph.]
 
-## The Hook
+<!--
+`/brainstorm pitch` writes this file to `design/product/pitch.md` from the product
+brief (or the one-pager at `minimal`). The brief stays the source of truth: when
+the two disagree, fix the brief first and regenerate the pitch.
 
-> [One powerful sentence. If someone reads nothing else, this should make them
-> curious.]
+Structure follows the problem → solution → why now → market → traction → business
+model → team → ask order most seed investors in Silicon Valley and Korea expect; the
+sections map one-to-one onto slides if the team builds a deck from it.
 
----
+SOURCING RULE — every market number, growth rate, competitor fact and traction
+figure carries `(Source: <url or internal report path>, retrieved YYYY-MM-DD)` or is
+labelled `Assumption:`. A number without either is removed, not softened. Traction
+comes only from evidence on disk (prototype reports, usability reports, analytics
+readouts) or figures the user supplies.
 
-## What Is It?
-
-[2-3 sentences expanding the hook into a clear picture. Genre, setting, core
-mechanic, and what makes it special.]
-
----
-
-## Why Now?
-
-[Why is this the right game at the right time? Market trends, audience gaps,
-technology enablers, cultural relevance.]
-
----
-
-## Target Audience
-
-**Primary**: [Who is the core audience? Be specific — not "gamers" but
-"roguelike fans who enjoy build-crafting and short sessions"]
-
-**Secondary**: [Adjacent audience who would also enjoy this]
-
-**Market Size**: [Estimated TAM based on comparable titles]
+Examples use Moa, a B2C subscription savings app for the Korean market; numbers in
+the examples are placeholders, not facts. Delete these comments before sharing.
+-->
 
 ---
 
-## Comparable Titles
+## Problem
 
-| Title | Similarity | Our Differentiation | Commercial Performance |
-| ---- | ---- | ---- | ---- |
-| [Game 1] | [What's similar] | [What's different/better] | [Revenue/units if known] |
-| [Game 2] | [What's similar] | [What's different/better] | [Performance] |
-| [Game 3] | [What's similar] | [What's different/better] | [Performance] |
+[Who has the problem, how often, how painful, and what it costs them — in two or
+three sentences, with the strongest evidence you have (quotes by participant ID,
+data with its source).]
 
----
-
-## Core Experience
-
-### The Player Fantasy
-[What does the player get to BE or DO? The emotional promise.]
-
-### Core Loop (30 seconds)
-[Describe the primary activity]
-
-### Session Flow (30 minutes)
-[What does a typical session look like start to finish?]
-
-### Progression Hook
-[Why do players come back tomorrow?]
+*Example (Moa)*: "Salaried people set savings goals and plan to transfer money on
+payday; within a few months most skip a transfer and abandon the goal. 7 of 9
+interviewees described exactly this (P1–P9)."
 
 ---
 
-## Key Features
+## Solution
 
-1. **[Feature Name]**: [1-2 sentence description of what it is and why it
-   matters to the player]
-2. **[Feature Name]**: [Description]
-3. **[Feature Name]**: [Description]
-4. **[Feature Name]**: [Description]
-5. **[Feature Name]**: [Description]
+[What the product does, shown through the core user journey and its success
+moment — not a feature list. Link a prototype or a short screen recording if one
+exists.]
 
----
+### Differentiation vs Alternatives
 
-## Visual Identity
-
-[Brief description of the art style, mood, and visual tone. Include reference
-images or mood board link if available.]
-
-**Art Style**: [e.g., "Hand-painted 2D with dynamic lighting, inspired by
-Hollow Knight's atmosphere but with warmer colors"]
+| Alternative | Why users choose it today | Why they will switch |
+|---|---|---|
+| [A bank's installment savings product] | [...] | [...] |
+| [Doing nothing] | [...] | [...] |
 
 ---
 
-## Audio Identity
+## Why Now
 
-[Brief description of the sonic palette and musical direction.]
+[What changed that makes this possible or urgent now — regulation, a platform or
+payment rail, user behaviour, the cost of a key technology — each change sourced.]
 
-**Music**: [e.g., "Adaptive orchestral with folk instruments, shifting based
-on biome and combat intensity"]
+---
 
-**SFX**: [e.g., "Crunchy, satisfying impact sounds. Tactile feedback on every
-player action."]
+## Market (TAM / SAM / SOM)
+
+[Bottom-up first: count the users who could buy, times what they would pay.
+Top-down industry totals only as a cross-check.]
+
+| Layer | Definition | Calculation | Value | Source |
+|---|---|---|---|---|
+| **TAM** | [everyone with the problem] | [number of people × annual price] | [...] | [...] |
+| **SAM** | [the part reachable with this product, channels and regions] | [TAM × share in the target segment and region] | [...] | [...] |
+| **SOM** | [what the team can realistically win in 3 years] | [SAM × achievable share, justified by channel capacity] | [...] | [...] |
+
+*Example (Moa, structure only)*: TAM = salaried workers in Korea × share who save
+toward a goal × Plus price × 12; SAM = the 25–39 segment reachable through app
+store search and referrals; SOM = SAM × a share justified by the acquisition plan.
+Every input comes from a cited statistic or is labelled `Assumption:`.
+
+---
+
+## Traction
+
+[Evidence that the problem is real and the solution works — in order of strength:
+revenue and retention, active usage, waitlist or fake-door conversion, prototype
+and usability results, interview findings. State sample sizes; label small samples
+as directional.]
+
+| Signal | Value | Period | Evidence |
+|---|---|---|---|
+| [fake-door sign-up rate] | [...] | [...] | [`prototypes/<name>-concept/REPORT.md`] |
+| [usability task success on the core journey] | [...] | [...] | [`production/qa/usability/…`] |
+
+[If there is no traction yet, say so and show the plan: the riskiest assumptions
+and the tests that will answer them in the next 8–12 weeks.]
 
 ---
 
 ## Business Model
 
-| Aspect | Plan |
-| ---- | ---- |
-| **Model** | [Premium $X / F2P / etc.] |
-| **Platforms** | [Steam, Console, Mobile] |
-| **Price Point** | [$X.XX] |
-| **DLC/Expansion Plans** | [Post-launch content strategy] |
-| **Monetization Ethics** | [What we will and won't do] |
+| Element | Plan |
+|---|---|
+| **Revenue model** | [subscription / usage / transaction fee / B2B seats — e.g. Free and Plus plans] |
+| **Pricing** | [price points and what each includes — hypothesis until tested] |
+| **Unit economics** | [target CAC, ARPU, gross margin, payback period — current value or target] |
+| **Key costs** | [payment fees, per-message notification costs, infrastructure, support] |
+| **Constraints** | [regulation, platform fees, market norms that shape the model] |
+
+### Go-to-Market
+[First channel and why it fits the segment (app store search, content, referrals,
+partnerships, sales-led for B2B); the first 1,000 users plan; launch markets.]
 
 ---
 
-## Development Plan
+## Team
 
-| Milestone | Duration | Deliverable |
-| ---- | ---- | ---- |
-| Concept & Pre-production | [X weeks] | Game concept, pillars, vertical slice plan |
-| Vertical Slice | [X weeks] | Playable slice demonstrating core loop |
-| Alpha | [X weeks] | All features in, content placeholder |
-| Beta | [X weeks] | Content complete, polish pass |
-| Launch | [Date] | Release build |
+| Name | Role | Why this person for this problem |
+|---|---|---|
+| [...] | [...] | [domain experience, prior products, unfair advantage] |
 
-**Team Size**: [X people, roles]
-**Engine**: [Godot / Unity / Unreal]
-**Estimated Budget**: [Range if applicable]
-
----
-
-## Risks and Mitigation
-
-| Risk | Likelihood | Impact | Mitigation |
-| ---- | ---- | ---- | ---- |
-| [Risk 1] | [H/M/L] | [H/M/L] | [How we handle it] |
-| [Risk 2] | [H/M/L] | [H/M/L] | [Mitigation] |
-| [Risk 3] | [H/M/L] | [H/M/L] | [Mitigation] |
+[Key hires the plan depends on, and advisors if relevant.]
 
 ---
 
 ## The Ask
 
-[What do you need? Funding, publishing deal, team members, feedback? Be
-specific about what you're looking for and what you're offering in return.]
+- **What we are asking for**: [amount and instrument (e.g. a SAFE, RCPS
+  (상환전환우선주), common equity), a partnership, a pilot customer, feedback]
+- **What it buys**: [the milestones it funds — e.g. public launch, a retention
+  target, break-even on a cohort — and the runway in months]
+- **Use of funds**: [split by team, marketing, infrastructure, compliance]
+- **Next step for the reader**: [a meeting, a pilot, an introduction]

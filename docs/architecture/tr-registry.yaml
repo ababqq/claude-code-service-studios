@@ -1,28 +1,46 @@
 # Technical Requirement ID Registry
 #
-# PURPOSE: Persistent, stable IDs for every GDD technical requirement.
+# PURPOSE: Persistent, stable IDs for every PRD technical requirement.
 # Prevents TR-ID renumbering across /architecture-review runs, which would
 # break story references.
 #
 # RULES:
 #   - IDs are PERMANENT. Never renumber, never delete (use status: deprecated).
-#   - Add new entries only at the END of each system's list.
-#   - When a GDD requirement is reworded (same intent): update `requirement`
+#   - Append-only: add new entries only at the END of each feature's list.
+#   - When a PRD requirement is reworded (same intent): update `requirement`
 #     text and add a `revised` date. The ID stays the same.
-#   - When a requirement is removed from the GDD: set status: deprecated.
-#   - When a requirement is split or replaced: set status: superseded-by with
-#     the new TR-ID(s).
+#   - When a requirement is removed from the PRD: set status: deprecated.
+#   - When a requirement is split or replaced: set status to superseded-by with
+#     the new TR-ID(s), quoted (see STATUS VALUES).
 #
-# WRITTEN BY: /architecture-review (appends new entries, never overwrites)
-# READ BY:    /create-stories (embed IDs in stories)
-#             /story-done (look up current requirement text at review time)
+# WRITTEN BY: /architecture-review — the ONLY writer (appends new entries,
+#             never overwrites)
+# READ BY:    /create-stories (embed IDs in stories as **Requirement**)
 #             /story-readiness (validate TR-ID exists and is active)
+#             /dev-story (implement against the current requirement text)
+#             /story-done (look up current requirement text at review time)
 #
-# ID FORMAT: TR-[system-slug]-[NNN]
-#   system-slug = short slug matching the GDD system name
-#   NNN = three-digit zero-padded sequence per system, starting at 001
+# ID FORMAT: TR-[feature-slug]-[NNN]
+#   feature-slug = the PRD stem (design/prd/goals.md -> goals); the same slug is
+#                  the feature_overrides key and the story's **PRD** field
+#   NNN = three-digit zero-padded sequence per feature, starting at 001
 #
-# STATUS VALUES: active | deprecated | superseded-by: TR-[system]-NNN
+# FIELDS:
+#   id            TR-[feature-slug]-[NNN]
+#   feature       feature slug
+#   prd           owning PRD path (design/prd/<feature-slug>.md)
+#   requirement   one-line requirement text, as the PRD states it
+#   type          functional | nfr  (optional; functional = from
+#                 ## Functional Requirements or ## Business Rules & Calculations,
+#                 nfr = from ## Non-Functional Requirements)
+#   nfr_category  optional, nfr only: performance | availability | security |
+#                 privacy | accessibility | localization
+#   created       YYYY-MM-DD
+#   revised       YYYY-MM-DD or ""
+#   status        see STATUS VALUES
+#
+# STATUS VALUES: active | deprecated | "superseded-by: TR-[feature-slug]-NNN"
+#   Quote the superseded-by value: an unquoted second colon is not valid YAML.
 
 version: 1
 last_updated: ""
@@ -31,26 +49,39 @@ requirements: []
 
 # --- EXAMPLE ENTRIES (remove when first real entries are added) ---
 #
-# - id: TR-combat-001
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Player takes damage from enemies based on attack power minus defence"
-#   created: 2026-03-10
+# - id: TR-goals-001
+#   feature: goals
+#   prd: design/prd/goals.md
+#   requirement: "Only the goal's owner can read, change or delete a savings goal"
+#   type: functional
+#   created: 2026-10-05
 #   revised: ""
 #   status: active
 #
-# - id: TR-combat-002
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Combo window timing is 0.4 seconds between hits"
-#   created: 2026-03-10
-#   revised: "2026-04-01"
+# - id: TR-goals-002
+#   feature: goals
+#   prd: design/prd/goals.md
+#   requirement: "The goal list returns within p95 300 ms at 1,000 requests/s"
+#   type: nfr
+#   nfr_category: performance
+#   created: 2026-10-05
+#   revised: "2026-10-20"
 #   status: active
 #
-# - id: TR-combat-003
-#   system: combat
-#   gdd: design/gdd/combat-system.md
-#   requirement: "Old damage formula using raw stats"
-#   created: 2026-03-10
+# - id: TR-goals-003
+#   feature: goals
+#   prd: design/prd/goals.md
+#   requirement: "Progress = settled deposits / target amount, rounded down to 1%, shown as a ring with empty, in-progress and completed states"
+#   type: functional
+#   created: 2026-10-05
 #   revised: ""
-#   status: superseded-by: TR-combat-001
+#   status: active
+#
+# - id: TR-goals-004
+#   feature: goals
+#   prd: design/prd/goals.md
+#   requirement: "Progress counts manual deposits only"
+#   type: functional
+#   created: 2026-10-05
+#   revised: ""
+#   status: "superseded-by: TR-goals-003"

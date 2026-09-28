@@ -1,0 +1,1124 @@
+version: 2
+last_updated: ""
+skills:
+  # One entry per .claude/skills/<name>/SKILL.md, in alphabetical order.
+  # Spec path: skills/<category>/<name>.md — the folder is the category.
+
+  - name: adopt
+    spec: CCSS Skill Testing Framework/skills/utility/adopt.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: api-design
+    spec: CCSS Skill Testing Framework/skills/authoring/api-design.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: authoring
+
+  - name: architecture-decision
+    spec: CCSS Skill Testing Framework/skills/authoring/architecture-decision.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: authoring
+
+  - name: architecture-review
+    spec: CCSS Skill Testing Framework/skills/review/architecture-review.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: critical
+    category: review
+
+  - name: brainstorm
+    spec: CCSS Skill Testing Framework/skills/utility/brainstorm.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: bug-report
+    spec: CCSS Skill Testing Framework/skills/utility/bug-report.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: bug-triage
+    spec: CCSS Skill Testing Framework/skills/utility/bug-triage.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: bundle-audit
+    spec: CCSS Skill Testing Framework/skills/analysis/bundle-audit.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: business-rules-check
+    spec: CCSS Skill Testing Framework/skills/analysis/business-rules-check.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: changelog
+    spec: CCSS Skill Testing Framework/skills/sprint/changelog.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: sprint
+
+  - name: code-review
+    spec: CCSS Skill Testing Framework/skills/analysis/code-review.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: consistency-check
+    spec: CCSS Skill Testing Framework/skills/analysis/consistency-check.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: analysis
+
+  - name: create-architecture
+    spec: CCSS Skill Testing Framework/skills/authoring/create-architecture.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: authoring
+
+  - name: create-control-manifest
+    spec: CCSS Skill Testing Framework/skills/pipeline/create-control-manifest.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: create-epics
+    spec: CCSS Skill Testing Framework/skills/pipeline/create-epics.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: create-stories
+    spec: CCSS Skill Testing Framework/skills/pipeline/create-stories.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: data-model
+    spec: CCSS Skill Testing Framework/skills/authoring/data-model.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: authoring
+
+  - name: design-language
+    spec: CCSS Skill Testing Framework/skills/authoring/design-language.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: authoring
+
+  - name: dev-story
+    spec: CCSS Skill Testing Framework/skills/pipeline/dev-story.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: estimate
+    spec: CCSS Skill Testing Framework/skills/analysis/estimate.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: feature-audit
+    spec: CCSS Skill Testing Framework/skills/analysis/feature-audit.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: gate-check
+    spec: CCSS Skill Testing Framework/skills/gate/gate-check.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: critical
+    category: gate
+
+  - name: help
+    spec: CCSS Skill Testing Framework/skills/utility/help.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: hotfix
+    spec: CCSS Skill Testing Framework/skills/ops/hotfix.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: ops
+
+  - name: incident
+    spec: CCSS Skill Testing Framework/skills/ops/incident.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: ops
+
+  - name: launch-checklist
+    spec: CCSS Skill Testing Framework/skills/utility/launch-checklist.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: load-test
+    spec: CCSS Skill Testing Framework/skills/utility/load-test.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: localize
+    spec: CCSS Skill Testing Framework/skills/utility/localize.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: map-features
+    spec: CCSS Skill Testing Framework/skills/pipeline/map-features.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: milestone-review
+    spec: CCSS Skill Testing Framework/skills/sprint/milestone-review.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: sprint
+
+  - name: onboard
+    spec: CCSS Skill Testing Framework/skills/utility/onboard.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: perf-profile
+    spec: CCSS Skill Testing Framework/skills/analysis/perf-profile.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: postmortem
+    spec: CCSS Skill Testing Framework/skills/ops/postmortem.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: ops
+
+  - name: prd-review
+    spec: CCSS Skill Testing Framework/skills/review/prd-review.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: critical
+    category: review
+
+  - name: project-stage-detect
+    spec: CCSS Skill Testing Framework/skills/utility/project-stage-detect.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: propagate-prd-change
+    spec: CCSS Skill Testing Framework/skills/pipeline/propagate-prd-change.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: prototype
+    spec: CCSS Skill Testing Framework/skills/utility/prototype.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: qa-plan
+    spec: CCSS Skill Testing Framework/skills/utility/qa-plan.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: quick-spec
+    spec: CCSS Skill Testing Framework/skills/authoring/quick-spec.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: authoring
+
+  - name: regression-suite
+    spec: CCSS Skill Testing Framework/skills/utility/regression-suite.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: release-checklist
+    spec: CCSS Skill Testing Framework/skills/utility/release-checklist.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: release-notes
+    spec: CCSS Skill Testing Framework/skills/sprint/release-notes.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: sprint
+
+  - name: retrospective
+    spec: CCSS Skill Testing Framework/skills/sprint/retrospective.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: sprint
+
+  - name: reverse-document
+    spec: CCSS Skill Testing Framework/skills/utility/reverse-document.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: review-all-prds
+    spec: CCSS Skill Testing Framework/skills/review/review-all-prds.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: critical
+    category: review
+
+  - name: rollout-plan
+    spec: CCSS Skill Testing Framework/skills/ops/rollout-plan.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: ops
+
+  - name: scope-check
+    spec: CCSS Skill Testing Framework/skills/analysis/scope-check.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: security-audit
+    spec: CCSS Skill Testing Framework/skills/analysis/security-audit.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: settings
+    spec: CCSS Skill Testing Framework/skills/utility/settings.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: setup-stack
+    spec: CCSS Skill Testing Framework/skills/utility/setup-stack.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: skill-improve
+    spec: CCSS Skill Testing Framework/skills/utility/skill-improve.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: skill-test
+    spec: CCSS Skill Testing Framework/skills/utility/skill-test.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: utility
+
+  - name: smoke-check
+    spec: CCSS Skill Testing Framework/skills/utility/smoke-check.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: sprint-plan
+    spec: CCSS Skill Testing Framework/skills/sprint/sprint-plan.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: sprint
+
+  - name: sprint-status
+    spec: CCSS Skill Testing Framework/skills/sprint/sprint-status.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: sprint
+
+  - name: start
+    spec: CCSS Skill Testing Framework/skills/utility/start.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: story-done
+    spec: CCSS Skill Testing Framework/skills/readiness/story-done.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: critical
+    category: readiness
+
+  - name: story-readiness
+    spec: CCSS Skill Testing Framework/skills/readiness/story-readiness.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: critical
+    category: readiness
+
+  - name: team-content
+    spec: CCSS Skill Testing Framework/skills/team/team-content.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: team-feature
+    spec: CCSS Skill Testing Framework/skills/team/team-feature.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: team-growth
+    spec: CCSS Skill Testing Framework/skills/team/team-growth.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: team-hardening
+    spec: CCSS Skill Testing Framework/skills/team/team-hardening.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: team-qa
+    spec: CCSS Skill Testing Framework/skills/team/team-qa.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: team-release
+    spec: CCSS Skill Testing Framework/skills/team/team-release.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: team-ui
+    spec: CCSS Skill Testing Framework/skills/team/team-ui.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: team
+
+  - name: tech-debt
+    spec: CCSS Skill Testing Framework/skills/analysis/tech-debt.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: test-evidence-review
+    spec: CCSS Skill Testing Framework/skills/analysis/test-evidence-review.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: test-flakiness
+    spec: CCSS Skill Testing Framework/skills/analysis/test-flakiness.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: analysis
+
+  - name: test-helpers
+    spec: CCSS Skill Testing Framework/skills/utility/test-helpers.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: test-setup
+    spec: CCSS Skill Testing Framework/skills/utility/test-setup.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: ui-inventory
+    spec: CCSS Skill Testing Framework/skills/utility/ui-inventory.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: usability-report
+    spec: CCSS Skill Testing Framework/skills/utility/usability-report.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: utility
+
+  - name: ux-design
+    spec: CCSS Skill Testing Framework/skills/authoring/ux-design.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: authoring
+
+  - name: ux-review
+    spec: CCSS Skill Testing Framework/skills/authoring/ux-review.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: low
+    category: authoring
+
+  - name: walking-skeleton
+    spec: CCSS Skill Testing Framework/skills/pipeline/walking-skeleton.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: pipeline
+
+  - name: write-prd
+    spec: CCSS Skill Testing Framework/skills/authoring/write-prd.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: high
+    category: authoring
+
+agents:
+  # One entry per .claude/agents/<name>.md, ordered by tier: directors and leads,
+  # then specialists and operations roles, then the stack family (each layer lead
+  # followed by its sub-specialists).
+  # Spec path: agents/<folder>/<name>.md — folders: director -> directors, lead -> leads,
+  # specialist -> specialists; qa, operations and stack keep the category name.
+
+  - name: product-director
+    spec: CCSS Skill Testing Framework/agents/directors/product-director.md
+    last_spec: ""
+    last_spec_result: ""
+    category: director
+
+  - name: technical-director
+    spec: CCSS Skill Testing Framework/agents/directors/technical-director.md
+    last_spec: ""
+    last_spec_result: ""
+    category: director
+
+  - name: delivery-manager
+    spec: CCSS Skill Testing Framework/agents/directors/delivery-manager.md
+    last_spec: ""
+    last_spec_result: ""
+    category: director
+
+  - name: design-director
+    spec: CCSS Skill Testing Framework/agents/directors/design-director.md
+    last_spec: ""
+    last_spec_result: ""
+    category: director
+
+  - name: product-manager
+    spec: CCSS Skill Testing Framework/agents/leads/product-manager.md
+    last_spec: ""
+    last_spec_result: ""
+    category: lead
+
+  - name: tech-lead
+    spec: CCSS Skill Testing Framework/agents/leads/tech-lead.md
+    last_spec: ""
+    last_spec_result: ""
+    category: lead
+
+  - name: qa-lead
+    spec: CCSS Skill Testing Framework/agents/leads/qa-lead.md
+    last_spec: ""
+    last_spec_result: ""
+    category: lead
+
+  - name: release-manager
+    spec: CCSS Skill Testing Framework/agents/operations/release-manager.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: localization-lead
+    spec: CCSS Skill Testing Framework/agents/operations/localization-lead.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: business-analyst
+    spec: CCSS Skill Testing Framework/agents/specialists/business-analyst.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: monetization-strategist
+    spec: CCSS Skill Testing Framework/agents/operations/monetization-strategist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: backend-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/backend-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: frontend-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/frontend-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: mobile-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/mobile-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: platform-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/platform-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: internal-tools-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/internal-tools-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: ml-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/ml-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: design-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/design-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: product-designer
+    spec: CCSS Skill Testing Framework/agents/specialists/product-designer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: ux-researcher
+    spec: CCSS Skill Testing Framework/agents/specialists/ux-researcher.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: ux-writer
+    spec: CCSS Skill Testing Framework/agents/specialists/ux-writer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: prototyper
+    spec: CCSS Skill Testing Framework/agents/specialists/prototyper.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: performance-engineer
+    spec: CCSS Skill Testing Framework/agents/specialists/performance-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: specialist
+
+  - name: accessibility-specialist
+    spec: CCSS Skill Testing Framework/agents/qa/accessibility-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: qa
+
+  - name: security-engineer
+    spec: CCSS Skill Testing Framework/agents/qa/security-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: qa
+
+  - name: qa-engineer
+    spec: CCSS Skill Testing Framework/agents/qa/qa-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: qa
+
+  - name: devops-engineer
+    spec: CCSS Skill Testing Framework/agents/operations/devops-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: sre-engineer
+    spec: CCSS Skill Testing Framework/agents/operations/sre-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: data-engineer
+    spec: CCSS Skill Testing Framework/agents/operations/data-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: analytics-engineer
+    spec: CCSS Skill Testing Framework/agents/operations/analytics-engineer.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: growth-manager
+    spec: CCSS Skill Testing Framework/agents/operations/growth-manager.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: customer-success-manager
+    spec: CCSS Skill Testing Framework/agents/operations/customer-success-manager.md
+    last_spec: ""
+    last_spec_result: ""
+    category: operations
+
+  - name: web-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/web-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: nextjs-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/nextjs-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: vue-nuxt-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/vue-nuxt-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: mobile-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/mobile-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: react-native-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/react-native-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: flutter-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/flutter-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: ios-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/ios-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: android-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/android-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: backend-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/backend-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: node-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/node-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: spring-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/spring-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: python-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/python-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: data-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/data-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack
+
+  - name: cloud-specialist
+    spec: CCSS Skill Testing Framework/agents/stack/cloud-specialist.md
+    last_spec: ""
+    last_spec_result: ""
+    category: stack

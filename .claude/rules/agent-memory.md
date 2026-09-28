@@ -11,34 +11,38 @@ exemption exists because the memory is the agent's own working notes about how t
 do its job, not a project artifact.
 
 It does **not** extend anywhere else. The Collaboration Protocol still governs
-every file under `src/`, `design/`, `docs/`, `production/` and `assets/`: ask
-first, naming the path. Writing a memory is never a substitute for asking, and a
-memory must never be used to record something the user declined to have written.
+every file in the code roots `project.yaml` declares (`apps/`, `services/`,
+`packages/`, `infra/` or wherever `stack.layers.<layer>.root` points) and every
+file under `design/`, `docs/`, `tests/` and `production/`: ask first, naming the
+path. Writing a memory is never a substitute for asking, and a memory must never
+be used to record something the user declined to have written.
 
 ## Never record a temporary absence as a durable fact
 
 This is the failure this file exists to prevent, and this repo is unusually
 exposed to it.
 
-**CCGS ships as a template the user clones *as their game*.** So on day one every
-agent observes the same things — no `src/`, no GDDs, no engine configured, no
-`tests/performance/` — and every one of those observations is **guaranteed to
-stop being true**. A memory reading *"this repo is the framework, not a game;
-perf requests have no target"* is accurate when written and actively harmful two
-weeks later, when it tells a future run to return BLOCKED on a project that now
-has a build. The agent will not re-derive it; that is what memory is for.
+**CCSS ships as a template the user clones *as their product*.** So on the first
+run every agent observes the same things — no code roots, no PRDs, no stack
+configured (`stack.pinned_on` unset), no `tests/load/` — and every one of those
+observations is **guaranteed to stop being true**. A memory reading *"this repo is
+the framework, not a product; load-test requests have no target"* is accurate when
+written and actively harmful two weeks later, when it tells a future run to return
+BLOCKED on a project that now has an API deployed to staging. The agent will not
+re-derive it; that is what memory is for.
 
 So:
 
-- **Prefer recording a method over a state.** "Confirm an engine project and a
-  captured profile exist before profiling; return BLOCKED naming what is missing
-  rather than estimating" is durable. "There is no game here" is a timestamp.
+- **Prefer recording a method over a state.** "Confirm a declared code root and a
+  reachable staging URL (or a captured trace) exist before profiling; return
+  BLOCKED naming what is missing rather than estimating" is durable. "There is no
+  product here" is a timestamp.
 - **If you must record a state, state what invalidates it**, on the same line:
-  `INVALIDATED WHEN: project.yaml declares an engine, or src/ contains game code.`
+  `INVALIDATED WHEN: project.yaml sets stack.pinned_on, or any stack.layers.<layer>.root contains code.`
   A reader with no other context must be able to tell whether the note still
   holds.
-- **Never record absence of a game, of assets, of tests or of config as a
-  settled property of the project.** Those are the states CCGS exists to move a
+- **Never record absence of a product, of code, of tests or of config as a
+  settled property of the project.** Those are the states CCSS exists to move a
   user out of.
 
 ## Disclose the write

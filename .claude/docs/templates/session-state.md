@@ -56,8 +56,10 @@ or agent picking this up cold.]
   FIELD NOTES
 
   STATUS block
-    Drives the status-line breadcrumb (`Combat System > Melee > Hitboxes`), and
-    only at Production / Polish / Release stage. All three fields are optional —
+    Drives the status-line breadcrumb (`Goals > Progress Ring > Animation`), and
+    only at the Build, Hardening or Launch stage — the last three of the seven
+    (Discovery / Definition / Architecture / Validation / Build / Hardening /
+    Launch). All three fields are optional —
     leave a field blank when it does not apply, and blank all three when there is
     no active focus. Do not delete the markers themselves — `statusline.sh`
     expects them to exist.

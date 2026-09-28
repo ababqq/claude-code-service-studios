@@ -12,7 +12,7 @@ will be compacted or lost. Files on disk persist across compactions and session 
 Maintain `production/session-state/active.md` as a living checkpoint. Update it
 after each significant milestone:
 
-- Design section approved and written to file
+- PRD or UX spec section approved and written to file
 - Architecture decision made
 - Implementation milestone reached
 - Test results obtained
@@ -24,7 +24,7 @@ Two regions, and the distinction is load-bearing:
 
 | Region | Who reads it | Rule |
 |--------|--------------|------|
-| `<!-- STATUS -->` … `<!-- /STATUS -->` | `statusline.sh` (breadcrumb, Production+ only) | Keep the markers even when empty |
+| `<!-- STATUS -->` … `<!-- /STATUS -->` | `statusline.sh` (breadcrumb, Build and later only) | Keep the markers even when empty |
 | `<!-- CHECKPOINT -->` … `<!-- /CHECKPOINT -->` | `session-start.sh` and `pre-compact.sh` | **Overwrite, never append.** Under ~25 lines — hooks inject it verbatim |
 | Everything after `<!-- /CHECKPOINT -->` | humans, and an agent that wants detail | Free-form; no hook injects it |
 
@@ -50,31 +50,34 @@ bash .claude/scripts/rotate-session-state.sh            # --dry-run to preview
 The checkpoint stays, the narrative is appended to a dated log, nothing is
 deleted. `session-start.sh` observes when rotation is due but never performs it.
 
-### Status Line Block (Production+ only)
+### Status Line Block (Build and later only)
 
-When the project is in Production, Polish, or Release stage, include a structured
-status block in `active.md` that the status line script can parse. (The project
-stage is resolved from `project.stage` in `project.yaml`, falling back to
-`production/stage.txt`.)
+When the project is in the Build, Hardening or Launch stage — the last three of the
+seven (Discovery, Definition, Architecture, Validation, Build, Hardening, Launch) —
+include a structured status block in `active.md` that the status line script can
+parse. (The status line takes the stage from the `STAGE:` line of
+`bash .claude/scripts/stage-estimate.sh --quick`: `project.stage` in `project.yaml`
+when it is set, otherwise the estimate from what is on disk.)
 
 ```markdown
 <!-- STATUS -->
-Epic: Combat System
-Feature: Melee Combat
-Task: Implement hitbox detection
+Epic: Goals
+Feature: Progress Ring
+Task: Animation
 <!-- /STATUS -->
 ```
 
 - All three fields (Epic, Feature, Task) are optional — include only what applies
 - Update this block when switching focus areas
-- The status line displays it as a breadcrumb: `Combat System > Melee Combat > Hitboxes`
-- Remove or empty the block when no active work focus exists
+- The status line displays it as a breadcrumb: `Goals > Progress Ring > Animation`
+- Empty the fields when no active work focus exists — keep the markers
 
 After any disruption (compaction, crash, `/clear`), read the state file first.
 
 ### Incremental File Writing
 
-When creating multi-section documents (design docs, architecture docs, lore entries):
+When creating multi-section documents (PRDs in `design/prd/`, the product brief and
+feature map in `design/product/`, UX specs, ADRs, architecture docs):
 
 1. Create the file immediately with a skeleton (all section headers, empty bodies)
 2. Discuss and draft one section at a time in conversation
@@ -99,7 +102,7 @@ This keeps the context window holding only the *current* section's discussion
 
 - Light (read/review): ~3k tokens startup
 - Medium (implement feature): ~8k tokens
-- Heavy (multi-system refactor): ~15k tokens
+- Heavy (multi-module refactor): ~15k tokens
 
 ## Deterministic Helpers — `.claude/scripts/`
 
@@ -116,11 +119,13 @@ Two directories, two purposes — reach for the right one:
 
 Current helpers:
 
-- **`gdd-structure-check.sh`** — which of the 8 standard sections a GDD contains.
-  Replaces a full-document read per GDD, and cannot hallucinate a missing
-  section. Reports **presence only**; the caller applies the workflow tier.
-- **`review-scope.sh`** — which GDDs changed since the last cross-review, plus
-  their declared dependencies. Replaces reasoning through git history.
+- **`prd-structure-check.sh`** — which of the 11 PRD contract sections each PRD
+  in `design/prd/` contains. Replaces a full-document read per PRD, and cannot
+  hallucinate a missing section. Reports **presence only**; the caller applies
+  the workflow tier (8 required at `standard`, all 11 at `full`).
+- **`review-scope.sh`** — which PRDs changed since the last cross-PRD review, plus
+  the dependency edges in their `## Dependencies` tables. Replaces reasoning
+  through git history.
 
 Two rules when adding one:
 
@@ -129,7 +134,7 @@ Two rules when adding one:
    documented `` !`cmd` `` body form, which is preprocessing and is not gated by
    `allowed-tools` (see `.claude/docs/config-resolution.md`).
 2. **Emit observations, not verdicts.** A script that scores or judges will
-   eventually contradict a tier, mode, or per-system override it does not know
+   eventually contradict a tier, mode, or per-feature override it does not know
    about. Report what is on disk and let the caller decide what it means.
 
 ## Subagent Delegation

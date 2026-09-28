@@ -1,44 +1,29 @@
-# Claude Code Game Studios -- Game Studio Agent Architecture
+# Claude Code Service Studios -- Product Studio Agent Architecture
 
-Indie game development managed through 49 coordinated Claude Code subagents.
+Web, mobile and API service development managed through 46 coordinated Claude Code subagents.
 Each agent owns a specific domain, enforcing separation of concerns and quality.
 
 ## Technology Stack
 
-- **Engine**: [CHOOSE: Godot 4 / Unity / Unreal Engine 5]
-- **Language**: [CHOOSE: GDScript / C# / C++ / Blueprint]
-- **Version Control**: Git with trunk-based development
-- **Build System**: [SPECIFY after choosing engine]
-- **Asset Pipeline**: [SPECIFY after choosing engine]
+Configured per layer in `project.yaml` under `stack.*` (web, mobile, backend, data, cloud) by `/setup-stack`; code roots per layer (`.claude/docs/code-root-resolution.md`); Git with trunk-based development.
 
-> **Note**: Engine-specialist agents exist for Godot, Unity, and Unreal with
-> dedicated sub-specialists. Use the set matching your engine.
+> **Note**: Stack specialists exist per layer (`web-specialist`, `mobile-specialist`,
+> `backend-specialist`, `data-specialist`, `cloud-specialist`), with framework
+> sub-specialists under the web, mobile and backend leads. Routing is derived from
+> the configured layers — see `.claude/docs/effects-map.md` § stack.layers and specialists.
 
 ## Project Structure
 
 @.claude/docs/directory-structure.md
 
-## Engine Version Reference
+## Stack Version Reference
 
-<!-- ENGINE-REFERENCE-IMPORT: the line below is engine-specific. /setup-engine
-     rewrites it to @docs/engine-reference/<engine>/VERSION.md for the chosen
-     engine, so a Unity or Unreal project stops loading the Godot reference every
-     session. It defaults to Godot (the template's example engine); skills that
-     need the pinned version read docs/engine-reference/<engine>/VERSION.md on
-     demand regardless of this import. -->
-@docs/engine-reference/godot/VERSION.md
-
+<!-- STACK-REFERENCE-IMPORT: fixed import. /setup-stack fills the file below; nothing rewrites this line. -->
+@docs/stack-reference/VERSION.md
 
 ## Technical Preferences
 
-`project.yaml` at the repo root is the primary config store — engine, specialists,
-naming, platform, performance, modes. Skills resolve it via `resolve_config`
-(see `.claude/docs/config-resolution.md`).
-
-`.claude/docs/technical-preferences.md` is the **legacy fallback**, read on demand
-when a key is absent from `project.yaml`. It is no longer imported here: before
-`/setup-engine` runs it is almost entirely `[TO BE CONFIGURED]` placeholders, and
-after it runs `project.yaml` holds the real values.
+`project.yaml` is the only config store (resolved via `resolve_config`, see `.claude/docs/config-resolution.md`). Allowed / held / forbidden technologies and patterns live in `docs/architecture/tech-radar.md` (seeded by `/setup-stack`).
 
 ## Coordination Rules
 
@@ -56,8 +41,17 @@ Every task follows: **Question -> Options -> Decision -> Draft -> Approval**
 
 See `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md` for full protocol and examples.
 
-> **First session?** If the project has no engine configured and no game concept,
-> run `/start` to begin the guided onboarding flow.
+> **First session?** If the project has no stack pinned and no product brief (or
+> one-pager), run `/start` to begin the guided onboarding flow.
+
+## Language Policy
+
+- Framework files an AI loads or a script parses are English. Human-facing docs are Korean (list:
+  `.claude/docs/coding-standards.md` § Language Policy).
+- Artifacts you write: keep every template heading, bold field label, status/verdict/severity token, YAML key,
+  enum value, ID and path in English exactly as the template spells it; write the body in the user's
+  conversation language. Never translate a heading — scripts and gates match on it.
+- Talk to the user in their conversation language; quoted prompts in skills are canonical English forms.
 
 ## Coding Standards
 

@@ -5,7 +5,7 @@
 - **ID**: RISK-[NNNN]
 - **Identified By**: [Agent or person]
 - **Date Identified**: [Date]
-- **Category**: [Technical | Design | Schedule | Resource | External | Quality]
+- **Category**: [Technical | Design | Schedule | Resource | External | Quality | Security | Privacy-Compliance | Vendor-Dependency | Cost]
 
 ## Assessment
 

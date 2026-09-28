@@ -5,19 +5,25 @@ that uses `AskUserQuestion` or writes files. Skills reference this document
 instead of embedding the full mode-handling rules inline — eliminating drift
 when the pattern needs updating.
 
-**Scope**: ~44 skills across authoring, review, team orchestration,
-implementation, and utility categories. Any skill that gates a decision
-through `AskUserQuestion` or writes files should follow this pattern.
+**Scope**: every skill whose `resolve_config --keys` includes `automation` —
+authoring, review, team orchestration, implementation and utility skills alike.
+The always-collaborative skills (§ Exemptions — Skills That Ignore the
+Automation Setting) are the only skills that ask or write and never resolve it.
 
 **Companion spec**: `.claude/docs/effects-map.md`
-section `modes.automation` is the source of truth for behavior. This document
-is the implementation pattern.
+sections `modes.automation` and `modes.automation_always_ask` are the source of
+truth for behavior. This document is the implementation pattern.
 
-> **Do not read `effects-map.md` during a skill run** — it is ~110 KB, a
-> reference for authoring the spec rather than a runtime input, and **this
-> document is self-sufficient** for deciding what to ask and what to proceed on.
-> If a case genuinely is not covered here, read only its `modes.automation`
-> section, never the file.
+> **Do not read `effects-map.md` during a skill run** — it is a large reference
+> for authoring the spec rather than a runtime input, and **this document is
+> self-sufficient** for deciding what to ask and what to proceed on. If a case
+> genuinely is not covered here, read only its `modes.automation` section, never
+> the file.
+
+> **Stable headings.** Skills cite this document by heading — for example
+> `.claude/docs/automation-modes.md` § The Three Modes or § Universal Rules per
+> Mode › Guided — never by line number. A heading here is renamed only together
+> with every skill that cites it.
 
 ---
 
@@ -26,24 +32,28 @@ is the implementation pattern.
 In any skill, add a single resolution step at startup and reference the
 mode-aware AskUserQuestion pattern below at each gated site.
 
-**Startup prelude** (add near Phase 0 / Phase 1):
+**Startup prelude** (every skill with `automation` in its `--keys` carries this
+block verbatim, directly after the line that follows its bootstrap block):
 
+```markdown
+**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →
+`project.yaml` → default `collaborative`). Every `AskUserQuestion` call and
+every file write follows `.claude/docs/automation-modes.md`
+(collaborative asks always · guided major-only · autonomous logs and proceeds;
+`automation_always_ask` categories always prompt).
 ```
-Resolve automation mode (once, store for the run):
-1. Read `modes.automation` from `project.local.yaml` (if present) → use that
-2. Else read `modes.automation` from `project.yaml` → use that value
-3. Else → default to `collaborative`
 
-Pattern reference: `.claude/docs/automation-modes.md`.
-```
+The value is already resolved by the skill's bootstrap line
+(`resolve_config --keys …,automation,…` prints `automation: <value> (<source>)`),
+which applies the whole chain: `project.local.yaml` (the key is on the local
+whitelist) → `project.yaml` → the terminal default `collaborative`. An invalid
+value never wins — it is reported in the notes line and the chain continues.
+Use the printed value as-is; do not re-read the YAML files.
 
-This resolution is automatic via `get_effective_yaml_key modes.automation` —
-the helper deep-merges project.local.yaml on top of project.yaml.
-
-**At each AskUserQuestion site**, follow the pattern table in §Universal
-Rules below. The skill author labels each decision as **major** or **minor**
-(per the classification matrix in §Major vs Minor) so the pattern can apply
-the right rule.
+**At each AskUserQuestion site**, follow the pattern table in § Universal
+Rules per Mode below. The skill author labels each decision as **major** or
+**minor** (per the classification matrix in § Major vs Minor Decision
+Classification) so the pattern can apply the right rule.
 
 ---
 
@@ -57,16 +67,18 @@ the right rule.
 
 **Default**: `collaborative`. New projects start here.
 
-**Set by**: `/start`, `/settings`.
+**Set by**: `/start`, `/settings`. It is locally overridable, so one developer
+can run `guided` from `project.local.yaml` while the team default stays
+`collaborative`.
 
 ---
 
 ## Universal Rules per Mode
 
-### Collaborative (current v1.0 behavior — no change)
+### Collaborative
 
 - `AskUserQuestion` called for every multi-option decision
-- 2–4 options presented with pros/cons for every design choice
+- 2–4 options presented with pros/cons for every product, design and technical choice
 - Full draft shown and approved before every file write
 - "May I write this to [filepath]?" asked before every write
 - Section-by-section approval in multi-section authoring skills
@@ -76,7 +88,7 @@ the right rule.
 
 - `AskUserQuestion` called for **major decisions only** (see classification below)
 - Minor decisions: AI states recommendation inline and proceeds — e.g.
-  > *"Going with a static utility pattern here — it fits the existing architecture. Continuing unless you want to change direction."*
+  > *"Going with a module-local helper in the goals module rather than a shared package — nothing else uses it yet. Continuing unless you want to change direction."*
 - Draft shown briefly before writing — proceeds after a short summary, does not wait for explicit "yes"
 - "May I write?" asked for **new files only** — updates to existing files proceed directly
 - Still presents options for major decisions but caps at 2 choices with a clear recommendation
@@ -84,7 +96,8 @@ the right rule.
 
 ### Autonomous
 
-- No `AskUserQuestion` calls **except** for categories listed in `modes.automation_always_ask`
+- No `AskUserQuestion` calls **except** for categories in the resolved
+  `automation_always_ask` list
 - No draft review
 - No "May I write?" prompts — writes directly
 - Picks the recommended option for every decision without presenting alternatives
@@ -103,21 +116,21 @@ the mode rules.
 
 | Decision type | Example |
 |---------------|---------|
-| Choosing a system name or document path | "What should we call this system?" |
-| Mutually exclusive design directions | "Real-time or turn-based?" |
-| Any choice that gates downstream work | Engine choice, architecture approach |
-| Scope changes | "Cut this feature or slip the deadline?" |
-| Any decision that can't be changed without significant rework | Core loop mechanic |
+| Choosing a feature name or document path | "Should this feature be `goals` or `savings-goals`? The name becomes the PRD stem and the TR-ID prefix." |
+| Mutually exclusive design directions | "SSR or SPA for the web app?" · "REST or GraphQL for the public API?" |
+| Any choice that gates downstream work | Stack choice, API style, identity provider, architecture approach |
+| Scope changes | "Cut Naver login from the MVP or slip the launch date?" |
+| Any decision that can't be changed without significant rework | Pricing model (freemium cap vs free trial), primary data store, multi-tenancy model |
 
 ### Minor — AI recommends and proceeds in guided mode
 
 | Decision type | Example |
 |---------------|---------|
 | Which section to work on next | "Moving to Edge Cases next" |
-| Optional section inclusion | "Adding a Visual Notes section — fits the system" |
+| Optional section inclusion | "Adding an `## API & Data Impact` section — this feature touches the payments contract" |
 | Formatting and structure choices | Heading levels, table vs prose |
 | Adding detail to an already-decided direction | Sub-options within an approved approach |
-| Next-step routing after a phase completes | "Running design-review now" |
+| Next-step routing after a phase completes | "Running /prd-review now" |
 
 ---
 
@@ -125,38 +138,71 @@ the mode rules.
 
 Even in `autonomous` mode, certain decision categories ALWAYS trigger
 `AskUserQuestion`. The configured list lives at
-`modes.automation_always_ask` in `project.yaml`.
+`modes.automation_always_ask` in `project.yaml` (locally overridable).
 
-**Default** (when unset): `[scope_changes, file_deletions, schema_changes]`.
+### Default list
+
+When the key is unset, the list is `scope_changes`, `file_deletions`,
+`schema_changes`, `production_deploys`, `db_migrations`, `infra_changes`,
+`secrets_access`, `pii_data_access`, `billing_changes`. Nothing is written to
+`project.yaml` for this default — it lives in yaml-helper
+(`_yaml_helper_always_ask_default`).
+
+Setting the key **replaces** this list; it does not extend it. A project that
+wants `architecture_decisions` on top of the defaults lists all ten (flow style,
+as `/settings` writes lists):
+
+```yaml
+modes:
+  automation_always_ask: [scope_changes, file_deletions, schema_changes, production_deploys, db_migrations, infra_changes, secrets_access, pii_data_access, billing_changes, architecture_decisions]
+```
 
 ### Recognized categories
 
 **This table is the set you may configure, NOT the set that always asks.** Only
-the categories actually listed in `modes.automation_always_ask` — the three
+the categories actually listed in `modes.automation_always_ask` — the nine
 defaults above, unless the project overrides them — interrupt an `autonomous`
 run. The other rows do nothing until a project opts into them. Read the resolved
-list with `resolve_config` rather than assuming a row here is active; a real run
-logged two `architecture_decisions` as rule violations on a project where that
-category was never configured.
+list from the bootstrap block (label `automation_always_ask`) rather than
+assuming a row here is active; a real run logged two `architecture_decisions` as
+rule violations on a project where that category was never configured.
 
-| Category | Examples of decisions in this category |
-|----------|----------------------------------------|
-| `scope_changes` | Cutting a feature, slipping a deadline, splitting/merging an epic, removing acceptance criteria |
-| `file_deletions` | Removing a story, deleting a GDD, removing a system, removing a test file |
-| `schema_changes` | Changes to project.yaml, story template, control manifest, ADR template, GDD template |
-| `architecture_decisions` | New ADR creation, ADR replacement, system boundary changes |
-| `version_bumps` | Engine version change, framework version bump, dependency major version change |
-| `external_calls` | Invoking external APIs (asset gen, AI services) when in autonomous mode |
+| Category | Covers |
+|---|---|
+| `scope_changes` | adding/removing features or stories from an approved plan |
+| `file_deletions` | deleting any tracked file |
+| `schema_changes` | API/contract or config-file schema changes (OpenAPI, GraphQL, protobuf, AsyncAPI, JSON Schema, registry schemas) |
+| `architecture_decisions` | accepting, superseding or deprecating an ADR |
+| `version_bumps` | changing `project.version`, a pinned stack version, or a dependency major version |
+| `external_calls` | calling third-party services or APIs from a skill |
+| `production_deploys` | any deploy or rollout stage beyond preview/staging; a flag change in production |
+| `db_migrations` | any database schema change or data migration/backfill (writing or running it) |
+| `infra_changes` | IaC plan/apply, CI/CD workflow changes, DNS, CDN, scaling, staging environment changes |
+| `secrets_access` | reading, creating or rotating secrets/keys |
+| `pii_data_access` | querying or exporting personal data; log samples containing PII |
+| `billing_changes` | prices, plans, entitlements, payment configuration, pricing experiments |
 
-### Helper
+**Overlaps prompt.** One decision can fall into several categories — a
+migration that drops a column the public API still returns is both
+`db_migrations` and `schema_changes`; raising the Plus plan price in production
+is both `billing_changes` and `production_deploys`. It prompts when **any** of
+its categories is in the resolved list.
+
+**Staging is not production — but it is still infrastructure.** A preview
+deploy or a staging flag toggle is not `production_deploys`; changing the
+staging environment itself is `infra_changes`, and writing or running any
+migration is `db_migrations`, whatever database it targets.
+
+### Helper: `is_always_ask_category`
 
 ```bash
 is_always_ask_category <category>
 ```
 
-Returns 0 if the named category is in `modes.automation_always_ask`,
-1 otherwise. Skills use this at decision points that fall into any
-of the six categories above.
+Returns 0 if the named category is in `modes.automation_always_ask` (or in the
+default list when the key is unset), 1 otherwise. Hooks and scripts use it;
+skills read the same answer from their bootstrap block. Use it at every
+decision point that falls into a category of the table above.
 
 ---
 
@@ -166,13 +212,21 @@ These skills always behave as `collaborative` regardless of the setting:
 
 | Skill | Why always collaborative |
 |-------|--------------------------|
-| `hotfix` | Emergency decisions — user must approve scope and risk before any action |
-| `gate-check` | Results must be reviewed — a gate verdict without acknowledgement defeats the purpose |
-| `day-one-patch` | Release-critical — every action needs explicit sign-off |
-| `setup-engine` | One-time irreversible choice that affects the entire project |
+| `gate-check` | stage transitions |
+| `hotfix` | production emergency |
+| `incident` | production emergency |
+| `rollout-plan` | production exposure |
+| `setup-stack` | stack pins and live sources |
+| `start` | runs before configuration |
+| `settings` | changes the automation settings themselves |
 
-These skills do NOT add the automation prelude described above. They keep
-the v1.0 Q→O→D→Draft→Approval protocol exactly.
+These skills do NOT add the automation prelude described above and never
+resolve `automation`. They keep the Q→O→D→Draft→Approval protocol exactly.
+
+Review mode is a separate axis: `/hotfix`, `/rollout-plan` and `/incident` are
+also exempt from `modes.review_mode` (every gate they name runs at every mode —
+`.claude/docs/director-gates.md`). Being always collaborative says nothing about
+review gates, and vice versa.
 
 ---
 
@@ -188,14 +242,19 @@ When `autonomous` mode skips an `AskUserQuestion`, the skill calls
 **Options considered:** [list of options that would have been presented]
 **Chosen:** [what was picked]
 **Reason:** [one-line rationale]
-**Category:** [scope_changes | file_deletions | schema_changes | … or "minor"]
+**Category:** [scope_changes | file_deletions | schema_changes | … | billing_changes, or "minor"]
 ```
 
 Written to `production/session-logs/decision-log.md` (append-only, never
 truncated, created if absent). The user reviews the log post-session to
 audit choices made.
 
-### Helper
+**Decisions only, never evidence.** `production/session-logs/` is gitignored:
+test results, screenshots, dry-run logs and reports written there vanish on the
+next clone and never count as evidence. Evidence goes under
+`production/qa/…`; the decision log records only what was chosen and why.
+
+### Helper: `log_decision`
 
 ```bash
 log_decision "<skill-name>" "<decision-point>" "<options>" "<chosen>" "<reason>" "<category>"
@@ -211,7 +270,7 @@ These rules keep autonomous logs consistent across runs:
 
 - **Log every decision that would have shown an `AskUserQuestion` widget** —
   including option/framing choices, not only final approvals. The
-  framing/options decisions (which approach, which formula, which edge
+  framing/options decisions (which approach, which business rule, which edge
   cases) are usually the most informative entries; do not log only the
   rote "approve this section" steps.
 - **Collapse a single multi-tab widget into ONE entry.** List each tab's
@@ -228,12 +287,16 @@ These rules keep autonomous logs consistent across runs:
 The most common categorization mistake is treating a data-file append as a
 `schema_changes` decision:
 
-- **Appending facts to a registry or index** — e.g.
-  `design/registry/entities.yaml`, `design/gdd/systems-index.md` — is
-  **`minor`**. It adds data without altering a *template*.
-- **`schema_changes`** means editing the *structure* of `project.yaml` or a
-  template (story / ADR / GDD / control-manifest template). These are
-  always-ask.
+- **Appending facts to a registry or index** — e.g. a new entity in
+  `design/registry/entities.yaml`, a row in `design/product/feature-map.md`, an
+  event in `design/product/tracking-plan.md` — is **`minor`**. It adds data
+  without altering a structure.
+- **`schema_changes`** means editing a *structure*: an API contract under
+  `docs/api/`, a JSON Schema, the section layout of a registry, or the key
+  structure of `project.yaml`. Changing the contract headings of a template
+  (PRD, ADR, story, control manifest) is the same kind of change — scripts and
+  gates match on those headings — so it is `schema_changes` too. These are
+  always-ask by default.
 - **When genuinely unsure** between `minor` and an always-ask category,
   prefer the always-ask category and prompt — failing safe.
 
@@ -244,10 +307,11 @@ The most common categorization mistake is treating a data-file append as a
 ```
 At each decision point in this skill:
 
-1. Classify the decision: major or minor (see §Major vs Minor above).
-2. Check whether the decision falls into an `automation_always_ask`
-   category: scope_changes, file_deletions, schema_changes,
-   architecture_decisions, version_bumps, external_calls.
+1. Classify the decision: major or minor (see § Major vs Minor Decision
+   Classification above).
+2. Check whether the decision falls into a category of § Recognized
+   categories that the resolved `automation_always_ask` list contains
+   (default: the nine categories of § Default list).
 3. Apply the mode rule:
 
    collaborative:           AskUserQuestion always.

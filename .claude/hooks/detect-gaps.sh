@@ -19,105 +19,112 @@
 #
 # NOT an upward search: that resolves a nested project to its parent's config.
 if [ -f "project.yaml" ] || [ -d ".claude" ]; then
-  CCGS_ROOT="$PWD"
+  CCSS_ROOT="$PWD"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "${CLAUDE_PROJECT_DIR}" ]; then
-  CCGS_ROOT="$CLAUDE_PROJECT_DIR"
+  CCSS_ROOT="$CLAUDE_PROJECT_DIR"
 else
-  CCGS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  CCSS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
 fi
-[ -n "$CCGS_ROOT" ] && cd "$CCGS_ROOT" 2>/dev/null || true
+[ -n "$CCSS_ROOT" ] && cd "$CCSS_ROOT" 2>/dev/null || true
 
 # Hook: detect-gaps.sh
 # Event: SessionStart
-# Purpose: Detect missing documentation when code/prototypes exist
-# Cross-platform: Windows Git Bash compatible (uses grep -E, not -P)
+# Purpose: Observe documentation gaps between what is on disk and what the
+#          project's workflow tier asks for -- code without PRDs, code without
+#          ADRs, a backend without an API contract, migrations without a data
+#          model, undocumented prototypes, and a recorded stage the tree has
+#          outrun -- and name the one skill that closes each gap.
+# Cross-platform: Windows Git Bash compatible (grep -E, not -P); bash 3.2.
+#
+# OBSERVATIONS, NEVER VERDICTS (CLAUDE.md). Every line below says what is on
+# disk and suggests a skill. Nothing here writes a file, advances the stage, or
+# decides that a gap blocks anything -- /gate-check owns that, and it asks.
+#
+# THE CHECKS
+#   0  fresh project           no stack pin, no product brief or one-pager,
+#                              no app manifest                  -> /start
+#   1  code, sparse PRDs       > 50 source files, < 5 PRDs      -> /reverse-document prd
+#   2  undocumented prototype  neither REPORT.md nor SPIKE-NOTE.md -> /prototype report
+#   3  code, no ADRs           0 ADRs at standard, < 3 at full  -> /reverse-document architecture
+#   4  backend, no contract    a backend root, no API contract  -> /api-design
+#   5  migrations, no model    migrations_dir has files, no
+#                              docs/data/data-model.md          -> /data-model
+#   6  stage lag               stage-estimate.sh is >= 2 phases
+#                              ahead of project.stage           -> /gate-check
+#
+# TIER-AWARE. Checks 1, 3, 4 and 5 ask "where is the document for this code?".
+# At `modes.workflow: minimal` the answer is that there deliberately is none:
+# the one-pager and a pinned stack are all that tier requires before code
+# starts. Reporting their absence nags the user about work their own
+# configuration told them to skip -- and a warning that fires when nothing is
+# wrong trains the user to ignore the ones that matter. So at minimal those
+# four checks are skipped, and the skip is announced once. Checks 2 and 6 are
+# not tiered: an undocumented prototype and a stale stage are gaps at any tier.
+#
+# CODE ROOTS come from yaml-helper resolve_code_roots, never from a literal
+# directory: every layer's declared root, the data layer's migrations_dir,
+# stack.shared_roots, and undeclared apps/*, services/*, packages/* workspaces.
+# Counting goes through list_code_files (pruned, extension-filtered). No root
+# resolved is NOT "no code": checks 1, 3 and 4 then print NOT CHECKED lines
+# instead of a silence that reads as a clean result.
 
-# Exit on error for debugging (but don't fail the session)
 set +e
 
 echo "=== Checking for Documentation Gaps ==="
 
+NOT_RESOLVED_HINT="set stack.layers.<layer>.root via /setup-stack"
+
+# --- yaml-helper, sourced once ---
+YH_LOADED=false
+if [ -f .claude/hooks/yaml-helper.sh ]; then
+  . .claude/hooks/yaml-helper.sh 2>/dev/null
+  command -v resolve_setting >/dev/null 2>&1 && YH_LOADED=true
+fi
+
 # --- Check 0: Fresh project detection (suggests /start) ---
+#
+# Fresh = all three of:
+#   - no stack.pinned_on        (/setup-stack has never pinned a stack)
+#   - no product brief AND no one-pager in design/product/ (the Discovery
+#     record at standard/full and at minimal respectively -- testing only one
+#     of them greets a minimal project that has run /start and /brainstorm
+#     with "NEW PROJECT" at every session)
+#   - no manifest at the repo root or in any apps/* or services/* directory
+#     (existing code means an existing product, whatever its docs say)
 FRESH_PROJECT=true
 
-# Check if engine is configured (project.yaml first, fall back to technical-preferences.md)
-if [ -f "project.yaml" ] && [ -f ".claude/hooks/yaml-helper.sh" ]; then
-  source .claude/hooks/yaml-helper.sh
-  ENGINE_NAME=$(get_yaml_key project.yaml engine.name 2>/dev/null)
-  if [ -n "$ENGINE_NAME" ]; then
-    FRESH_PROJECT=false
-  fi
-fi
-if [ "$FRESH_PROJECT" = true ] && [ -f ".claude/docs/technical-preferences.md" ]; then
-  ENGINE_LINE=$(grep -E "^[[:space:]]*-[[:space:]]+\*\*Engine\*\*:" .claude/docs/technical-preferences.md 2>/dev/null)
-  if [ -n "$ENGINE_LINE" ] && ! echo "$ENGINE_LINE" | grep -q "TO BE CONFIGURED" 2>/dev/null; then
-    FRESH_PROJECT=false
+# Stack pin. The grep is a cheap superset pre-filter so an unconfigured
+# template pays no interpreter start; get_yaml_key confirms the dotted path.
+if [ -f project.yaml ] && grep -qE '^[[:space:]]+pinned_on:[[:space:]]*[^[:space:]#]' project.yaml 2>/dev/null; then
+  if [ "$YH_LOADED" = true ] && command -v get_yaml_key >/dev/null 2>&1; then
+    [ -n "$(get_yaml_key project.yaml stack.pinned_on 2>/dev/null)" ] && FRESH_PROJECT=false
+  else
+    FRESH_PROJECT=false   # the pre-filter's line is the only evidence we have
   fi
 fi
 
-# Check if a design record exists.
-#
-# TWO FILES, NOT ONE. `game-concept.md` is the `standard`/`full` concept doc;
-# at `minimal` the design record is the one-page `design/game-brief.md`, which
-# `/brainstorm` writes in its place. workflow-modes.md states the rule this
-# check has to satisfy: any check, gate or glob for the minimal design artifact
-# must target `design/game-brief.md`.
-#
-# Testing only for `game-concept.md` means a minimal-tier project that has
-# already run `/start` AND `/brainstorm` is greeted with "NEW PROJECT ... Run:
-# /start" at every session start -- the banner wrong about the one artifact
-# that tier produces.
-if [ -f "design/gdd/game-concept.md" ] || [ -f "design/game-brief.md" ]; then
+# Discovery record.
+if [ -f "design/product/product-brief.md" ] || [ -f "design/product/one-pager.md" ]; then
   FRESH_PROJECT=false
 fi
 
-# Check if source code exists.
-#
-# All three code roots, not just `src/`. Per .claude/docs/directory-structure.md
-# `src/` is the Godot row; Unity builds from `Assets/` and Unreal from
-# `Source/`. Testing only `src/` meant a Unity project with a full codebase
-# could still be greeted with "NEW PROJECT ... Run: /start".
-#
-# Tested directly rather than through resolve_code_root: this check runs before
-# the config helper is guaranteed to be sourced, and "is there any code at all"
-# does not need the engine to be known.
-for _root in src Assets Source; do
-  [ -d "$_root" ] || continue
-  SRC_CHECK=$(find "$_root" -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | head -1)
-  if [ -n "$SRC_CHECK" ]; then
-    FRESH_PROJECT=false
-    break
-  fi
-done
-
-# --- Check 0b: v1.0 project — legacy config present, project.yaml absent ---
-# The migration story depends on users discovering /adopt; UPGRADING.md only
-# reaches people who read it. An unconfigured technical-preferences.md template
-# does not count as legacy data (same rule as migrate-v1-config.sh), and legacy
-# config also means the project is not fresh — the NEW PROJECT banner below
-# would be wrong for it.
-if [ ! -f "project.yaml" ]; then
-  LEGACY_FILES=""
-  [ -f "production/stage.txt" ] && LEGACY_FILES="production/stage.txt"
-  [ -f "production/review-mode.txt" ] && LEGACY_FILES="${LEGACY_FILES:+$LEGACY_FILES, }production/review-mode.txt"
-  if [ -f ".claude/docs/technical-preferences.md" ]; then
-    TP_ENGINE=$(grep -E "^[[:space:]]*-[[:space:]]+\*\*Engine\*\*:" .claude/docs/technical-preferences.md 2>/dev/null)
-    if [ -n "$TP_ENGINE" ] && ! echo "$TP_ENGINE" | grep -q "TO BE CONFIGURED" 2>/dev/null; then
-      LEGACY_FILES="${LEGACY_FILES:+$LEGACY_FILES, }.claude/docs/technical-preferences.md"
-    fi
-  fi
-  if [ -n "$LEGACY_FILES" ]; then
-    FRESH_PROJECT=false
-    echo ""
-    echo "⬆️  v1.0 PROJECT: legacy config ($LEGACY_FILES) but no project.yaml."
-    echo "   Run: /adopt — it detects this and drives the migration (non-destructive)."
-    echo "   Preview first: bash .claude/scripts/migrate-v1-config.sh --dry-run"
-  fi
+# Manifests. The list is yaml-helper's own (the one resolve_code_roots uses to
+# recognise a workspace package), so "is there code?" and "which roots are
+# there?" can never disagree; the literal is the same list for a tree whose
+# helper is missing.
+MANIFESTS="${_yaml_helper_manifests:-package.json pyproject.toml build.gradle build.gradle.kts pom.xml go.mod pubspec.yaml Cargo.toml composer.json Gemfile}"
+if [ "$FRESH_PROJECT" = true ]; then
+  for _dir in . apps/* services/*; do
+    [ -d "$_dir" ] || continue
+    for _m in $MANIFESTS; do
+      if [ -f "$_dir/$_m" ]; then FRESH_PROJECT=false; break 2; fi
+    done
+  done
 fi
 
 if [ "$FRESH_PROJECT" = true ]; then
   echo ""
-  echo "🚀 NEW PROJECT: No engine configured, no game concept, no source code."
+  echo "🚀 NEW PROJECT: no stack pinned, no product brief or one-pager, no app manifest."
   echo "   This looks like a fresh start! Run: /start"
   echo ""
   echo "💡 To get a comprehensive project analysis, run: /project-stage-detect"
@@ -127,203 +134,269 @@ fi
 
 # --- Resolve the workflow tier once, for the checks below ---
 #
-# Checks 1, 3 and 4 all ask "where is the design/architecture document for this
-# code?". At `minimal` the answer is that there deliberately is none:
-# workflow-modes.md requires only engine choice and a filled
-# `design/game-brief.md` before code starts, and says everything else can be
-# skipped. Reporting their absence as a GAP nags the user about work their own
-# configuration told them to skip -- and a warning that fires when nothing is
-# wrong trains the user to ignore the ones that matter.
-#
 # resolve_setting, NOT get_yaml_key: `modes.workflow` is rigor-fronted, so a
-# project that set `rigor: minimal` and nothing else has no `modes.workflow` key
-# to read. Only the full chain sees the expansion. Same pattern and same reason
-# as validate-commit.sh.
+# project that set `rigor: standard` and nothing else has no `modes.workflow`
+# key to read. Only the full chain sees the expansion. Same pattern and same
+# reason as validate-commit.sh.
 #
-# Resolved AFTER the fresh-project early-exit above, so a brand-new project
-# never pays for the lookup.
-WORKFLOW="standard"
-if [ -f .claude/hooks/yaml-helper.sh ]; then
-    . .claude/hooks/yaml-helper.sh 2>/dev/null
-    W=$(resolve_setting modes.workflow 2>/dev/null | cut -f1)
-    [ -n "$W" ] && WORKFLOW="$W"
+# NO FALLBACK TIER. When the helper cannot answer, the tiered checks say NOT
+# CHECKED; a hard-coded tier would be a second default that disagrees with the
+# documented one.
+#
+# Resolved AFTER the fresh-project early exit, so a brand-new project never pays
+# for the lookup.
+WORKFLOW=""
+if [ "$YH_LOADED" = true ]; then
+  _w=$(resolve_setting modes.workflow 2>/dev/null)
+  WORKFLOW="${_w%%$(printf '\t')*}"
+fi
+case "$WORKFLOW" in
+  minimal)       DOC_CHECKS=false ;;
+  standard|full) DOC_CHECKS=true ;;
+  *)             DOC_CHECKS=unknown ;;
+esac
+
+if [ "$DOC_CHECKS" = false ]; then
+  echo "ℹ️  Checks 1, 3, 4, 5 skipped — modes.workflow is minimal (PRDs, ADRs, an API contract and a data model are not required at this tier)."
+elif [ "$DOC_CHECKS" = unknown ]; then
+  echo "ℹ️  NOT CHECKED — checks 1, 3, 4, 5: modes.workflow could not be resolved (yaml-helper unavailable)."
 fi
 
-# Check 2 is NOT gated: an undocumented prototype is a gap about the prototype
-# itself, not about the design pipeline the tier scales.
-if [ "$WORKFLOW" = "minimal" ]; then
-    DOC_CHECKS=false
-else
-    DOC_CHECKS=true
-fi
-
-# --- Resolve the engine-specific code root for checks 1, 3 and 4 ------------
+# --- Resolve the code roots once, for checks 1, 3, 4 and 5 ---
 #
-# Checks 1, 3 and 4 were all hardcoded to `src/`, which .claude/docs/directory-
-# structure.md defines as the GODOT row of the code-root table -- Unity uses
-# `Assets/`, Unreal `Source/`. On those two engines every directory test below
-# failed, the source-file count came back 0, and NONE of the three checks ran.
-# A project with 200 undocumented Unity systems produced the same empty output
-# as a fully documented one.
-#
-# Only the ROOT is engine-specific. The `core/`, `engine/` and `gameplay/`
-# sub-layout is CCGS's own convention, unchanged by the engine, so it stays
-# literal.
-#
-# Resolved AFTER the fresh-project early-exit, so a brand-new project never
-# pays for the lookup.
-if command -v resolve_code_root >/dev/null 2>&1; then
-  CODE_ROOT=$(resolve_code_root 2>/dev/null | cut -f1)
-else
-  CODE_ROOT=""
-fi
-
-# A doc check that cannot locate the code root has not established that there
-# are no gaps -- it has established nothing (obligation 1 and 3 of
-# .claude/rules/skill-authoring.md). Announce it, once, and only when the checks
-# would otherwise have had somewhere to look.
-if [ "$DOC_CHECKS" = true ] && [ -z "$CODE_ROOT" ]; then
-  if [ -d src ] || [ -d Assets ] || [ -d Source ]; then
-    echo "ℹ️  NOT CHECKED: code exists but the code root is ambiguous (engine.name unset, and the tree does not name one unambiguously)."
-    echo "    Checks 1, 3 and 4 (design and architecture docs for existing code) did NOT run."
-    echo "    Suggested action: /setup-engine, or set engine.name in project.yaml"
+# One line per root: <dir> TAB <layer> TAB <source>. `missing` roots are
+# declared but absent on disk -- never scanned. Resolved AFTER the fresh-project
+# early exit, so a brand-new project never pays for the lookup.
+CODE_ROOTS=""
+ROOTS_STATE="unresolved"
+if [ "$YH_LOADED" = true ] && command -v resolve_code_roots >/dev/null 2>&1; then
+  CODE_ROOTS=$(resolve_code_roots 2>/dev/null)
+  if [ -n "$(printf '%s\n' "$CODE_ROOTS" | awk -F '\t' '$1 != "" && $3 != "missing"')" ]; then
+    ROOTS_STATE="resolved"
   fi
-fi
-
-# --- Check 1: Substantial codebase but sparse design docs ---
-if [ -n "$CODE_ROOT" ] && [ -d "$CODE_ROOT" ]; then
-  # Count source files (cross-platform, handles Windows paths)
-  SRC_FILES=$(find "$CODE_ROOT" -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.c" -o -name "*.h" -o -name "*.hpp" -o -name "*.rs" -o -name "*.py" -o -name "*.js" -o -name "*.ts" \) 2>/dev/null | wc -l)
 else
-  SRC_FILES=0
+  ROOTS_STATE="nohelper"
+fi
+# Roots worth naming in a remediation: every scannable root except the data
+# layer's migrations directory (a migration folder is not a module to document).
+MODULE_ROOTS=$(printf '%s\n' "$CODE_ROOTS" | awk -F '\t' '$1 != "" && $3 != "missing" && $2 != "data" { print $1 }')
+MODULE_ROOTS_LIST=$(printf '%s\n' "$MODULE_ROOTS" | awk 'NF' | paste -sd, - | sed 's/,/, /g')
+
+# A doc check that cannot locate the code has not established that there are no
+# gaps -- it has established nothing (obligations 1 and 3 of
+# .claude/rules/skill-authoring.md). One line per check that did not run.
+if [ "$DOC_CHECKS" = true ] && [ "$ROOTS_STATE" != "resolved" ]; then
+  if [ "$ROOTS_STATE" = "nohelper" ]; then
+    _why="yaml-helper unavailable, code roots cannot be resolved"
+  else
+    _why="no code root resolved ($NOT_RESOLVED_HINT)"
+  fi
+  echo "ℹ️  Check 1 (code vs PRDs): NOT CHECKED — $_why"
+  echo "ℹ️  Check 3 (ADRs for existing code): NOT CHECKED — $_why"
+  echo "ℹ️  Check 4 (API contract for the backend): NOT CHECKED — $_why"
 fi
 
-if [ -d "design/gdd" ]; then
-  DESIGN_FILES=$(find design/gdd -type f -name "*.md" 2>/dev/null | wc -l)
-else
-  DESIGN_FILES=0
+# Source files across every scannable root. Capped: the checks only need to
+# know whether there are more than 50, and a capped walk stops early on a large
+# monorepo.
+SRC_FILES=0
+if [ "$ROOTS_STATE" = "resolved" ] && command -v list_code_files >/dev/null 2>&1; then
+  SRC_FILES=$(list_code_files --limit 51 2>/dev/null | awk 'NF' | wc -l | tr -d ' ')
+  case "$SRC_FILES" in ''|*[!0-9]*) SRC_FILES=0 ;; esac
 fi
 
-# Normalize whitespace from wc output
-SRC_FILES=$(echo "$SRC_FILES" | tr -d ' ')
-DESIGN_FILES=$(echo "$DESIGN_FILES" | tr -d ' ')
+# --- Check 1: Substantial codebase but sparse PRDs ---
+# PRDs live at depth 1 of design/prd/ -- one file per feature, nothing else
+# there (review logs sit in design/prd/reviews/, which this count excludes).
+PRD_FILES=$(find design/prd -mindepth 1 -maxdepth 1 -type f -name "*.md" 2>/dev/null | wc -l | tr -d ' ')
+case "$PRD_FILES" in ''|*[!0-9]*) PRD_FILES=0 ;; esac
 
-if [ "$DOC_CHECKS" = true ] && [ "$SRC_FILES" -gt 50 ] && [ "$DESIGN_FILES" -lt 5 ]; then
-  echo "⚠️  GAP: Substantial codebase ($SRC_FILES source files) but sparse design docs ($DESIGN_FILES files)"
-  echo "    Suggested action: /reverse-document design ${CODE_ROOT:-<code root>}/[system]"
+if [ "$DOC_CHECKS" = true ] && [ "$ROOTS_STATE" = "resolved" ] \
+   && [ "$SRC_FILES" -gt 50 ] && [ "$PRD_FILES" -lt 5 ]; then
+  echo "⚠️  GAP: Substantial codebase (more than 50 source files) but sparse PRDs ($PRD_FILES in design/prd/)"
+  echo "    Code roots: ${MODULE_ROOTS_LIST:-none outside the data layer}"
+  echo "    Suggested action: /reverse-document prd <root>/<module>  (one feature module at a time)"
   echo "    Or run: /project-stage-detect to get full analysis"
 fi
 
-# --- Check 2: Prototypes without documentation ---
+# --- Check 2: Prototypes without their record ---
+#
+# A concept prototype's record is REPORT.md (/prototype, from
+# templates/prototype-report.md); a spike's is SPIKE-NOTE.md (/prototype
+# --spike). Either one documents the directory. Asking for a README flagged every
+# prototype /prototype had ever produced, and the old remediation wrote the
+# wrong file -- a warning that is always on is a warning nobody reads.
 if [ -d "prototypes" ]; then
-  PROTOTYPE_DIRS=$(find prototypes -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
   UNDOCUMENTED_PROTOS=()
-
-  if [ -n "$PROTOTYPE_DIRS" ]; then
-    while IFS= read -r proto_dir; do
-      # Normalize path separators for Windows
-      proto_dir=$(echo "$proto_dir" | sed 's|\\|/|g')
-
-      # Check for README.md or CONCEPT.md
-      if [ ! -f "${proto_dir}/README.md" ] && [ ! -f "${proto_dir}/CONCEPT.md" ]; then
-        proto_name=$(basename "$proto_dir")
-        UNDOCUMENTED_PROTOS+=("$proto_name")
-      fi
-    done <<< "$PROTOTYPE_DIRS"
-
-    if [ ${#UNDOCUMENTED_PROTOS[@]} -gt 0 ]; then
-      echo "⚠️  GAP: ${#UNDOCUMENTED_PROTOS[@]} undocumented prototype(s) found:"
-      for proto in "${UNDOCUMENTED_PROTOS[@]}"; do
-        echo "    - prototypes/$proto/ (no README or CONCEPT doc)"
-      done
-      echo "    Suggested action: /reverse-document concept prototypes/[name]"
+  while IFS= read -r proto_dir; do
+    [ -z "$proto_dir" ] && continue
+    # Normalize path separators for Windows
+    proto_dir=$(echo "$proto_dir" | sed 's|\\|/|g')
+    if [ ! -f "${proto_dir}/REPORT.md" ] && [ ! -f "${proto_dir}/SPIKE-NOTE.md" ]; then
+      UNDOCUMENTED_PROTOS+=("$(basename "$proto_dir")")
     fi
+  done <<EOF
+$(find prototypes -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+EOF
+
+  if [ ${#UNDOCUMENTED_PROTOS[@]} -gt 0 ]; then
+    echo "⚠️  GAP: ${#UNDOCUMENTED_PROTOS[@]} prototype(s) without a record (neither REPORT.md nor SPIKE-NOTE.md):"
+    for proto in "${UNDOCUMENTED_PROTOS[@]}"; do
+      echo "    - prototypes/$proto/"
+      echo "      Suggested action: /prototype report prototypes/$proto"
+    done
   fi
 fi
 
-# --- Check 3: Core systems without architecture docs ---
-if [ "$DOC_CHECKS" = true ] && [ -n "$CODE_ROOT" ] && { [ -d "$CODE_ROOT/core" ] || [ -d "$CODE_ROOT/engine" ]; }; then
-  if [ ! -d "docs/architecture" ]; then
-    echo "⚠️  GAP: Core engine/systems exist but no docs/architecture/ directory"
-    echo "    Suggested action: Create docs/architecture/ and run /architecture-decision"
-  else
-    ADR_COUNT=$(find docs/architecture -type f -name "*.md" 2>/dev/null | wc -l)
-    ADR_COUNT=$(echo "$ADR_COUNT" | tr -d ' ')
-
-    if [ "$ADR_COUNT" -lt 3 ]; then
-      echo "⚠️  GAP: Core systems exist but only $ADR_COUNT ADR(s) documented"
-      echo "    Suggested action: /reverse-document architecture $CODE_ROOT/core/[system]"
+# --- Check 3: Code without architecture decisions ---
+#
+# ADRs are docs/architecture/adr-*.md (the catalog's architecture-decision
+# glob) -- not every Markdown file under docs/architecture/, which would count
+# architecture.md, reviews and the traceability matrix as decisions.
+# Thresholds follow the tier: standard records critical ADRs only, so zero is
+# the gap; full expects at least three Foundation-layer ADRs.
+if [ "$DOC_CHECKS" = true ] && [ "$ROOTS_STATE" = "resolved" ] && [ "$SRC_FILES" -gt 0 ]; then
+  ADR_COUNT=$(find docs/architecture -mindepth 1 -maxdepth 1 -type f -name "adr-*.md" 2>/dev/null | wc -l | tr -d ' ')
+  case "$ADR_COUNT" in ''|*[!0-9]*) ADR_COUNT=0 ;; esac
+  ADR_MIN=1
+  [ "$WORKFLOW" = "full" ] && ADR_MIN=3
+  if [ "$ADR_COUNT" -lt "$ADR_MIN" ]; then
+    if [ "$ADR_COUNT" -eq 0 ]; then
+      echo "⚠️  GAP: Source code exists but no ADRs are recorded (docs/architecture/adr-*.md)"
+    else
+      echo "⚠️  GAP: Source code exists but only $ADR_COUNT ADR(s) are recorded — the full workflow expects at least $ADR_MIN Foundation-layer ADRs"
     fi
+    _shown=0
+    while IFS= read -r _root; do
+      [ -z "$_root" ] && continue
+      [ "$_shown" -ge 3 ] && break
+      echo "    Suggested action: /reverse-document architecture $_root"
+      _shown=$((_shown + 1))
+    done <<EOF
+$MODULE_ROOTS
+EOF
+    [ "$_shown" -eq 0 ] && echo "    Suggested action: /architecture-decision"
   fi
 fi
 
-# --- Check 4: Gameplay systems without design docs ---
-if [ "$DOC_CHECKS" = true ] && [ -n "$CODE_ROOT" ] && [ -d "$CODE_ROOT/gameplay" ]; then
-  # Find major gameplay subdirectories (those with 5+ files)
-  GAMEPLAY_SYSTEMS=$(find "$CODE_ROOT/gameplay" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
-
-  if [ -n "$GAMEPLAY_SYSTEMS" ]; then
-    while IFS= read -r system_dir; do
-      system_dir=$(echo "$system_dir" | sed 's|\\|/|g')
-      system_name=$(basename "$system_dir")
-      file_count=$(find "$system_dir" -type f 2>/dev/null | wc -l)
-      file_count=$(echo "$file_count" | tr -d ' ')
-
-      # If system has 5+ files, check for corresponding design doc
-      if [ "$file_count" -ge 5 ]; then
-        # Check for design doc (allow variations: combat-system.md, combat.md)
-        design_doc_1="design/gdd/${system_name}-system.md"
-        design_doc_2="design/gdd/${system_name}.md"
-
-        if [ ! -f "$design_doc_1" ] && [ ! -f "$design_doc_2" ]; then
-          echo "⚠️  GAP: Gameplay system '$CODE_ROOT/gameplay/$system_name/' ($file_count files) has no design doc"
-          echo "    Expected: design/gdd/${system_name}-system.md or design/gdd/${system_name}.md"
-          echo "    Suggested action: /reverse-document design $CODE_ROOT/gameplay/$system_name"
-        fi
+# --- Check 4: Backend without an API contract ---
+#
+# "Backend root" = a root declared under stack.layers.backend.root that exists
+# on disk. The contract globs are READ FROM THE CATALOG (step api-design of the
+# architecture phase), not repeated here: a contract style added there --
+# OpenAPI, GraphQL, protobuf, AsyncAPI -- is recognised without editing this
+# hook (derive coverage, don't enumerate). The reader follows the catalog's
+# indentation contract, the same one artifact-check.sh parses.
+#
+# An UNDECLARED workspace may hold a backend this check cannot see; when there
+# is no declared backend root but undeclared ones exist, the check says so
+# instead of passing.
+if [ "$DOC_CHECKS" = true ] && [ "$ROOTS_STATE" = "resolved" ]; then
+  BACKEND_ROOTS=$(printf '%s\n' "$CODE_ROOTS" | awk -F '\t' '$2 == "backend" && $3 != "missing" { print $1 }' \
+                  | paste -sd, - | sed 's/,/, /g')
+  UNDECLARED_ROOTS=$(printf '%s\n' "$CODE_ROOTS" | awk -F '\t' '$2 == "undeclared" { print $1 }' \
+                  | paste -sd, - | sed 's/,/, /g')
+  if [ -n "$BACKEND_ROOTS" ]; then
+    CATALOG=".claude/docs/workflow-catalog.yaml"
+    API_GLOBS=""
+    if [ -f "$CATALOG" ]; then
+      API_GLOBS=$(awk -v P="architecture" -v S="api-design" -v Q="'" '
+        { sub(/\r$/, "") }
+        /^[[:space:]]*#/ || /^[[:space:]]*$/ { next }
+        /^[^ ]/         { phase = ""; step = ""; next }
+        /^  [^ ]/       { phase = $1; sub(/:$/, "", phase); step = ""; next }
+        /^      - id:/  { step = $0; sub(/^      - id:[[:space:]]*/, "", step)
+                          gsub(/"/, "", step); gsub(Q, "", step); gsub(/[[:space:]]/, "", step); next }
+        phase == P && step == S && ($0 ~ /^          glob:/ || $0 ~ /^            - glob:/) {
+          v = $0; sub(/^[^:]*:[[:space:]]*/, "", v); sub(/[[:space:]]+$/, "", v)
+          gsub(/"/, "", v); gsub(Q, "", v)
+          if (v != "") print v
+        }
+      ' "$CATALOG" 2>/dev/null)
+    fi
+    if [ -z "$API_GLOBS" ]; then
+      echo "ℹ️  Check 4 (API contract for the backend): NOT CHECKED — the catalog's architecture/api-design step is not readable ($CATALOG)"
+    else
+      CONTRACT=""
+      while IFS= read -r _g; do
+        [ -z "$_g" ] && continue
+        for _f in $_g; do
+          if [ -f "$_f" ]; then CONTRACT="$_f"; break 2; fi
+        done
+      done <<EOF
+$API_GLOBS
+EOF
+      if [ -z "$CONTRACT" ]; then
+        echo "⚠️  GAP: Backend code root ($BACKEND_ROOTS) but no API contract in docs/api/"
+        echo "    Expected one of: $(printf '%s\n' "$API_GLOBS" | paste -sd, - | sed 's/,/, /g')"
+        echo "    Suggested action: /api-design"
       fi
-    done <<< "$GAMEPLAY_SYSTEMS"
+    fi
+  elif [ -n "$UNDECLARED_ROOTS" ]; then
+    echo "ℹ️  Check 4 (API contract for the backend): NOT CHECKED — no backend root declared, and undeclared roots ($UNDECLARED_ROOTS) may hold one (declare them with /setup-stack)"
   fi
 fi
 
-# --- Check 5: Production planning ---
-if [ "$SRC_FILES" -gt 100 ]; then
-  # For projects with substantial code, check for production planning
-  if [ ! -d "production/sprints" ] && [ ! -d "production/milestones" ]; then
-    echo "⚠️  GAP: Large codebase ($SRC_FILES files) but no production planning found"
-    echo "    Suggested action: /sprint-plan or create production/ directory"
-  fi
+# --- Check 5: Migrations without a data model ---
+#
+# The data layer's migrations_dir (stack.layers.data.migrations_dir) is the one
+# place executable migrations live. Files there with no docs/data/data-model.md
+# mean the schema is evolving with no record of ownership, classification or
+# retention -- the document /data-model writes and the migration rules read.
+if [ "$DOC_CHECKS" = true ] && [ "$ROOTS_STATE" = "resolved" ]; then
+  while IFS= read -r _mdir; do
+    [ -z "$_mdir" ] && continue
+    if [ -n "$(find "$_mdir" -type f 2>/dev/null | head -1)" ] && [ ! -f "docs/data/data-model.md" ]; then
+      echo "⚠️  GAP: Migrations exist in $_mdir but there is no data model (docs/data/data-model.md)"
+      echo "    Suggested action: /data-model"
+      break
+    fi
+  done <<EOF
+$(printf '%s\n' "$CODE_ROOTS" | awk -F '\t' '$2 == "data" && $3 != "missing" { print $1 }')
+EOF
 fi
 
 # --- Check 6: project.stage is behind what is actually on disk ---
 #
-# On the `minimal` path nothing ever advances the stage. Only
-# /gate-check writes it, and the four-step jam route never invokes one -- so a
-# project with stories and running game code keeps reporting `Concept` to the
-# status line, to /help, and to every gate checklist that branches on stage.
+# Only /gate-check advances the stage, and the lightweight path never has to
+# run one -- so a project with stories in flight and real code can keep
+# reporting `Definition` to the status line, to /help, and to every skill that
+# branches on stage.
 #
-# This is an OBSERVATION, never a write. CLAUDE.md is explicit that the stage
-# advances on a /gate-check PASS with the user confirming, so a hook that
-# advanced it silently would be the worse bug. Say what is inconsistent and name
-# the skill that resolves it.
-STAGE=""
-if [ -f .claude/hooks/yaml-helper.sh ]; then
-    STAGE=$(get_yaml_key project.stage 2>/dev/null)
-fi
-[ -z "$STAGE" ] && [ -f production/stage.txt ] && STAGE=$(head -1 production/stage.txt 2>/dev/null | tr -d '
-' | tr -d ' ')
-
-if [ -n "$STAGE" ]; then
-    STORY_COUNT=$(find production/epics -name "story-*.md" 2>/dev/null | wc -l | tr -d ' ')
-    case "$STAGE" in
-      Concept|concept|Pre-Production|"Pre-Production")
-        if [ "$STORY_COUNT" -gt 0 ] && [ "$SRC_FILES" -gt 0 ]; then
-            echo "⚠️  GAP: project.stage says '$STAGE', but $STORY_COUNT stories and $SRC_FILES source files exist"
-            echo "    The stage only advances on a /gate-check PASS, and nothing on the"
-            echo "    minimal path runs one -- so the status line can sit at '$STAGE' indefinitely."
-            echo "    Suggested action: /gate-check  (it asks before advancing; this hook never writes the stage)"
-        fi
-        ;;
+# The comparison comes from .claude/scripts/stage-estimate.sh, the one ladder
+# the status line, /help and /gate-check share: SOURCE: project.yaml means a
+# stage is recorded, and ESTIMATE is what the tree looks like. Two or more
+# phases apart is a gap; one phase apart is ordinary (the next gate is simply
+# not run yet).
+#
+# This is an OBSERVATION, never a write. The stage advances on a /gate-check
+# PASS with the user confirming, so a hook that advanced it silently would be the
+# worse bug. Say what is inconsistent and name the skill that resolves it.
+SE_SCRIPT=".claude/scripts/stage-estimate.sh"
+if [ -f "$SE_SCRIPT" ]; then
+  SE_OUT=$(bash "$SE_SCRIPT" "$PWD" 2>/dev/null)
+  SE_STAGE=$(printf '%s\n' "$SE_OUT" | sed -n 's/^STAGE:[[:space:]]*//p' | head -1)
+  SE_SOURCE=$(printf '%s\n' "$SE_OUT" | sed -n 's/^SOURCE:[[:space:]]*//p' | head -1)
+  SE_EST=$(printf '%s\n' "$SE_OUT" | sed -n 's/^ESTIMATE:[[:space:]]*//p' | head -1)
+  SE_EVIDENCE=$(printf '%s\n' "$SE_OUT" | sed -n 's/^EVIDENCE:[[:space:]]*//p' | head -1)
+  _stage_index() {
+    case "$1" in
+      Discovery) echo 1 ;; Definition) echo 2 ;; Architecture) echo 3 ;;
+      Validation) echo 4 ;; Build) echo 5 ;; Hardening) echo 6 ;; Launch) echo 7 ;;
+      *) echo 0 ;;
     esac
+  }
+  if [ "$SE_SOURCE" = "project.yaml" ]; then
+    _si=$(_stage_index "$SE_STAGE")
+    _ei=$(_stage_index "$SE_EST")
+    if [ "$_si" -gt 0 ] && [ "$_ei" -gt 0 ] && [ $((_ei - _si)) -ge 2 ]; then
+      echo "⚠️  GAP: project.stage says $SE_STAGE but the tree looks like $SE_EST — run /gate-check"
+      [ -n "$SE_EVIDENCE" ] && echo "    Evidence: $SE_EVIDENCE"
+      echo "    /gate-check asks before advancing; this hook never writes the stage."
+    fi
+  fi
+else
+  echo "ℹ️  Check 6 (stage lag): NOT CHECKED — $SE_SCRIPT not found"
 fi
 
 # --- Summary ---

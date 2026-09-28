@@ -1,114 +1,131 @@
 # Concept Prototype Report: [Concept Name]
 
+> **Verdict**: [PROCEED | PIVOT | KILL | NOT ASSESSED]
+> **Product Director Review (PD-USER-VALIDATION)**: [APPROVED | CONCERNS (accepted) | REVISED] [YYYY-MM-DD]
 > **Date**: [YYYY-MM-DD]
-> **Prototype Path**: [HTML / Engine / Paper]
-> **Concept File**: design/gdd/game-concept.md (if exists)
+> **Directory**: `prototypes/[name]-concept/`
+> **Brief**: [`design/product/product-brief.md` | `design/product/one-pager.md` | none]
+> **Assumption tested**: [row # of the brief's `## Riskiest Assumptions`, or the assumption in one line]
 
----
+<!--
+`/prototype` writes this file to `prototypes/<name>-concept/REPORT.md`. It is the
+record of the prototype — the code beside it is throwaway, the evidence is not.
+
+MACHINE CONTRACT
+- The `> **Verdict**:` line sits directly under the H1 after one blank line, with
+  exactly one token: PROCEED, PIVOT, KILL, or NOT ASSESSED when the evidence
+  supports none of the three (name the missing evidence under `## Verdict`).
+  `/gate-check definition` reads it: a concept prototype with verdict PROCEED is a
+  recommended Discovery artifact.
+- Replace the review line with the recorded PD-USER-VALIDATION outcome
+  (`.claude/docs/director-gates.md` § Recording Gate Outcomes) or with the skip note
+  `> [PD-USER-VALIDATION] skipped — Solo mode` / `— Lean mode`.
+- Keep the six `##` headings exactly as spelled, in this order. Write the body in
+  the team's language.
+
+EVIDENCE RULES
+- Record what was observed — counts, rates, time, quotes with participant IDs —
+  separately from what it means.
+- State sample sizes. Five usability sessions find usability problems; they do not
+  prove demand. Small samples are labelled directional.
+- No real personal data in this file: participant IDs only; recordings and contact
+  details stay in the team's approved research store.
+
+Examples use Moa, a B2C subscription savings app for the Korean market; numbers are
+illustrative. Delete these comments when the report is written.
+-->
 
 ## Hypothesis
 
-[The falsifiable hypothesis this prototype set out to test:
-"If the player [does X], they will feel [Y] — evidenced by [measurable signal Z]."]
+[A falsifiable statement with a behaviour and a metric, written before the
+sessions ran:]
 
----
+> We believe [target segment] will [observable behaviour] when [condition]. We will
+> know this is true when [metric] reaches [threshold] across [n participants /
+> visits / days].
 
-## Riskiest Assumption Tested
+- **Risk type**: [Value | Usability | Feasibility | Viability]
+- **Why this assumption first**: [why it is the riskiest — what fails if it is wrong]
+- **Written down before the sessions**: [yes — date | no — interpreted after the fact
+  (weaker evidence)]
 
-[What was identified as the biggest risk in the concept, and whether it proved out.]
+*Example (Moa)*: "We believe salaried 25–34-year-olds will authorise an automatic
+payday transfer in their first session when the screen shows exactly when and how
+much will move. We will know this is true when at least 4 of 5 participants
+complete authorisation without help."
 
----
+## Path
 
-## Approach
+- **Path**: [clickable | code | fake-door | concierge]
+- **Why this path**: [what kind of question it answers best for this hypothesis]
+- **What this path cannot tell us**: [e.g. a clickable prototype says nothing about
+  real payment failures; a fake door says nothing about retention]
+- **What was built**: [files in this directory, sandbox accounts used, preview URL
+  if any (noindex, torn down after the sessions)]
+- **Shortcuts taken on purpose**: [hard-coded data, faked steps, skipped screens]
 
-[What was built, how long it took, what shortcuts were taken deliberately.]
+## Method
 
-**Path chosen:** [HTML / Engine / Paper]
-**Reason for path:** [Why this path was appropriate for this hypothesis]
+- **Participants / traffic**: [segment, how recruited, screener, n; for a fake door:
+  channel, audience, impressions]
+- **Consent and data handling**: [how consent was collected; where recordings live
+  (never in the repository); participant IDs used here]
+- **Tasks or scenario**: [the tasks given, or the offer shown, or the service run by
+  hand]
+- **Measures**: [task success, time on task, errors, SEQ; click-through and sign-up
+  rate; continuation after N days; for code: success rate, latency, error modes]
+- **Time box**: [build time, session period] — [kept | exceeded, and why]
 
-**Shortcuts taken (intentional):**
-- [e.g., hardcoded values, placeholder art, no menus, etc.]
+## Results
 
----
+### Participants
 
-## Result
+| ID | Segment fit | Device / surface | Notes |
+|---|---|---|---|
+| P1 | [yes / partial] | [iOS app via Expo Go / web / …] | [...] |
 
-[What actually happened — specific observations, not opinions. Quote playtesters
-directly where possible.]
+### Measures
 
----
+| Measure | Result | Threshold | Met? |
+|---|---|---|---|
+| [task success: authorise the payday transfer] | [3 of 5] | [≥ 4 of 5] | [no] |
+| [fake-door click-through] | [...] | [...] | [...] |
+| [conversion to waitlist sign-up] | [...] | [...] | [...] |
 
-## Metrics
+### Observations
+- [What participants did — with IDs: "P2 and P4 stopped at the account-connection
+  step and asked whether the app could withdraw more than the goal amount"]
+- [Quotes, verbatim, with IDs]
+- [Surprises — good or bad]
 
-| Metric | Value |
-|--------|-------|
-| Path used | [HTML / Engine / Paper] |
-| Iterations to playable | [N — Engine path only; N/A otherwise] |
-| Prototype duration | [e.g., 4 hours] |
-| Playtesters | [N internal / N external] |
-| Feel assessment | [Specific — "response felt sluggish at 200ms" not "felt bad"] |
-| Hypothesis verdict | [CONFIRMED / PARTIALLY CONFIRMED / REFUTED] |
+**Hypothesis outcome**: [SUPPORTED | REFUTED | INCONCLUSIVE] — [one sentence with
+the evidence]
 
----
+## Verdict
 
-## Recommendation: [PROCEED / PIVOT / KILL]
+**[PROCEED | PIVOT | KILL | NOT ASSESSED]** — [the recommendation in one paragraph,
+reasoned from the results above, not from how the team feels about the idea.]
 
-[One paragraph explaining the recommendation with evidence from the result above.]
+- **PROCEED** — the value hypothesis held; what the PRDs must carry over from this
+  prototype: [confirmed assumptions, numbers observed, copy that worked].
+- **PIVOT** — what almost worked and what to change; the revised hypothesis is in
+  `PIVOT-NOTE.md` in this directory.
+- **KILL** — the specific signal that ends this direction, what worked and is worth
+  carrying to the next concept, and what to try differently next time.
+- **NOT ASSESSED** — the evidence supports none of the three; name what is missing
+  (sessions not run, no traffic, sandbox unavailable) and how to get it.
 
----
+[When PD-USER-VALIDATION disagrees with this verdict, record the disagreement and
+the user's decision here — neither side is silently kept.]
 
-## If Proceeding
+## Next Step
 
-[What the prototype revealed that should directly inform GDD writing:]
-
-- **Core tuning values discovered:** [e.g., "jump height of 3.5 units felt best"]
-- **Assumptions confirmed:** [What the concept doc assumed that proved true]
-- **Assumptions disproved:** [What the concept doc assumed that proved wrong]
-- **Emergent mechanics:** [Behaviors that appeared during testing worth formalizing]
-
-> Note: If HTML path was used and feel is uncertain, consider an engine prototype
-> targeting feel specifically before committing to GDDs.
-
-**Next steps:**
-1. `/design-review design/gdd/game-concept.md`
-2. `/gate-check`
-3. `/map-systems`
-4. `/design-system [mechanic]` (use learnings in Tuning Knobs and Formulas sections)
-
----
-
-## If Pivoting
-
-[What alternative direction the results suggest — what felt almost right and what
-to adjust. Be specific about what to change, not just that something needs changing.]
-
-**Pivot direction:** [What to try differently]
-**What to keep:** [What worked and should be preserved]
-**Next step:** `/prototype [revised-concept]`
-
----
-
-## If Killing
-
-[Why this concept does not work — what specific signal led to this verdict.
-This report is the deliverable; no further action needed on this concept.]
-
-**Next step:** `/brainstorm [new-direction]`
-
----
-
-## Lessons Learned
-
-- **What assumptions were broken by actually building this?**
-  [...]
-
-- **What surprised us that didn't show up in the brainstorm?**
-  [...]
-
-- **What would we test differently next time?**
-  [...]
-
----
-
-> *Prototype code location: `prototypes/[concept-name]-concept/`*
-> *This code is throwaway. Never refactor into production.*
+- **Brief update**: [set the status of the tested row in `## Riskiest Assumptions`
+  to Validated / Invalidated]
+- **Next skill**: [PROCEED → `/prd-review design/product/product-brief.md`, then
+  `/gate-check definition` and `/map-features` (at `minimal`: `/create-stories`);
+  no brief yet → `/reverse-document brief prototypes/[name]-concept`;
+  PIVOT → `/prototype [revised concept]`; KILL → `/brainstorm open`;
+  NOT ASSESSED → run the missing sessions, then `/prototype report prototypes/[name]-concept`]
+- **Throwaway reminder**: production code is written from scratch in the code roots;
+  nothing here is imported or refactored into it.

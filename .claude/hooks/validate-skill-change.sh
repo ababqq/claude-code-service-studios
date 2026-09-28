@@ -19,16 +19,18 @@
 #
 # NOT an upward search: that resolves a nested project to its parent's config.
 if [ -f "project.yaml" ] || [ -d ".claude" ]; then
-  CCGS_ROOT="$PWD"
+  CCSS_ROOT="$PWD"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "${CLAUDE_PROJECT_DIR}" ]; then
-  CCGS_ROOT="$CLAUDE_PROJECT_DIR"
+  CCSS_ROOT="$CLAUDE_PROJECT_DIR"
 else
-  CCGS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  CCSS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
 fi
-[ -n "$CCGS_ROOT" ] && cd "$CCGS_ROOT" 2>/dev/null || true
+[ -n "$CCSS_ROOT" ] && cd "$CCSS_ROOT" 2>/dev/null || true
 
-# Claude Code PostToolUse hook: Advises running skill-test after skill file changes
-# Fires when any file inside .claude/skills/ is written or edited.
+# Claude Code PostToolUse hook: Advises running /skill-test after a skill or an
+# agent definition changes.
+#   .claude/skills/<name>/...   -> /skill-test static <name>  (structural lint)
+#   .claude/agents/<name>.md    -> /skill-test spec <name>    (behavioural spec)
 #
 # Exit behavior:
 #   exit 0 = advisory only (non-blocking)
@@ -53,12 +55,23 @@ fi
 # single `s|\\|/|g` then turns each of those into its own slash, producing
 # `.claude//skills//help//SKILL.md`, which no path test below matches. The hook
 # went silent on every Windows edit whenever jq was absent -- and jq is absent
-# on a stock Windows Git Bash, which is this project's primary platform.
+# on a stock Windows Git Bash, one of the supported platforms.
 #
 # Rule 1 collapses the escaped pair to one slash; rule 2 handles an already
 # unescaped separator (the jq path, or a POSIX caller). Running both is safe
 # for either input because rule 1 finds nothing to do on unescaped text.
 FILE_PATH=$(printf '%s' "$FILE_PATH" | sed 's|\\\\|/|g; s|\\|/|g')
+
+# Agent definitions: .claude/agents/<name>.md (top level only -- agent memory
+# lives in .claude/agent-memory/, which is not an agent definition).
+if echo "$FILE_PATH" | grep -qE '(^|/)\.claude/agents/[^/]+\.md$'; then
+    AGENT_NAME=$(echo "$FILE_PATH" | grep -oE '\.claude/agents/[^/]+\.md$' | sed 's|\.claude/agents/||; s|\.md$||')
+    [ -z "$AGENT_NAME" ] && exit 0
+    echo "=== Agent Modified: $AGENT_NAME ===" >&2
+    echo "Run /skill-test spec $AGENT_NAME to check the agent against its behavioural spec." >&2
+    echo "====================================" >&2
+    exit 0
+fi
 
 # Only act on files inside .claude/skills/
 if ! echo "$FILE_PATH" | grep -qE '(^|/)\.claude/skills/'; then
