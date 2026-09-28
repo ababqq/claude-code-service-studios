@@ -1,58 +1,78 @@
 ---
 paths:
-  - "assets/data/**"
+  - "config/**"
+  - "**/seed/**"
+  - "**/fixtures/**"
+  - "**/locales/**"
+  - "**/i18n/**"
 ---
 
 # Data File Rules
 
-- All JSON files must be valid JSON — broken JSON blocks the entire build pipeline
-- File naming: lowercase with underscores only, following `[system]_[name].json` pattern
-- Every data file must have a documented schema (either JSON Schema or documented in the corresponding design doc)
-- Numeric values must include comments or companion docs explaining what the numbers mean
-- Use consistent key naming: **`snake_case` for keys within JSON files**, matching
-  the `[system]_[name].json` file convention one line above and the engine idiom
-  every other standard in this repo uses.
+Configuration, seed data, test fixtures and locale files are code: they are reviewed, versioned and validated like
+code.
 
-  > **On Unity and Unreal this costs you a mapping layer — budget for it rather
-  > than changing the keys.** `JsonUtility` binds by *exact field name*, and C#
-  > fields are `camelCase` per `naming.variables`, so a snake_case file cannot bind
-  > directly to the type that consumes it. Use a private nested DTO whose fields
-  > are the wire format and which maps once into your real type, or take a
-  > dependency that supports a naming policy (Newtonsoft `SnakeCaseNamingStrategy`,
-  > `System.Text.Json` `JsonNamingPolicy`). Do **not** switch the file to camelCase
-  > to avoid the DTO: keys are the cross-engine contract. Write the DTO and
-  > document it as a wire-format boundary — that is the intended shape.
-- No orphaned data entries — every entry must be referenced by code or another data file
-- Version data files when making breaking schema changes
-- Include sensible defaults for all optional fields
+- **Valid JSON or YAML, always.** The `validate-data-files` hook rejects an unparseable file under `config/**`,
+  `**/locales/**` and `**/i18n/**` right after the write, and `validate-commit` blocks the commit. YAML is block
+  style, indented with spaces, never tabs.
+- **A schema per file.** Every config file has a schema — a JSON Schema referenced by `$schema`, or a typed loader
+  (zod, Pydantic, a Kotlin or Swift `Codable` type) that validates at startup and in CI. The application refuses to
+  start on an invalid config rather than falling back to guesses.
+- **Key casing per `naming.*`.** File names follow `naming.files`. Keys in files the API serves to clients follow
+  `naming.api_fields`; keys read only by server code follow `naming.variables`; environment variable names follow
+  `naming.env_vars`. One casing per file. Locale message keys are dotted paths by feature and screen
+  (`goals.create.title`), identical across every locale file.
+- **No secrets.** API keys, tokens, passwords, private keys and connection strings with credentials never go in
+  these files — they come from the secret manager or the environment at runtime. Commit `.env.example` with
+  placeholder values only; `validate-commit` blocks `.env` files and known key formats.
+- **Versioned config.** Each config file carries a `schemaVersion`; a breaking shape change bumps it and the loader
+  rejects versions it does not know. Environment differences are overlays (`config/base.yaml` +
+  `config/staging.yaml`), not copies. Business values (prices, limits, quotas, timeouts) live here or in feature
+  flags — never hardcoded in code — and each one names the PRD rule it implements.
+- **Money and time in data files** use the API conventions: integer minor units with an ISO 4217 code (KRW has no
+  minor unit), RFC 3339 UTC instants, IANA timezone names (`Asia/Seoul`).
+- **Seeds and fixtures are synthetic.** No production data and no real personal data: emails at `example.com`,
+  obviously fake phone numbers, generated names. Fixtures are deterministic (fixed IDs and seeds, fixed clock) so
+  tests do not depend on run order or time.
+- **Locale files**: ICU MessageFormat for plurals, selects and numbers; named placeholders, never string
+  concatenation; every key present in every shipped locale of `localization.locales` (a missing key fails CI);
+  length limits noted for push, SMS and 알림톡 templates.
+- **No orphans.** Every entry is read by code or referenced by another data file; unused keys are removed in the
+  same change that stops reading them.
 
 ## Examples
 
-**Correct** naming and structure (`combat_enemies.json`):
+**Correct** (`config/plans.yaml` — Moa subscription plans):
+
+```yaml
+$schema: ./schemas/plans.schema.json
+schemaVersion: 2
+plans:
+  - id: free
+    monthlyPrice: { amount: 0, currency: KRW }
+    activeGoalLimit: 3          # PRD goals, Business Rules & Calculations — rule R2
+  - id: plus
+    monthlyPrice: { amount: 4900, currency: KRW }
+    activeGoalLimit: 20
+```
+
+**Correct** (`apps/mobile/locales/ko-KR/goals.json` — ICU plural, named placeholder):
 
 ```json
 {
-  "goblin": {
-    "base_health": 50,
-    "base_damage": 8,
-    "move_speed": 3.5,
-    "loot_table": "loot_goblin_common"
-  },
-  "goblin_chief": {
-    "base_health": 150,
-    "base_damage": 20,
-    "move_speed": 2.8,
-    "loot_table": "loot_goblin_rare"
-  }
+  "goals.list.count": "{count, plural, other {목표 #개}}",
+  "goals.create.limitReached": "{planName} 플랜은 목표를 {limit}개까지 만들 수 있어요."
 }
 ```
 
-**Incorrect** (`EnemyData.json`):
+**Incorrect** (`config/Plans.json`):
 
 ```json
 {
-  "Goblin": { "hp": 50 }
+  "Free": { "price": 0.0, "goal_limit": 3 },
+  "Plus": { "Price": 4.9, "goalLimit": 20, "tossSecretKey": "live_sk_..." }
 }
 ```
 
-Violations: uppercase filename, uppercase key, no `[system]_[name]` pattern, missing required fields.
+Violations: uppercase file name; mixed key casing (`goal_limit`, `goalLimit`, `Price`); prices as floats in the wrong
+unit with no currency; a secret in a config file; no `schemaVersion` and no schema.

@@ -16,11 +16,18 @@ project.local.yaml
 production/session-logs/
 # Ephemeral per-session checkpoint. directory-structure.md documents this as
 # gitignored; the rule was missing, so active.md would have been committed.
-production/session-state/
+# The contents are ignored rather than the directory itself: git cannot
+# re-include a file whose parent directory is excluded, so only this form lets
+# the `.gitkeep` exception below take effect.
+production/session-state/*
+!production/session-state/.gitkeep
 .scratch/
 # Per-agent working memory written at runtime — not release material
 .claude/agent-memory/
 
+# === Skill Testing Framework ===
+# Local /skill-test and /skill-improve run output — regenerated on demand
+CCSS Skill Testing Framework/results/
 
 # === Local sandboxes and scratch work ===
 examples/
@@ -32,6 +39,9 @@ qa-sandbox/
 # === Runtime Artifacts (auto-generated, start empty on fresh clone) ===
 # Created on first use by /consistency-check and /architecture-review
 docs/consistency-failures.md
+# Raw load-test output (k6/Artillery/Locust JSON, HTML dumps). The summarized
+# report in production/qa/load/load-test-*.md is the retained evidence.
+production/qa/load/raw/
 
 # === Build Output ===
 build/
@@ -46,79 +56,45 @@ dist/
 *.dylib
 *.app
 
-# === Engine: Godot ===
-# Two subtleties, both of which produced a silently-wrong rule before this:
-#  1. A pattern with an internal `/` is anchored to THIS directory, so `.godot/*`
-#     would only match a top-level `.godot` and miss `examples/<game>/.godot`.
-#     `**/` makes it match at any depth.
-#  2. Git cannot re-include a file whose PARENT DIRECTORY is excluded, so
-#     `**/.godot/` plus a `!` negation is inert. Exclude the CONTENTS instead.
-**/.godot/*
-# ...except the script class registry. `class_name` declarations resolve from this
-# one file, so on a FRESH CLONE every script referencing a class_name fails to
-# parse — while `godot --headless --path . --quit` still exits 0, so no CI check
-# catches it. Fresh clones hit this trap reliably.
-# Keep this un-ignore, or run `godot --headless --import` once after cloning.
-!**/.godot/global_script_class_cache.cfg
-*.translation
-export_presets.cfg
-# Uncomment if using Godot:
-# *.import
+# === Node / Web ===
+node_modules/
+.next/
+.nuxt/
+.output/
+.turbo/
+.vercel/
+coverage/
+playwright-report/
+test-results/
 
-# === Engine: Unity ===
-[Ll]ibrary/
-[Tt]emp/
-[Oo]bj/
-[Bb]uild/
-[Bb]uilds/
-[Ll]ogs/
-[Uu]ser[Ss]ettings/
-*.csproj
-*.unityproj
-*.sln
-*.suo
-*.tmp
-*.user
-*.userprefs
-*.pidb
-*.booproj
-*.svd
-*.pdb
-*.mdb
-*.opendb
-*.VC.db
-crashlytics-buildid.txt
-sysinfo.txt
-# Uncomment if using Unity:
-# [Aa]ssets/[Aa]sset[Ss]tore[Tt]ools/
+# === Mobile ===
+# Anchored patterns carry a `**/` prefix so they also match inside a monorepo
+# app root such as apps/mobile/ (a pattern with an internal `/` is otherwise
+# anchored to the repository root).
+.expo/
+**/ios/Pods/
+**/DerivedData/
+*.xcuserstate
+**/android/.gradle/
+**/android/app/build/
+.dart_tool/
 
-# === Engine: Unreal ===
-Binaries/
-DerivedDataCache/
-Intermediate/
-Saved/
-*.VC.opendb
-*.opensdf
-*.sdf
-*.cachefile
-*.VC.db
-# Uncomment if using Unreal:
-# *.uasset
-# *.umap
+# === Python ===
+__pycache__/
+.venv/
+.pytest_cache/
 
-# === Compiled Shaders ===
-*.spv
-*.cso
-*.dxbc
+# === Infra ===
+.terraform/
+*.tfstate
+*.tfstate.*
 
 # === Temporary and Cache ===
 *.tmp
 *.temp
 *.cache
 *.log
-__pycache__/
 *.pyc
-node_modules/
 .npm/
 
 # === Archives ===
@@ -129,27 +105,27 @@ node_modules/
 
 # === Secrets and Environment ===
 .env
-.env.local
-.env.*.local
+.env.*
+!.env.example
 *.pem
 *.key
+*.keystore
+*.jks
+*.p12
+*.mobileprovision
 credentials.json
 secrets.json
 
-# === Large Binary Assets (use Git LFS instead) ===
+# === Large Binary Media (use Git LFS instead) ===
 # Uncomment and configure with Git LFS for your project:
-# *.png
-# *.jpg
-# *.jpeg
+# *.psd
+# *.ai
+# *.sketch
+# *.mp4
+# *.mov
+# *.webm
 # *.wav
 # *.mp3
-# *.ogg
-# *.fbx
-# *.blend
-# *.psd
-# *.tga
-# *.exr
-# *.hdr
 
 # === OS Generated ===
 ehthumbs.db
@@ -162,3 +138,10 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+
+# === Retained QA evidence (keep last) ===
+# Evidence only counts when it is committed. The generic `*.log` and `*.zip`
+# rules above would silently drop a story's migration-dry-run.log and its
+# Playwright trace archives, so both are re-included under the evidence tree.
+!production/qa/evidence/**/*.log
+!production/qa/evidence/**/*.zip

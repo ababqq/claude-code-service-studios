@@ -1,6 +1,10 @@
 > Authoring guidance for interaction-pattern-library.md. Load only the part covering the section currently being authored — not the whole file at once.
 
-> Covers: **Navigation Patterns** (Screen Push / Pop / Replace, Focus Management, Escape / Cancel) and **Feedback and Loading Patterns** (Loading State, Empty State, Error State) — full reference specifications.
+> Covers: **Navigation Patterns** (Screen Push / Pop / Replace — including browser history and deep links; Focus Management; Escape / Cancel — including the browser back button, iOS swipe-back and Android system back) and **Feedback and Loading Patterns** (Loading State, Empty State, Error State — including toasts and snackbars as feedback) — full reference specifications.
+
+Examples use **Moa**, a subscription savings app on the web, iOS and Android, and
+its web admin console. Durations and easing come from the design language's
+`## 7. Motion & Feedback`; the values below are worked examples.
 
 ## Navigation Patterns
 
@@ -11,23 +15,61 @@
 **Category**: Navigation
 **Status**: Draft
 
-These three patterns define how screens enter and exit the navigation stack.
+These three patterns define how screens enter and leave the navigation history —
+the in-app stack on iOS and Android, the browser history on the web.
 
-| Pattern | Trigger | Animation | Stack Behavior | Focus Behavior |
-|---------|---------|-----------|---------------|----------------|
-| Push | Navigate deeper (open submenu, open detail view) | New screen slides in from right. Previous screen slides left and dims. | Previous screen remains on stack | Focus moves to first interactive element on new screen |
-| Pop (Back) | Back button / Escape / B / Circle | Current screen slides right and exits. Previous screen slides in from left and brightens. | Current screen removed from stack | Focus returns to the element that triggered the Push |
-| Replace | Navigate to a peer screen (not child, not parent). Loading screen. | Fade out current, fade in new. No directional bias. | Current screen removed. New screen added. | Focus moves to first interactive element on new screen |
+| Pattern | Trigger | Animation | History Behavior | Focus Behavior |
+|---------|---------|-----------|------------------|----------------|
+| Push | Navigate deeper (open a goal, open a transaction, open a settings sub-page) | Mobile: new screen slides in from the trailing edge (iOS) or with the platform's shared-axis transition (Android). Web: no slide; content swaps. | Previous screen stays in the stack; on the web a new history entry (`history.pushState` / the router's `push`) | Focus moves to the new screen's heading (web) or first element (native screen readers do this for native navigation) |
+| Pop (Back) | Back button, system back, swipe-back, browser back, Esc where applicable | Reverse of Push | Current entry removed; previous screen restored with its scroll position and form state | Focus returns to the element that triggered the Push (the tapped row), or the heading if it no longer exists |
+| Replace | Navigate to a peer, redirect after sign-in, move from a finished flow to its result | Cross-fade | Current entry replaced (`history.replaceState` / router `replace`) — back does not return to it | Focus moves to the new screen's heading |
 
-**Animation durations**: Push/Pop: 250ms ease-in-out. Replace: 200ms fade out + 200ms fade in.
+**Replace is the right choice when going back would be wrong**: after sign-in (back
+must not return to the login form), after completing a payment (back must not
+resubmit or show the checkout again), when a filter or sort changes on a list
+(each keystroke must not create a history entry — replace the URL query instead).
 
-**Motion reduction**: All slide animations become fades. Duration reduces to 100ms.
+**Browser history rules (web)**:
+- Every screen and every meaningful view state (tab, filters, page, selected
+  item in a master–detail layout) has a URL, so back, refresh and a shared link
+  all restore it.
+- The browser back button follows what the user perceives as "a page": opening a
+  modal dialog does not push an entry by default; a full-screen modal flow on
+  mobile web may push one so that back closes it.
+- Forms with unsaved input warn on navigation (`beforeunload` for leaving the
+  site, an in-app confirmation for in-app routes) — only when there is real input
+  to lose.
+- Scroll position is restored on back; it is reset to the top on push.
 
-**Implementation Notes**: [Godot: Implement as a `ScreenManager` singleton managing
-a stack of `Control` scenes. `push(screen_scene)` instantiates and animates in.
-`pop()` animates out and frees. `replace(screen_scene)` calls pop then push without
-the intermediate stack state. Use `CanvasLayer` per screen to isolate input handling.
-Store the "return focus" element reference before pushing so it can be restored on pop.]
+**Deep links**:
+- Every linkable screen has a custom-scheme link and a universal link (iOS) /
+  App Link (Android) on the same path as the web route:
+  `moa://goals/{goalId}` and `https://moa.example/goals/{goalId}`. When the app
+  is not installed, the web route opens.
+- A deep link builds a **synthetic back stack**: opening a transaction from a
+  "자동이체 실패" (auto-debit failed) push lands on the transaction detail with the
+  History list and Home beneath it, so back walks up the hierarchy instead of
+  exiting the app.
+- A deep link into a signed-in screen while signed out goes to sign-in first and
+  continues to the target afterwards (`/login?next=/goals/g_123`).
+- A deep link to something that no longer exists (a deleted goal) lands on the
+  parent list with an explanation, not an error screen.
+- Links are never trusted: the screen loads the object through the API with the
+  user's permissions (a link to someone else's goal is a 404, not a leak).
+
+**Animation durations**: Push/Pop: platform defaults on native (do not
+reimplement them); web content swap 150ms cross-fade or none. Replace: 150ms fade
+out + 150ms fade in.
+
+**Motion reduction**: Slides become fades; web transitions become instant.
+
+**Implementation Notes**: [Web: the framework router (Next.js App Router, React
+Router, etc.) with `push` / `replace`; scroll restoration enabled; announce the
+route change (see Focus Management). iOS: `NavigationStack` with a path bound to
+state so deep links can set the full path at once. Android: Navigation Compose
+with deep-link destinations and `TaskStackBuilder` / the navigation library's
+back-stack synthesis for links opened from notifications. React Native: React
+Navigation linking config with the same path structure as the web routes.]
 
 ---
 
@@ -36,23 +78,25 @@ Store the "return focus" element reference before pushing so it can be restored 
 **Category**: Navigation
 **Status**: Draft
 
-> Focus management is the most common keyboard and gamepad accessibility failure
-> in game UIs. These rules must be implemented consistently. A player should
-> never be in a state where they cannot see which element is focused, or where
-> Tab/D-pad produces no visible result.
+> Focus management is the most common keyboard and screen-reader failure in web
+> apps, and single-page apps make it worse: a client-side route change swaps the
+> content without the page load that screen readers rely on. A user must never be
+> left unable to see where focus is, or with focus on something that no longer
+> exists.
 
 | Rule | Description |
 |------|-------------|
-| Screen open | Focus is placed on the most logical interactive element — typically the Primary button, the first list item, or the last-focused element if the screen was previously visited. Never on a non-interactive element. |
-| Screen close / pop | Focus returns to the element that triggered the navigation (the button that opened the screen, the list item that was selected). If that element no longer exists, focus goes to the nearest preceding interactive element. |
-| Modal open | Focus is trapped inside the modal. See Modal Dialog pattern. |
-| Modal close | Focus returns to the element that triggered the modal. |
-| Element disabled | If the focused element becomes disabled, focus moves to the next available interactive element in the tab order. |
-| Element destroyed | If the focused element is removed from the scene, focus moves to the nearest preceding element in the tab order. |
-| Screen without interactive elements | Focus management is a no-op. Ensure back/cancel input still works. |
-| Tab key (keyboard) | Moves focus forward through interactive elements in document order (left to right, top to bottom). Shift+Tab moves backward. |
-| D-pad (gamepad) | Moves focus in the spatial direction pressed. Spatial navigation is preferred over strict tab order for gamepad. Never wrap focus between unrelated regions (e.g., Tab bar and content area should be separate navigation regions). |
-| Focus is always visible | Focus ring or equivalent focus indicator must ALWAYS be visible when an element is focused via keyboard or gamepad. Never suppress focus indicators. |
+| Screen open (route change, web) | Move focus to the new page's main heading (`h1` with `tabindex="-1"`) or to `main`; update `document.title`; the title or heading is announced. Do not leave focus on the link that was activated. |
+| Screen open (native) | Native navigation moves VoiceOver/TalkBack focus to the new screen; custom transitions must post a screen-changed notification to do the same. |
+| Screen close / pop | Focus returns to the element that triggered the navigation (the row that was tapped). If it no longer exists, focus goes to the nearest preceding element or the heading. |
+| Modal open | Focus moves into the dialog and is trapped there. See Modal Dialog in the standard controls guidance. |
+| Modal close | Focus returns to the element that opened it. |
+| Element disabled while focused | Focus moves to the next available element; never to the top of the page. |
+| Element removed while focused | (e.g. deleting a list row) Focus moves to the next row, or the previous one if it was last, or the list heading if the list is now empty. |
+| Inline content change | Content that appears after an action (validation errors, a loaded section) does not steal focus unless the user must act on it; announce it instead. |
+| Tab order | Follows the visual reading order (left to right, top to bottom; for Korean and English the same). Never use positive `tabindex` values. |
+| Focus is always visible | A focus indicator is visible on every element reached by keyboard (WCAG 2.2 SC 2.4.7) and is not hidden behind sticky headers, bottom bars or banners (SC 2.4.11). `:focus-visible` shows it for keyboard users without showing it on every mouse click. |
+| Skip link | The first focusable element on every web page skips to the main content ("본문 바로가기"). |
 
 ---
 
@@ -61,22 +105,55 @@ Store the "return focus" element reference before pushing so it can be restored 
 **Category**: Navigation
 **Status**: Draft
 
-> The "go back" action is the most-used navigation input in all menu systems.
-> It must be consistent across every screen with no exceptions.
+> "Go back / cancel" is the most-used navigation input. Each surface has its own
+> physical form of it, and users expect each one to work the way their platform
+> works. Every screen spec defines what back does on that screen.
 
-| Platform | Input | Behavior |
-|----------|-------|---------|
-| PC (keyboard) | Escape | Close top-most modal / go back one screen in stack / if at root screen (main menu), open "quit?" confirmation |
-| PC (gamepad) | B (Xbox layout) / Circle (PS layout) | Same as Escape |
-| Xbox | B button | Same as Escape |
-| PlayStation | Circle button | Same as Escape |
-| Nintendo Switch | B button | Same as Escape (NOTE: Nintendo uses B for confirm in some first-party titles — verify platform convention for this release and document the decision) |
+| Surface / input | Input | Behavior |
+|-----------------|-------|----------|
+| Web — keyboard | Esc | Closes the top-most overlay (menu, popover, dialog, sheet). Never navigates the page back. |
+| Web — browser back button / gesture | Back button, `Alt+←` / `⌘[`, trackpad swipe | Goes to the previous history entry (see Screen Push / Pop / Replace for what creates entries). An open full-screen modal flow that pushed an entry closes. Unsaved input prompts a confirmation. |
+| iOS — back button | "‹ [Previous title]" in the navigation bar | Pops the stack. |
+| iOS — swipe-back | Swipe from the leading screen edge | Pops the stack interactively; the user can cancel mid-gesture. Keep it working — do not disable it on normal screens, and do not place horizontal carousels or sliders flush against the leading edge. |
+| iOS — sheets | Swipe down / close button | Dismisses; with unsaved input, the sheet refuses the swipe and asks to discard (`interactiveDismissDisabled` + a confirmation). |
+| Android — system back | Back gesture from either screen edge, or the back button in three-button navigation | Closes the top-most overlay, then pops the stack; on a tab's root, goes to the start destination; on the start destination, leaves the app. **Predictive back**: the system shows a preview of where back will go — register back handling through the platform callback API so the preview is correct, and never intercept back on normal screens. |
+| Android — up button | "←" in the top app bar | Goes to the logical parent screen (which may differ from back after a deep link). |
+| Screen reader | VoiceOver two-finger "Z" scrub; TalkBack back gesture | Same as the platform's back. Custom overlays must honor it (`accessibilityPerformEscape` on iOS). |
 
-**Rules**: This input must never be overridden to do something other than "go back / cancel." If a screen has no back action (e.g., the game is paused and the player must make a choice), Escape does nothing or shows a "you must choose" message — it does not navigate away. Every screen must define its Escape behavior explicitly in its UX spec.
+**Rules**:
+- Back never does something other than "go back / cancel". It never submits,
+  never deletes and never moves forward.
+- A step that cannot be abandoned (a payment already submitted and waiting for
+  the provider's result) handles back by showing why the user must wait — it does
+  not silently navigate away, and it does not trap the user forever (show a way
+  out once the result is known or after a timeout, with the status explained).
+- Leaving a form with unsaved input asks "Discard changes?" with "Discard" /
+  "Keep editing" — only when there is input to lose.
+- Every screen spec states its back behavior explicitly, including after a deep
+  link.
 
 ---
 
 ## Feedback and Loading Patterns
+
+**Choosing the feedback channel** — the patterns below cover states of a screen
+or a component. Transient confirmations of an action use a **toast** ("저장했어요"
+— saved) or, when there is one useful follow-up, a **snackbar** with a single
+action ("Undo" after archiving a goal, "Retry" after a failed refresh). Both are
+specified in Toast / Notification in the standard controls guidance; the rules
+that decide between channels are:
+
+| The user needs to… | Channel |
+|--------------------|---------|
+| Know an action worked, no follow-up | Toast (4s), or nothing when the result is visible on screen |
+| Be able to reverse what they just did | Snackbar with "Undo" (6s or more; paused on focus); the action is performed immediately and reversed on Undo |
+| Retry something that failed without leaving the screen | Snackbar with "Retry", or an inline error with a retry button when the failed content occupies a region |
+| Fix an input | Inline message at the field (never a toast) |
+| Know about a problem that affects the whole product | Global banner (app shell `## Notifications & Banners`) |
+| Decide before continuing | Modal Dialog |
+
+Toasts and snackbars never carry information that exists nowhere else, never
+hold the only path to an action, and never announce by stealing focus.
 
 ---
 
@@ -87,12 +164,18 @@ Store the "return focus" element reference before pushing so it can be restored 
 
 | Scope | Pattern | Notes |
 |-------|---------|-------|
-| Full screen (initial load) | Full-screen loading screen with game art, progress bar (determinate if possible), tip text (optional). | Never use an empty black screen. Give the player something to read or look at. |
-| Full screen (level transition) | Fade to black, loading screen, fade from black to new scene. | The fade removes the pop of the previous scene disappearing. |
-| Component / inline | Spinner or skeleton placeholder replaces the loading component. Component does not shift layout when content loads. | Skeleton placeholder (grey boxes approximating content shape) is preferable to spinner for layout-heavy content — it prevents layout shift on load. |
-| Background / async | No visual indication unless operation exceeds 2 seconds. After 2 seconds, show a small spinner or toast. | Do not show loading indicators for operations that complete in under 2 seconds — the flash of an indicator is more disruptive than waiting. |
+| First load of a screen | Skeleton of the screen's layout (header, cards, list rows in their final sizes) | Layout does not shift when content arrives (Cumulative Layout Shift). No blank white screen. |
+| Region / component | Skeleton or a small spinner in the region; the rest of the screen stays usable | Each region loads and fails independently (partial data). |
+| Button-triggered action | The button's Loading state (spinner, disabled, fixed width) | Prevents double submission. |
+| Background refresh | No indicator under about 1s; then a subtle indicator (pull-to-refresh spinner, "Updating…" label) | Showing spinners for fast operations is more disruptive than waiting. |
+| Optimistic update | Show the result immediately (toggle flips, row archived); roll back with a snackbar if the server rejects it | Only for actions that almost always succeed and are cheap to reverse — never for payments or transfers. |
+| Long operation (export, large upload) | Progress Bar with real progress; the user may leave and is notified on completion | State the expected time if known. |
+| Server-driven wait (payment confirmation) | A dedicated waiting state with what is happening ("결제 확인 중이에요" — confirming your payment) and what not to do ("do not close this screen") | Poll or subscribe for the result; time out into a clear status, never an endless spinner. |
 
-**Accessibility**: Loading states must announce to screen readers: "[Context] loading, please wait." Completion must announce "[Context] loaded." For full-screen loading, ensure the loading screen itself is navigable to screen readers — the tips text and any UI elements must be exposed.
+**Accessibility**: Announce the start of a long load politely ("Loading your
+history") and its completion ("24 transactions loaded"); skeletons are hidden from
+assistive technology (`aria-busy="true"` on the region while loading); spinners
+have a text alternative; reduced motion replaces shimmer with a static skeleton.
 
 ---
 
@@ -101,20 +184,27 @@ Store the "return focus" element reference before pushing so it can be restored 
 **Category**: Feedback
 **Status**: Draft
 
-> Empty states are consistently the least-designed parts of game UIs. They are
-> the difference between a player feeling "this is where I'll store my items"
-> and "why is nothing here? did something break?" Every empty list and grid must
-> have a designed empty state. The empty state is not an error — it is a starting
-> point.
+> Empty states are the first thing a new user sees in almost every feature, and
+> they are routinely left undesigned. They are the difference between "this is
+> where my goals will live" and "did something break?". Every list, table and
+> grid has a designed empty state. An empty state is not an error — it is a
+> starting point.
 
 | Location | Empty State Content | Notes |
-|----------|--------------------|----|
-| Inventory (no items) | Icon (subtle, large, centered). Message: "Your inventory is empty." Sub-message: "Items you find on your journey will appear here." | Do not say "No items found" — "found" implies a failed search. |
-| Quest Log (no active quests) | Icon. Message: "No active quests." Sub-message: "Talk to characters marked with [quest marker icon] to start a quest." | Give the player a clear action. |
-| Achievements (none earned) | Icon. Message: "No achievements yet." List of hint achievements: "Try [Action] to earn your first achievement." | Gamified motivation, not just emptiness. |
-| Search results (no matches) | Icon. Message: "No results for '[search term]'." Sub-message: "Try a different search or [browse all]." | Mirror the search term back at them. Give an alternative action. |
+|----------|---------------------|-------|
+| Goals (first use) | Illustration (decorative). "아직 목표가 없어요" (no goals yet). Sub-message: what a goal does for the user. Primary action: "목표 만들기" (Create goal). | First-use empty states sell the feature and offer exactly one next step. |
+| History (no transactions yet) | "첫 자동이체는 10월 25일이에요" (your first auto-debit is on October 25) — when the next event is known, say it. | Specific beats generic. |
+| Notifications inbox | "새 알림이 없어요" (no new notifications). Link to notification settings. | Not an illustration-heavy state; users check this often. |
+| Search / filter with no results | "'여행'에 대한 결과가 없어요" (no results for 'travel'). Actions: clear filters, change the period. | Mirror the query back; offer the way to widen it. Distinct from first-use. |
+| Admin console table with no rows | "No users match these filters" with the active filters listed and "Clear filters". | Operators need to know it is the filter, not missing data. |
+| Permission-limited | "Plus 플랜에서 목표를 3개 이상 만들 수 있어요" (create more than 3 goals on Plus) with the upgrade path | Gated is not empty — say why, and what unlocks it. |
 
-**Rule**: Every empty state must include an icon, a message, and either a sub-message or an action button. A blank container with no explanation is never acceptable.
+**Rule**: Every empty state has a message and either a sub-message or an action.
+A blank container with no explanation is never acceptable. First-use, no-results,
+filtered-empty and gated states are different states with different copy.
+
+**Accessibility**: The empty-state message is real text in the reading order, not
+only an illustration; announce "No results" when a search returns nothing.
 
 ---
 
@@ -125,11 +215,27 @@ Store the "return focus" element reference before pushing so it can be restored 
 
 | Error Type | Pattern | Tone |
 |-----------|---------|------|
-| Input validation (form field) | Inline error message below the field. Error icon left of message. Red border on field (colorblind-safe with icon). | Neutral and specific — "Username must be 3-20 characters." Not "Invalid input." |
-| Operation failed (save error, network error) | Toast notification for non-critical failures. Modal Dialog for critical failures (save file cannot be written). | Calm and actionable — "Save failed. Check storage space." Not "FATAL ERROR." |
-| System error (crash, data corruption) | Full-screen error screen with error code, recovery options ("Restart Game," "Load last save"), and support contact. | Reassuring — acknowledge the problem, give the player agency. Never blame the player. |
-| Soft error (action cannot be performed) | Toast or inline message. | Explanatory — "Not enough gold" not "Action unavailable." |
+| Input validation (form field) | Inline message below the field, error icon, error border; on submit also an error summary at the top that links to each field. See Form & Inline Validation in the service-specific guidance. | Specific and neutral — "휴대폰 번호 11자리를 입력해 주세요" (enter all 11 digits), not "Invalid input". |
+| Recoverable operation failed (save, refresh) | Snackbar with "Retry" for background actions; inline error with a retry button when a region failed to load; the user's input is always preserved. | Calm and actionable — "저장하지 못했어요. 다시 시도해 주세요." (couldn't save — please try again). |
+| Network offline | Global offline banner (app shell `## Global States`) plus disabled actions that need the network, with the reason. | Explains what still works. |
+| Session expired (401) | Re-authentication sheet or redirect with `next=`, preserving unsaved work. | Never "Error 401". |
+| Permission denied (403) | Explain the role or plan that is needed and how to get it. | Not an error tone — a gate. |
+| Not found (404) | Screen with a way back (parent list, home); for deep links see Screen Push / Pop / Replace. | "이 목표를 찾을 수 없어요" (we can't find this goal). |
+| Conflict (409) / stale data | "This was changed elsewhere" with the options to reload or review. | Never silently overwrite. |
+| Rate limited (429) | Tell the user when they can try again ("잠시 후 다시 시도해 주세요" — try again shortly), and disable the action until then. | |
+| Server error (5xx) / unknown | Region-level error with retry; full-screen only when nothing can render. Include a support reference (request ID) the user can copy. | Reassuring — acknowledge, give agency, never blame the user. |
+| Payment declined | Inline on the payment step with the reason the provider returned in plain language and the next step (another card, check the limit) | Specific, private (no card details in the message), no alarm. |
 
-**Principle**: Error messages are never the player's fault. They are the game telling the player what happened and what to do next. Remove the word "invalid" from all error messages — replace with specific explanations.
+**Principles**:
+- Error messages are never the user's fault. They say what happened and what to do
+  next. Remove "invalid" and raw codes from user-facing messages; log the codes.
+- Preserve what the user entered. Losing a filled form to an error is the most
+  common reason users abandon.
+- Every error state has a way forward — retry, an alternative, or support.
+- No personal data, tokens or stack traces in error messages.
+
+**Accessibility**: Errors are announced (live region or focus to the error
+summary on submit), identified in text rather than color alone (WCAG 2.2 SC
+3.3.1, 1.4.1), and suggestions are given where known (SC 3.3.3).
 
 ---

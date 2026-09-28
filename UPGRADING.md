@@ -1,1138 +1,309 @@
-# Upgrading Claude Code Game Studios
+# 업그레이드 가이드
 
-This guide covers upgrading your existing game project repo from one version
-of the template to the next.
+이 문서는 Claude Code Service Studios(CCSS) 템플릿으로 시작한 여러분의 제품 저장소를 템플릿의 새 버전으로
+올리는 방법을 설명합니다. 버전마다 무엇이 바뀌었는지는 [CHANGELOG.md](CHANGELOG.md)에 있습니다.
 
-**Find your current version** in your git log:
-```bash
-git log --oneline | grep -i "release\|setup"
+**지금 쓰고 있는 버전은 `project.yaml`에서 확인합니다.** 템플릿 버전을 기록하는 곳은 이 키 하나뿐입니다.
+
+```yaml
+framework:
+  version: <지금 쓰는 프레임워크 버전>
+  last_upgraded: <마지막으로 업그레이드한 날짜>
 ```
-Or check `README.md` for the version badge.
+
+Claude Code 세션에서 `/settings framework.version`으로 봐도 됩니다. README의 배지나 커밋 로그로 버전을
+추측하지 마세요. 업그레이드를 마치면 이 두 값을 새 버전의 절이 알려 주는 값으로 바꿉니다.
 
 ---
 
-## Table of Contents
+## 목차
 
-- [Upgrade Strategies](#upgrade-strategies)
-- [v1.1.0 → v1.1.1](#v110--v111)
-- [v1.0 → v1.1](#v10--v11)
-- [v1.0.0-beta → v1.0](#v100-beta--v10)
-- [v0.4.x → v1.0](#v04x--v10)
-- [v0.4.0 → v0.4.1](#v040--v041)
-- [v0.3.0 → v0.4.0](#v030--v040)
-- [v0.2.0 → v0.3.0](#v020--v030)
-- [v0.1.0 → v0.2.0](#v010--v020)
+- [Claude Code Game Studios 프로젝트의 마이그레이션은 지원하지 않습니다](#claude-code-game-studios-프로젝트의-마이그레이션은-지원하지-않습니다)
+- [파일 소유 구분](#파일-소유-구분)
+- [업그레이드 전략](#업그레이드-전략)
+- [첫 릴리스 (2026-09-27)](#010-2026-09-27)
+- [업그레이드한 뒤 확인할 것](#업그레이드한-뒤-확인할-것)
+- [버전별 절의 형식](#버전별-절의-형식)
 
 ---
 
-## Upgrade Strategies
+## Claude Code Game Studios 프로젝트의 마이그레이션은 지원하지 않습니다
 
-There are four ways to pull in template updates. Choose based on how your
-repo is set up.
+CCSS는 Claude Code Game Studios v1.1.1(커밋 `7ed2c3e`, 작성자 Donchitos, MIT 라이선스,
+`https://github.com/Donchitos/Claude-Code-Game-Studios`)에서 포크했습니다. 하지만 **업스트림으로 만든 프로젝트를
+CCSS로 옮기는 경로는 제공하지 않습니다.** 변환 스크립트도, 옛 이름을 받아 주는 호환 별칭도 없습니다.
 
-### Strategy A — Git Remote Merge (recommended)
+**지원하지 않는 이유**
 
-Best when: you cloned the template and have your own commits on top of it —
-your repo shares history with the template.
+1. **식별자가 모두 바뀌었습니다.** 에이전트, 스킬, 디렉터 게이트, 단계 값, 설정 키, 산출물 경로, 템플릿
+   헤딩이 한 번에 새 이름으로 바뀌었고, CCSS는 옛 이름을 어디에서도 읽지 않습니다. 옛 파일을 그대로 두면
+   동작하는 것처럼 보이다가 조용히 아무것도 찾지 못합니다.
+2. **문서 계약이 다릅니다.** 업스트림의 GDD 8개 섹션과 CCSS PRD의 11개 섹션은 일대일로 대응하지 않습니다.
+   `Goals & Non-Goals`, `Non-Functional Requirements`, `Success Metrics & Instrumentation`처럼 새로 생긴 섹션의
+   내용은 기계적 변환으로 만들어지지 않습니다. ADR 헤딩과 스토리 헤더(`**Surface**`, `**API Contract**`,
+   `**Migration**` 등)도 마찬가지입니다.
+3. **엔진 계층이 스택 계층으로 바뀌었습니다.** 업스트림의 `engine.*` 설정과 엔진 레퍼런스에는 서비스 스택의
+   대응 값이 없습니다. 코드 루트도 고정 경로에서 레이어별 선언(`stack.layers.<layer>.root`)으로 바뀌었습니다.
+4. **v1 레거시 설정 계층이 없어졌습니다.** production/stage.txt, production/review-mode.txt,
+   .claude/docs/technical-preferences.md를 읽던 코드와 migrate-v1-config.sh가 모두 삭제되었습니다.
+
+**대신 이렇게 하세요**
+
+- **게임을 만들고 있다면** 업스트림을 계속 쓰고, 업스트림 저장소의 업그레이드 가이드를 따르세요.
+- **업스트림 템플릿으로 서비스를 만들고 있었다면** CCSS로 새로 시작하는 편이 빠릅니다.
+  1. 새 브랜치(또는 새 저장소)에서 업스트림 프레임워크 파일(`.claude/`, 루트 `CLAUDE.md`, `project.yaml`,
+     업스트림의 스킬 테스트 프레임워크 폴더)을 지우고, CCSS 템플릿의 파일을 복사해 넣습니다. **옛 `.claude/`를
+     CCSS 위에 덮어쓰거나 섞지 마세요.** 옛 스킬과 새 스킬이 섞이면 서로 없는 파일과 키를 가리킵니다.
+     개인 설정(`.claude/settings.local.json` 등)을 옮겨 온다면 옛 훅 경로를 고칩니다.
+     `.claude/hooks/validate-assets.sh`를 가리키는 항목은 `.claude/hooks/validate-data-files.sh`로 바꾸세요.
+     옛 훅은 없어졌고, 새 훅은 에셋 이름 규칙 없이 설정·API 계약·로케일 같은 JSON/YAML 파일의 파싱만 검사합니다.
+  2. Claude Code에서 `/start`를 실행하고 "기존 제품이나 코드베이스가 있다"(D)를 고릅니다. `/start`가
+     `stage-estimate.sh`로 현재 단계를 추정해 기록합니다.
+  3. `/setup-stack`으로 레이어별 스택과 코드 루트를 선언합니다. `/start`는 곧바로 `/adopt`를 권하지만, 코드
+     루트를 먼저 선언해 두어야 `/adopt`가 코드를 제대로 찾습니다.
+  4. `/adopt`로 기존 산출물이 CCSS 계약과 어디서 어긋나는지 감사하고, 번호가 매겨진 적용 계획을 받습니다.
+  5. `/reverse-document`로 기존 코드와 문서에서 PRD, ADR, 제품 브리프를 다시 만듭니다. 옛 설계 문서(예:
+     design/gdd/)는 이때 참고 자료로만 쓰고, 끝나면 정리합니다.
+  6. `/gate-check <목표 단계>`로 지금 단계가 맞는지 확인합니다.
+
+---
+
+## 파일 소유 구분
+
+업그레이드는 결국 "어떤 파일을 새 버전으로 바꾸고, 어떤 파일을 지킬 것인가"의 문제입니다. 아래 표가 모든
+전략의 기준입니다.
+
+| 구분 | 경로 | 업그레이드할 때 |
+|---|---|---|
+| **템플릿 소유** | `.claude/agents/`, `.claude/skills/`, `.claude/hooks/`, `.claude/scripts/`, `.claude/rules/`, `.claude/docs/`, `.claude/statusline.sh`, `docs/stack-reference/README.md`, `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md`, `docs/WORKFLOW-GUIDE.md`, `docs/skill-flow-diagrams.md`, `design/CLAUDE.md`, `docs/CLAUDE.md`, `CCSS Skill Testing Framework/`(`results/` 제외), `README.md`, `CHANGELOG.md`, `UPGRADING.md`, `CONTRIBUTING.md`, `SECURITY.md`, `LICENSE`, `.gitattributes` | 새 버전으로 교체합니다. 직접 고친 파일만 예외입니다 |
+| **섞여 있음** — 템플릿의 구조와 여러분의 내용 | `CLAUDE.md`, `project.yaml`, `.claude/settings.json`, `.gitignore` | diff를 보고 손으로 병합합니다 |
+| **여러분의 데이터** — 템플릿은 뼈대만 싣거나 싣지 않고, 스킬이 채우는 파일 | `docs/stack-reference/VERSION.md`와 `docs/stack-reference/<component>/`, `design/registry/entities.yaml`, `docs/registry/architecture.yaml`, `docs/architecture/tr-registry.yaml`, 그 밖의 `design/`·`docs/architecture/`·`docs/api/`·`docs/data/`·`docs/ops/`·`docs/security/` 아래 문서, `docs/CHANGELOG.md`, `production/`, `tests/`, `prototypes/`, 코드 루트와 `<root>/CLAUDE.md`, `.github/workflows/` | 절대 덮어쓰지 않습니다. 새 버전이 이 파일들의 형식을 바꾸면 그 버전의 절이 무엇을 고칠지 알려 줍니다 |
+| **개인 파일** — gitignore 대상 | `project.local.yaml`, `.claude/settings.local.json`, `CLAUDE.local.md`, `.claude/agent-memory/`, `production/session-state/`, `production/session-logs/` | 건드리지 않습니다 |
+
+- `.github/`의 이슈·PR 템플릿과 `CODEOWNERS`는 이 템플릿 저장소 자체를 위한 파일입니다. 제품 저장소에서는
+  여러분의 것으로 바꾸고 업그레이드 대상에서 빼세요. `.github/workflows/ci.yml`은 `/test-setup`이 만든
+  여러분의 CI입니다.
+- **업그레이드를 쉽게 만드는 습관**: 개인 설정은 `project.local.yaml`(`/settings --local <key>=<value>`)과
+  `.claude/settings.local.json`에 두고, 템플릿 소유 파일은 되도록 고치지 마세요. 꼭 고쳐야 한다면 그 사실이 커밋
+  메시지에 드러나게 해서 `git log --oneline -- .claude`로 찾을 수 있게 해 두세요.
+
+---
+
+## 업그레이드 전략
+
+템플릿 업데이트를 가져오는 방법은 네 가지입니다. 여러분 저장소가 템플릿과 Git 이력을 공유하는지에 따라
+고르세요. 어느 전략이든 **작업 브랜치에서** 진행하고, 업그레이드는 제품 변경과 섞지 말고 별도 커밋으로
+남기는 것이 좋습니다.
+
+### 전략 A — Git 원격 병합 (권장)
+
+**이럴 때**: 템플릿을 clone하거나 fork해서 그 위에 여러분의 커밋을 쌓아 온 경우 — 즉 저장소가 템플릿과 이력을
+공유하는 경우입니다. GitHub의 "Use this template"으로 만든 저장소는 템플릿과 이력을 공유하지 않으므로 전략
+A2를 쓰세요.
 
 ```bash
-# Add the template as a remote (one-time setup)
-git remote add template https://github.com/Donchitos/Claude-Code-Game-Studios.git
+# 템플릿을 원격 저장소로 추가합니다(한 번만).
+git remote add template <이 템플릿 저장소의 URL>
 
-# Fetch the new version
+# 새 버전을 가져옵니다.
 git fetch template main
 
-# Merge into your branch
+# 작업 브랜치를 만들고 병합합니다.
+git switch -c chore/upgrade-ccss
 git merge template/main
 ```
 
-Git will flag conflicts only in files that both the template *and* you have
-changed. Resolve each one — your game content goes in, structural improvements
-come along for the ride. Then commit the merge.
+Git은 템플릿과 여러분이 **둘 다** 고친 파일에서만 충돌을 표시합니다. 충돌마다 여러분의 내용은 지키고 구조
+변경은 받아들인 뒤 병합을 커밋하세요.
 
-**Tip:** The files most likely to conflict are `CLAUDE.md`, `project.yaml`, and
-`.claude/docs/technical-preferences.md`, because you've filled them in with
-your engine and project settings. Keep your content; accept the structural changes.
+- 충돌이 가장 잦은 파일은 `CLAUDE.md`, `project.yaml`, `.claude/settings.json`, `.gitignore`입니다.
+- `project.yaml`에서는 여러분의 값(`project.*`, `modes.rigor`, `modes.automation`, `stack.*`, `platform.*` 등)을
+  모두 지키고, 템플릿 쪽 주석 변경만 받아들인 다음 `framework.version`과 `framework.last_upgraded`를 새 버전의
+  절이 알려 주는 값으로 바꿉니다. `modes.rigor`가 대신 정하는 여섯 개 설정(`modes.review_mode`,
+  `modes.workflow`, `docs.density`, `qa.level`, `modes.story_granularity`, `team.size`)은 여러분이 `/settings`로
+  직접 정한 값이 아니라면 병합하면서 새로 적어 넣지 마세요. 적힌 값은 rigor 확장을 가립니다.
+- `CLAUDE.md`의 `## Stack Version Reference` 아래 import 줄(`@docs/stack-reference/VERSION.md`)은 고정된 줄입니다.
+  `/setup-stack`도 이 줄을 고치지 않으니 그대로 두세요.
 
-**If git refuses with `fatal: refusing to merge unrelated histories`**, your
-repo did not start as a clone of the template (zip download, `git init` from
-scratch). Do **not** force it with `--allow-unrelated-histories` — with no
-common ancestor, git flags *every* template file as a conflict and you'll be
-resolving hundreds of files by hand. Use Strategy A2 instead.
+**`fatal: refusing to merge unrelated histories`가 나오면** 저장소가 템플릿의 clone에서 시작하지 않은 것입니다(zip
+다운로드, 새 `git init`, "Use this template" 등). `--allow-unrelated-histories`로 억지로 병합하지 마세요. 공통
+조상이 없으면 Git이 템플릿의 **모든** 파일을 충돌로 표시해 수백 개 파일을 손으로 풀어야 합니다. 전략 A2를
+쓰세요.
 
-### Strategy A2 — Selective checkout (no shared history)
+### 전략 A2 — 선택적 체크아웃 (이력을 공유하지 않는 경우)
 
-Best when: your repo has no common history with the template but you do use git.
+**이럴 때**: Git은 쓰지만 템플릿과 공통 이력이 없는 경우입니다.
 
-> **First, check whether you have edited any framework files.** The checkout
-> below **replaces** everything under `.claude/`. Files *you added* survive, but
-> your edits to files the framework also ships are overwritten — agent
-> definitions and director gates are the ones people customise most.
+> **먼저 프레임워크 파일을 직접 고친 적이 있는지 확인하세요.** 아래 체크아웃은 `.claude/` 아래의 템플릿
+> 파일을 **새 버전으로 바꿉니다.** 여러분이 *추가한* 파일은 남지만, 템플릿도 싣고 있는 파일에 한 수정은
+> 덮어써집니다. 에이전트 정의, 디렉터 게이트, `.claude/settings.json`이 가장 자주 고치는 파일입니다.
 >
 > ```bash
-> git log --oneline -- .claude    # commits here mean you have customisations
+> git log --oneline -- .claude    # 처음 들여온 커밋 말고도 나오면 직접 고친 파일이 있다는 뜻입니다
 > ```
 >
-> If that lists anything beyond your initial import, work through the restore
-> step below rather than skipping it.
+> 무언가 나온다면 아래의 되돌리기 단계를 건너뛰지 마세요.
 
 ```bash
-git remote add template https://github.com/Donchitos/Claude-Code-Game-Studios.git
+git remote add template <이 템플릿 저장소의 URL>
 git fetch template main
+git switch -c chore/upgrade-ccss
 
-# Take the framework-owned paths wholesale from the new version.
-# This overwrites/adds template files but never deletes files you added.
-git checkout template/main -- .claude UPGRADING.md CHANGELOG.md docs/migration-guide-v1.1.md
+# 템플릿 소유 경로를 새 버전으로 통째로 가져옵니다.
+# 템플릿 파일을 덮어쓰거나 추가할 뿐, 여러분이 추가한 파일은 지우지 않습니다.
+git checkout template/main -- .claude docs/stack-reference/README.md UPGRADING.md CHANGELOG.md
 
-# The checkout is STAGED, not committed — so nothing is lost yet, and this
-# lists every framework file it changed:
+# 스킬 테스트 프레임워크를 쓰고 있다면 함께 가져옵니다.
+git checkout template/main -- "CCSS Skill Testing Framework"
+
+# 체크아웃은 스테이징만 하고 커밋하지 않습니다. 아직 잃은 것은 없고,
+# 다음 명령으로 바뀐 프레임워크 파일을 모두 볼 수 있습니다.
 git diff --cached --stat -- .claude
 
-# Restore any file whose local edits you want to keep. This is one command per
-# file, deliberately: each is a decision between your version and the new one.
-git checkout HEAD -- .claude/docs/technical-preferences.md   # v1.0 config; v1.1 keeps config in project.yaml
-git checkout HEAD -- <any other file you customised>
+# 여러분의 버전을 지킬 파일은 하나씩 되돌립니다. 파일마다 명령을 따로 쓰는 것은
+# 의도적입니다 — 파일마다 여러분의 버전과 새 버전 중 하나를 고르는 결정이기 때문입니다.
+git checkout HEAD -- <직접 고쳐서 지킬 파일>
 
-git status   # review what changed before committing
+# 새 버전에서 없어진 템플릿 파일은 체크아웃으로 지워지지 않습니다.
+# 여러분 쪽에만 있는 파일을 나열합니다 — 여러분이 추가한 파일과 템플릿이 없앤 파일이 함께 나옵니다.
+git diff --name-only --diff-filter=D HEAD template/main -- .claude
+
+git status   # 커밋하기 전에 바뀐 내용을 검토합니다
 ```
 
-> **Restoring a file keeps your version of it in full — including whatever the
-> new release changed there.** For a file you edited lightly, it is usually
-> better to take the new version and re-apply your change on top than to keep
-> the old one wholesale. `git diff HEAD template/main -- <file>` shows what you
-> would be giving up.
-
-For `CLAUDE.md`, don't checkout — diff and merge by hand, keeping your
-engine/project content:
-
-```bash
-git diff HEAD template/main -- CLAUDE.md
-```
-
-`project.yaml` depends on where you are coming from, and the two cases need
-opposite actions:
-
-- **Upgrading from v1.0** (the case this section is about): you have no
-  `project.yaml` — it did not exist in v1.0. There is nothing to merge by hand,
-  and the checkout above deliberately does not fetch it. Build it from your
-  legacy files instead, which is what the converter is for:
+- **되돌린 파일은 여러분의 버전이 통째로 남습니다.** 새 버전이 그 파일에서 고친 내용은 함께 잃게 됩니다.
+  가볍게 고친 파일이라면 새 버전을 받고 여러분의 수정을 그 위에 다시 적용하는 편이 대개 낫습니다.
+  `git diff HEAD template/main -- <file>`로 무엇을 포기하게 되는지 확인할 수 있습니다.
+- **`.claude/settings.json`**: 되돌리면 새 버전의 훅 등록과 거부 목록 변경을 잃습니다. 새 버전을 받은 뒤
+  여러분이 추가했던 항목만 다시 넣으세요. 개인용 허용 항목은 애초에 `.claude/settings.local.json`에 두는 편이
+  낫습니다.
+- **템플릿이 없앤 파일**: 마지막 `git diff` 목록에서 그 버전 절의 "삭제된 파일"에 있는 경로만 `git rm`으로
+  지웁니다. 여러분이 추가한 파일은 남기세요. 이름이 바뀐 스킬의 옛 디렉터리가 남아 있으면 Claude Code가 옛
+  스킬을 여전히 실행할 수 있고, `/skill-test audit`은 그것을 카탈로그에 없는 스킬로 보고합니다.
+- **`CLAUDE.md`, `.gitignore`**: 체크아웃하지 말고 diff를 보며 손으로 병합합니다.
 
   ```bash
-  bash .claude/scripts/migrate-v1-config.sh --dry-run   # preview
-  bash .claude/scripts/migrate-v1-config.sh             # writes project.yaml
+  git diff HEAD template/main -- CLAUDE.md
+  git diff HEAD template/main -- .gitignore
   ```
 
-  If you skip this, `detect-gaps.sh` will nudge you at the next session start —
-  but do it here rather than discovering it later.
-
-- **Upgrading from v1.1 or later:** you already have a `project.yaml` holding
-  your settings. Treat it like `CLAUDE.md` — diff and merge by hand, never
-  checkout, or you will overwrite your own configuration:
+- **`project.yaml`**: 여러분의 설정이 들어 있으므로 **절대 체크아웃하지 마세요.** `CLAUDE.md`처럼 diff를 보고 손으로
+  병합한 뒤 `framework.version`과 `framework.last_upgraded`를 갱신합니다.
 
   ```bash
   git diff HEAD template/main -- project.yaml
   ```
 
----
+- `docs/stack-reference/VERSION.md`와 레지스트리 파일(`design/registry/entities.yaml`,
+  `docs/registry/architecture.yaml`, `docs/architecture/tr-registry.yaml`)은 여러분의 데이터입니다. 체크아웃
+  목록에 넣지 마세요.
 
-### Strategy B — Cherry-pick specific commits
+### 전략 B — 특정 커밋만 체리픽
 
-Best when: you only want one specific feature (e.g., just the new skill, not
-the full update).
+**이럴 때**: 전체 업데이트가 아니라 특정 수정 하나만 필요할 때입니다.
 
 ```bash
-git remote add template https://github.com/Donchitos/Claude-Code-Game-Studios.git
+git remote add template <이 템플릿 저장소의 URL>
 git fetch template main
 
-# Cherry-pick the specific commit(s) you want
+# 원하는 커밋을 찾습니다.
+git log --oneline template/main
+
+# 그 커밋만 가져옵니다.
 git cherry-pick <commit-sha>
 ```
 
-Commit SHAs for each version are listed in the version sections below.
+스킬은 게이트 참조 파일, `CONTRACT.md`, 템플릿, 디렉터 게이트 파일을 서로 참조합니다. 가져오려는 커밋이 앞선
+커밋에 기대고 있지 않은지 [CHANGELOG.md](CHANGELOG.md)와 커밋 내용을 먼저 확인하세요. 기능 하나를 통째로
+가져와야 한다면 전략 A나 A2가 안전합니다.
+
+### 전략 C — 파일 직접 복사
+
+**이럴 때**: Git 없이 템플릿을 내려받아(zip 등) 쓰고 있는 경우입니다.
+
+1. 새 버전을 여러분 저장소 옆에 내려받거나 clone합니다.
+2. [파일 소유 구분](#파일-소유-구분)의 **템플릿 소유** 파일을 복사합니다. **`.claude/`는 통째로 복사하고 일부만
+   골라 복사하지 마세요.** 스킬은 게이트 참조 파일, `CONTRACT.md`, 템플릿, 디렉터 게이트 파일을 서로 참조하므로,
+   일부만 복사하면 없는 문서를 가리키는 스킬이 생깁니다. 그리고 그 실패는 복사할 때가 아니라 스킬을 실행할 때
+   드러납니다.
+3. 복사는 더하기만 합니다. 새 버전에서 없어진 파일은 그 버전 절의 "삭제된 파일" 목록을 보고 손으로 지웁니다.
+4. **섞여 있음** 파일은 두 버전을 나란히 열고, 여러분의 내용을 지키면서 구조 변경만 옮깁니다.
+5. **여러분의 데이터**와 **개인 파일**은 복사 대상에서 뺍니다. 특히 템플릿의 `project.yaml`과
+   `docs/stack-reference/VERSION.md`를 여러분의 파일 위에 복사하지 마세요.
+
+> 재귀 복사는 여러분이 고친 템플릿 파일을 경고 없이 덮어씁니다. 복사하기 전에 `diff -r`로 두 `.claude/`
+> 디렉터리를 비교해 두세요.
 
 ---
 
-### Strategy C — Manual file copy
+## 0.1.0 (2026-09-27)
 
-Best when: you didn't use git to set up the template (just downloaded a zip).
+**첫 릴리스입니다.** 이전 CCSS 버전이 없으므로 이 버전으로 업그레이드할 대상은 없습니다. Claude Code Game
+Studios v1.1.1(`7ed2c3e`)에서 포크했으며, 무엇이 달라졌는지는 [CHANGELOG.md](CHANGELOG.md)에 정리했습니다.
+업스트림 프로젝트를 옮기려 한다면 [위의 절](#claude-code-game-studios-프로젝트의-마이그레이션은-지원하지-않습니다)을
+먼저 읽으세요.
 
-1. Download or clone the new version alongside your repo.
-2. Copy the files listed under **"Safe to overwrite"** directly.
-3. For files under **"Merge carefully"**, open both versions side-by-side
-   and manually merge the structural changes while keeping your content.
+### 새로 시작하기
 
----
+1. 템플릿을 clone합니다. 나중에 전략 A로 업그레이드하려면 clone으로 시작하는 것이 가장 편합니다.
+2. 저장소에서 Claude Code를 열고 `/start`를 실행합니다. 지금 어디에 있는지(아이디어 전, 문제 영역, 명확한 제품
+   구상, 기존 제품)를 묻고 `project.stage`, `modes.rigor`, `modes.automation`을 기록합니다.
+3. `/setup-stack`으로 레이어별 스택과 버전, 코드 루트, 표면(`platform.surfaces`), 배포 방식
+   (`release.distribution`), 지역(`compliance.regions`), 로케일(`localization.locales`)을 정합니다. 버전은 실시간
+   소스에서 확인해 `docs/stack-reference/`에 기록합니다.
+4. 막히면 `/help`가 다음 할 일을 알려 줍니다.
 
-## v1.1.0 → v1.1.1
+PyYAML은 선택 사항입니다. `python3 -m pip install --user pyyaml`로 설치하면 `validate-commit.sh`와
+`validate-data-files.sh`가 YAML을 완전한 파서로 검사합니다. 없으면 구조 검사로 대신하며
+`NOT CHECKED: full YAML parse (PyYAML unavailable)`를 출력합니다. 운영체제별 설치 방법은
+[.claude/docs/setup-requirements.md](.claude/docs/setup-requirements.md)에 있습니다.
 
-**Released:** 2026-09-24
-**Commit range:** `d056997..v1.1.1`
-**Key themes:** Fix for skills and agents failing to start outside auto mode ([#128](https://github.com/Donchitos/Claude-Code-Game-Studios/issues/128))
+자세한 안내는 [README.md](README.md), [.claude/docs/quick-start.md](.claude/docs/quick-start.md),
+[docs/WORKFLOW-GUIDE.md](docs/WORKFLOW-GUIDE.md)에 있습니다.
 
-### What Changed
+### 이 버전의 `project.yaml`
 
-| Category | Changes |
-|----------|---------|
-| **Skill fix (66 skills)** | The config line at the top of each skill is now one plain `bash` command, pre-approved in that skill's own `allowed-tools`. The 1.1.0 line aborted the skill outside auto mode |
-| **Helper** | `.claude/hooks/yaml-helper.sh` can be run directly as `bash yaml-helper.sh resolve_config …`, and finds the project root from its own location |
-| **Docs** | `.claude/docs/config-resolution.md` documents the required form and why |
+- 템플릿의 `project.yaml`에는 `schema_version`, `framework.version`(이 버전),
+  `framework.last_upgraded: 2026-09-27`과 주석만 들어 있고 `modes:` 블록은 없습니다.
+- `/start`가 `modes.rigor`와 `modes.automation`을, `/setup-stack`이 `stack.*`, `platform.*`, `release.*`,
+  `privacy.*`, `compliance.*`, `localization.*`, `naming.*`, `commands.*`를 채웁니다.
+- 기본값: "Unset on an unconfigured project: `modes.rigor` defaults to `minimal`, which resolves `review_mode` to
+  `solo`." 여러 사람이 함께 만드는 서비스라면 `/settings modes.rigor=standard`(또는 `full`) 한 번으로 올릴 수
+  있습니다. `/start`는 만들려는 제품의 성격을 듣고 적절한 수준을 추천합니다.
 
-No settings, config files or agents change. Your `project.yaml` and
-`project.local.yaml` are untouched apart from the version stamp.
+### 다음 업그레이드를 위해 지금 해 둘 것
 
----
-
-### Files: Safe to Overwrite
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/*/SKILL.md                 ← all skills with a config line (66)
-.claude/hooks/yaml-helper.sh              ← direct-execution entry point
-.claude/docs/config-resolution.md         ← corrected "why this command" section
-.claude/docs/director-gates.md            ← example line updated
-```
-
----
-
-### Files: Merge Carefully
-
-**Skills you have edited yourself.** If you customised a skill, keep your
-version and change two lines in it — the config line and the `allowed-tools`
-entry — to this form, with your skill's folder name in place of `<name>`:
-
-```markdown
-allowed-tools: …, Bash(bash "*/.claude/skills/<name>/../../hooks/yaml-helper.sh" resolve_config *)
-```
-```markdown
-!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys <same keys as before>`
-```
-
-Both halves are needed: the line without the grant still aborts. The same
-applies to any skill you wrote yourself that copied the 1.1.0 line.
-
-**`project.yaml`** — optionally set `framework.version: 1.1.1`. Nothing reads it
-for this release.
+- 개인 설정은 `project.local.yaml`과 `.claude/settings.local.json`에 둡니다.
+- `.github/`의 이슈·PR 템플릿과 `CODEOWNERS`를 여러분 제품 저장소에 맞게 바꿉니다.
+- 템플릿 소유 파일을 고쳤다면 그 사실을 커밋 메시지에 남겨 둡니다.
 
 ---
 
-## v1.0 → v1.1
+## 업그레이드한 뒤 확인할 것
 
-**Released:** 2026-09-23
-**Key themes:** `project.yaml` as the single source of truth, a modes system
-(`modes.rigor` fronting `workflow`/`docs.density`/`qa.level`/`story_granularity`,
-plus `review_mode` and `automation`), `/settings`, `project.local.yaml`
-per-developer overrides, migration tooling, token-efficiency cuts.
-
-This is the biggest config change since the template's `production/stage.txt`
-/ `production/review-mode.txt` era. Read
-[CHANGELOG.md](CHANGELOG.md#110--2026-09-23) for the full list of additions —
-this section covers what to do about it.
-
-### What Changed
-
-See [CHANGELOG.md](CHANGELOG.md#110--2026-09-23) for the complete list. The
-short version: `project.yaml` replaces `production/stage.txt`,
-`production/review-mode.txt`, and `.claude/docs/technical-preferences.md` as
-the primary config store (all three still work as a fallback — nothing is
-force-deleted), a new `modes` block controls how much process the project
-carries (`modes.rigor: minimal | standard | full`), and a new `/settings`
-skill views and edits any of it, including a gitignored
-`project.local.yaml` for settings that should vary per developer.
-
-### Heads-up: the process level you get by default has changed
-
-`modes.rigor` now defaults to **`minimal`**, not `standard`. If your
-`project.yaml` sets `modes.rigor` explicitly, nothing changes for you and you
-can skip this.
-
-If it does not, the upgrade is visible: any of the six knobs `rigor` fronts that
-you never set moves from the `standard` row to the `minimal` row. In practice
-that means fewer required GDD sections, terser writing, coarser stories, no
-director review panels, and `qa.level` dropping from `standard` to `minimal`.
-Knobs you *did* set explicitly are untouched.
-
-**To keep the old behaviour, pin it in one line:**
-
-```yaml
-modes:
-  rigor: standard
-```
-
-We changed the default because we measured it. Built both ways, `standard` cost
-several times more to reach working code, did not produce a better result, and
-gave nothing back when a fresh developer picked the project up. Most projects
-were paying for process that did not repay.
-If yours is one that does -- several interacting systems, or a design someone
-else has to implement -- `standard` and `full` are one `/settings` call away,
-and `/help` and `/gate-check` will suggest raising it as your project grows.
-
-### Files: Safe to Overwrite
-
-**Take `.claude/` as a whole. Do not copy a subset.** v1.1 adds around 73 new
-files under that directory — `automation-modes.md`, `workflow-modes.md`,
-`config-resolution.md`, `effects-map.md`, 28 director gates, the game-brief
-template, 7 guidance templates, 8 scripts, 6 gate-check references, 10
-`CONTRACT.md` files — and the skills cross-reference each other across all of
-them. A partial copy leaves skills pointing at documents you do not have, which
-fails at the moment you run them rather than at the moment you copy. That is why
-there is no short file list here.
-
-```
-.claude/          (the whole directory — new and changed files alike)
-                  EXCEPT .claude/docs/technical-preferences.md — see the note below.
-                  The template ships a placeholder copy of that file; overwriting
-                  yours silently discards your Forbidden Patterns and Allowed
-                  Libraries, which have no project.yaml equivalent. Back it up
-                  before you copy and restore it afterwards.
-README.md
-CHANGELOG.md
-UPGRADING.md
-.gitignore        (adds project.local.yaml)
-```
-
-> **Strategy A (git merge) protects you here automatically** — git flags that file
-> as a conflict because you both changed it. The manual-copy strategies do not:
-> a recursive copy overwrites it without a word.
-
-Your own tests under `tests/` and any tooling under `tools/` are yours; the
-template ships nothing into either, so nothing there is at risk.
-
-Copying is additive: files *you* added under `.claude/` survive, because nothing
-is deleted. Only files the template also ships get replaced.
-
-All 74 `SKILL.md` files changed in v1.1, and 66 of them now resolve config via
-`resolve_config`. If you have not hand-edited any skill file, taking them all is
-safe.
-
-> **Two things under `.claude/` are yours — check them before you copy.**
->
-> - `.claude/docs/technical-preferences.md` still holds your Forbidden Patterns
->   and Allowed Libraries, which have no `project.yaml` equivalent. Keep your
->   copy; see [Merge Carefully](#claudedocstechnical-preferencesmd) below.
-> - Anything else you customised — agent definitions and director gates are the
->   usual ones. If your project is in git, `git log --oneline -- .claude` lists
->   whether you have any. Re-apply your edits on top of the new version rather
->   than keeping your old file wholesale; the new version almost certainly
->   changed there too.
-
-(`project.yaml` itself is not copied from the template — `/start` generates it
-for new projects, and `.claude/scripts/migrate-v1-config.sh` builds it from
-your legacy config files for existing ones.)
-
-### Files: Merge Carefully
-
-#### `project.yaml` (new — this is YOUR data, not template infrastructure)
-
-This file does not exist in v1.0. If you have an existing project with
-`production/stage.txt`, `production/review-mode.txt`, or a filled-in
-`.claude/docs/technical-preferences.md`, **do not hand-author
-`project.yaml`** — those files hold your project's actual configuration and
-migrating them by hand risks transcription errors the tooling is built to
-avoid. Follow the dedicated
-[migration guide](docs/migration-guide-v1.1.md) instead, which walks
-`.claude/scripts/migrate-v1-config.sh` end to end.
-
-If you're starting fresh (no legacy files with real values), just run
-`/start` — it writes a complete `project.yaml` for you.
-
-#### `.claude/docs/technical-preferences.md`
-
-Stays in place. Most of its content (engine, naming, performance budgets,
-testing framework, specialists) has a `project.yaml` equivalent now and is
-read from there first. Two sections — Forbidden Patterns and Allowed
-Libraries — have no `project.yaml` equivalent and this file remains their
-home permanently; `--finalize` migration never deletes it.
-
-### After Upgrading
-
-1. If you have an existing project (not starting fresh), read
-   [docs/migration-guide-v1.1.md](docs/migration-guide-v1.1.md) and run
-   `.claude/scripts/migrate-v1-config.sh --dry-run` to see what migration
-   would do before committing to it.
-2. Run `/settings` to see your effective configuration once `project.yaml`
-   exists — it shows you the value, source, and whether each setting is
-   locally overridable.
-3. Consider setting `modes.rigor` explicitly if your project doesn't match
-   the `minimal` default — `/settings modes.rigor=standard` to keep the
-   process level v1.0 had, `modes.rigor=full` for a project that wants every
-   gate. The migration report says this too.
-4. If you customised any skill, re-read it against the new version before
-   relying on it — a skill that resolves config differently from the rest of
-   the framework fails quietly, by taking a default branch rather than by
-   erroring.
+1. `project.yaml`의 `framework.version`과 `framework.last_upgraded`를 새 버전의 절이 알려 준 값으로 바꿨는지
+   확인합니다.
+2. 새 Claude Code 세션을 열어 세션 시작 배너(`Claude Code Service Studios`)와 경고를 확인합니다. 설정 값 오류,
+   선언되지 않은 코드 루트, 스택 레퍼런스 상태가 여기에 나타납니다.
+3. `/settings`로 최종 적용된 설정과 각 값의 출처를 확인합니다. 새 버전에서 허용 값이 바뀐 키가 있으면 여기서
+   드러납니다.
+4. `/skill-test static all`로 모든 스킬의 구조를 점검합니다. 직접 고친 스킬은 특히 새 버전과 비교해 다시
+   읽어 보세요. 설정을 다른 방식으로 읽는 스킬은 오류를 내지 않고, 기본값 분기로 조용히 잘못 동작합니다.
+   스킬 테스트 프레임워크를 함께 쓰고 있다면 `/skill-test audit`으로 카탈로그와 파일이 일치하는지도 봅니다.
+5. `/help`나 `/project-stage-detect`로 워크플로 카탈로그가 여러분의 산출물을 여전히 알아보는지 확인합니다.
+   새 버전이 템플릿 헤딩 같은 기계 계약을 바꿨다면, 그 버전의 절이 여러분 문서에서 무엇을 고칠지 알려 줍니다.
+6. 업그레이드는 제품 변경과 섞지 말고 별도 커밋으로 남깁니다(예: `chore: upgrade CCSS framework`).
 
 ---
 
-## v0.4.1
-
-**Released:** 2026-04-02
-**Key themes:** Art direction integration, asset specification pipeline
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New skill** | `/art-bible` — guided section-by-section visual identity authoring (9 sections). Mandatory art-director Task spawn per section. AD-ART-BIBLE sign-off gate. Required at Technical Setup phase. |
-| **New skill** | `/asset-spec` — per-asset visual spec and AI generation prompt generator. Reads art bible + GDD/level/character docs. Writes `design/assets/specs/` files and `design/assets/asset-manifest.md`. Full/lean/solo modes. |
-| **New director gates (3)** | `AD-CONCEPT-VISUAL` (brainstorm Phase 4), `AD-ART-BIBLE` (art bible sign-off), `AD-PHASE-GATE` (gate-check panel) |
-| **`/brainstorm` update** | Added `Task` to allowed-tools (was missing — blocked all director spawning). Art-director now spawns in parallel with creative-director after pillars lock. Visual Identity Anchor written to game-concept.md. |
-| **`/gate-check` update** | Art-director added as 4th parallel director (AD-PHASE-GATE). Visual artifact checks: Visual Identity Anchor (Concept gate), art bible (Technical Setup gate), AD-ART-BIBLE sign-off + character visual profiles (Pre-Production gate). |
-| **`/team-level` update** | Art-director added to Step 1 parallel spawn (visual direction before layout). Level-designer now receives art-director targets as explicit constraints. Step 4 art-director role corrected to production-concepts only. |
-| **`/team-narrative` update** | Art-director added to Phase 2 parallel spawn (character visual design, environmental storytelling, cinematic tone). |
-| **`/design-system` update** | Routing table expanded with art-director + technical-artist for Combat, UI, Dialogue, Animation/VFX, Character categories. Visual/Audio section now mandatory (with art-director Task spawn) for 7 system categories. |
-| **`workflow-catalog.yaml`** | `/art-bible` added to Technical Setup (required). `/asset-spec` added to Pre-Production (optional, repeatable). |
-
-### Files: Safe to Overwrite
-
-**New files to add:**
-```
-.claude/skills/art-bible/SKILL.md
-.claude/skills/asset-spec/SKILL.md
-.claude/docs/director-gates.md
-```
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/brainstorm/SKILL.md
-.claude/skills/gate-check/SKILL.md
-.claude/skills/team-level/SKILL.md
-.claude/skills/team-narrative/SKILL.md
-.claude/skills/design-system/SKILL.md
-.claude/docs/workflow-catalog.yaml
-README.md
-UPGRADING.md
-```
-
-### Files: Merge Carefully
-
-None — all changes are to infrastructure files with no user content.
-
----
-
-## v1.0.0-beta → v1.0
-
-**Released:** 2026-05-13
-**Commit range:** `49d1e45..HEAD`
-**Key themes:** New `/vertical-slice` gate, skill polish & bug fixes, contributor docs
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New skill** | `/vertical-slice` — Pre-Production gate that validates the full game loop with a production-quality end-to-end build before Production. Pairs with the overhauled `/prototype` (concept validation right after `/brainstorm`). |
-| **New flow** | Entity inventory step in `/map-systems` — surfaces all named entities up front for cleaner downstream GDD authoring. |
-| **UX polish** | Added missing `AskUserQuestion` widgets to 7 skills; comprehensive skill audit for consistency, prompts, and flow gaps; exposed `--review` flag in `argument-hints` for all `team-*` skills. |
-| **Bug fixes** | log-agent hooks logged "unknown" `agent_type`; missing `allowed-tools` in `/architecture-decision` and `/story-done`; `rg --type gdscript` is invalid (now uses `--glob *.gd`); session-start preview showed oldest state instead of newest; duplicate `## 0.` heading and broken step numbering in `/architecture-decision`. |
-| **Project docs** | Added `CONTRIBUTING.md` (framework contribution guidelines) and `SECURITY.md` (coordinated disclosure policy). |
-| **Counts/refs** | Synced agent/skill/hook counts across `WORKFLOW-GUIDE.md`, `README.md`, and agent rosters; fixed stale agent names and skill model-tier fields. |
-
----
-
-### Files: Safe to Overwrite
-
-**New files to add:**
-```
-.claude/skills/vertical-slice/SKILL.md
-CONTRIBUTING.md
-SECURITY.md
-```
-
-**Existing files to overwrite (no user content):**
-- All files under `.claude/skills/` modified in the commit range (skill audit + AskUserQuestion widgets + `--review` argument-hints)
-- `.claude/hooks/log-agent.sh` (`agent_type` logging fix)
-- `README.md`, `docs/WORKFLOW-GUIDE.md`, `docs/skill-flow-diagrams.md`
-- `UPGRADING.md`
-
----
-
-### Files: Merge Carefully
-
-None — all changes are to infrastructure files with no user content.
-
----
-
-## v0.4.x → v1.0
-
-**Released:** 2026-03-29
-**Commit range:** `6c041ac..HEAD`
-**Key themes:** Director gates system, gate intensity modes, Godot C# specialist
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New system** | Director gates — named review checkpoints shared across all workflow skills. Defined in `.claude/docs/director-gates.md` |
-| **New feature** | Gate intensity modes: `full` (all director gates), `lean` (phase gates only), `solo` (no directors). Set globally via `production/review-mode.txt` during `/start`, or override per-run with `--review [mode]` on any gate-using skill |
-| **New agent** | `godot-csharp-specialist` — C# code quality in Godot 4 projects |
-| **Skill updates (13)** | All gate-using skills now parse `--review [full\|lean\|solo]` and include it in their argument-hint: `brainstorm`, `map-systems`, `design-system`, `architecture-decision`, `create-architecture`, `create-epics`, `create-stories`, `sprint-plan`, `milestone-review`, `playtest-report`, `prototype`, `story-done`, `gate-check` |
-| **`/start` update** | Added Phase 3b — sets review mode during onboarding, writes `production/review-mode.txt` |
-| **`/setup-engine` update** | Language selection step for Godot (GDScript vs C#) |
-| **Docs** | `director-gates.md` — full gate catalog; `WORKFLOW-GUIDE.md` — Director Review Modes section; `README.md` — review intensity customization |
-
----
-
-### Files: Safe to Overwrite
-
-**New files to add:**
-```
-.claude/agents/godot-csharp-specialist.md
-.claude/docs/director-gates.md
-```
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/brainstorm/SKILL.md
-.claude/skills/map-systems/SKILL.md
-.claude/skills/design-system/SKILL.md
-.claude/skills/architecture-decision/SKILL.md
-.claude/skills/create-architecture/SKILL.md
-.claude/skills/create-epics/SKILL.md
-.claude/skills/create-stories/SKILL.md
-.claude/skills/sprint-plan/SKILL.md
-.claude/skills/milestone-review/SKILL.md
-.claude/skills/playtest-report/SKILL.md
-.claude/skills/prototype/SKILL.md
-.claude/skills/story-done/SKILL.md
-.claude/skills/gate-check/SKILL.md
-.claude/skills/start/SKILL.md
-.claude/skills/quick-design/SKILL.md
-.claude/skills/setup-engine/SKILL.md
-README.md
-docs/WORKFLOW-GUIDE.md
-UPGRADING.md
-```
-
----
-
-### Files: Merge Carefully
-
-No files require manual merging in this release. All changes are to infrastructure files with no user content.
-
----
-
-### New Features
-
-#### Director Gates System
-
-All major workflow skills now reference named gate checkpoints defined in
-`.claude/docs/director-gates.md`. Gates are identified by domain prefix and name
-(e.g., `CD-CONCEPT`, `TD-ARCHITECTURE`, `LP-CODE-REVIEW`). Each gate defines
-which director to spawn, what inputs to pass, what verdicts mean, and how
-lean/solo modes affect it.
-
-Skills spawn gates using `Task` with the gate ID and documented inputs, rather
-than embedding director prompts inline. This keeps skill bodies clean and makes
-gate behavior consistent across all workflow phases.
-
-#### Gate Intensity Modes
-
-Three modes let you control how much director review you get:
-
-- **`full`** (default) — all director gates run at every review checkpoint
-- **`lean`** — per-skill director reviews are skipped; phase gates at `/gate-check` still run
-- **`solo`** — no director gates anywhere; `/gate-check` checks artifact existence only
-
-Set globally during `/start` (writes `production/review-mode.txt`). Override any
-individual run with `--review [mode]` on any gate-using skill:
-
-```
-/design-system combat --review lean
-/gate-check concept --review full
-/brainstorm my-game-idea --review solo
-```
-
----
-
-### After Upgrading
-
-1. Run `/start` once to set your preferred review mode — or create `production/review-mode.txt` manually with `full`, `lean`, or `solo`.
-2. If you're mid-project, review `.claude/docs/director-gates.md` to understand which gates apply to your current phase.
-3. Run `/skill-test static all` to verify all skills pass structural checks.
-
----
-
-## v0.4.0 → v0.4.1
-
-**Released:** 2026-03-26
-**Commit range:** `04ed5d5..HEAD`
-**Key themes:** Genre-agnostic agents, new skills, skill fixes
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New skills (1)** | `/consistency-check` — cross-GDD entity consistency scanner |
-| **Skill fixes (all team-*)** | Added no-argument guards, formal `Verdict: COMPLETE / BLOCKED` keywords, per-step AskUserQuestion gates, adjacent area dependency checks (team-level), ethics enforcement (team-live-ops), NO-GO path with Phase skip (team-release) |
-| **Agent fixes (4)** | Genre-agnostic language in game-designer, systems-designer, economy-designer, live-ops-designer — removed RPG-specific terms |
-
----
-
-### Files: Safe to Overwrite
-
-**New files to add:**
-```
-.claude/skills/consistency-check/SKILL.md
-```
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/team-combat/SKILL.md      ← no-arg guard, verdict keywords, gate improvements
-.claude/skills/team-narrative/SKILL.md   ← no-arg guard, verdict keywords, gate improvements
-.claude/skills/team-ui/SKILL.md          ← no-arg guard, verdict keywords, gate improvements
-.claude/skills/team-release/SKILL.md     ← no-arg guard, verdict keywords, NO-GO path
-.claude/skills/team-polish/SKILL.md      ← no-arg guard, verdict keywords, gate improvements
-.claude/skills/team-audio/SKILL.md       ← no-arg guard, verdict keywords, gate improvements
-.claude/skills/team-level/SKILL.md       ← no-arg guard, verdict keywords, adjacent area checks
-.claude/skills/team-live-ops/SKILL.md    ← no-arg guard, verdict keywords, ethics enforcement
-.claude/skills/team-qa/SKILL.md          ← no-arg guard, verdict keywords, gate improvements
-.claude/skills/map-systems/SKILL.md      ← verdict keywords
-.claude/skills/create-epics/SKILL.md     ← "May I write" protocol fix, verdict keywords
-.claude/skills/create-stories/SKILL.md   ← verdict keywords
-.claude/agents/game-designer.md          ← genre-agnostic language
-.claude/agents/systems-designer.md       ← genre-agnostic language
-.claude/agents/economy-designer.md       ← genre-agnostic language
-.claude/agents/live-ops-designer.md      ← genre-agnostic language
-```
-
----
-
-### Files: Merge Carefully
-
-No files require manual merging in this release. All changes are to infrastructure files with no user content.
-
----
-
-### After Upgrading
-
-1. Run `/skill-test catalog` to verify all skills are indexed.
-2. Run `/skill-test lint [skill-name]` after any skill edits to check structural compliance.
-3. If you've customized any team-* skills, review the updated versions — no-argument guard and `Verdict:` keywords are now required for all team-* skills.
-
----
-
-## v0.3.0 → v0.4.0
-
-**Released:** 2026-03-21
-**Commit range:** `b1cad29..HEAD`
-**Key themes:** Full UX/UI pipeline, complete story lifecycle, brownfield adoption, comprehensive QA/testing framework, pipeline integrity, 29 new skills
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New skills (17)** | `/ux-design`, `/ux-review`, `/help`, `/quick-design`, `/review-all-gdds`, `/story-readiness`, `/story-done`, `/sprint-status`, `/adopt`, `/create-architecture`, `/create-control-manifest`, `/create-epics`, `/create-stories`, `/dev-story`, `/propagate-design-change`, `/content-audit`, `/architecture-review` |
-| **New skills QA (12)** | `/qa-plan`, `/smoke-check`, `/soak-test`, `/regression-suite`, `/test-setup`, `/test-helpers`, `/test-evidence-review`, `/test-flakiness`, `/skill-test`, `/bug-triage`, `/team-live-ops`, `/team-qa` |
-| **New hooks (4)** | `log-agent-stop.sh` — agent audit trail stop; `notify.sh` — Windows toast notifications; `post-compact.sh` — session recovery reminder after compaction; `validate-skill-change.sh` — advises `/skill-test` after skill edits |
-| **New templates (8)** | `ux-spec.md`, `hud-design.md`, `accessibility-requirements.md`, `interaction-pattern-library.md`, `player-journey.md`, `difficulty-curve.md`, and 2 adoption plan templates |
-| **New infrastructure** | `workflow-catalog.yaml` (7-phase pipeline, read by `/help`), `docs/architecture/tr-registry.yaml` (stable TR-IDs), `production/sprint-status.yaml` schema |
-| **Skill updates** | `/gate-check` — 3 gates now require UX artifacts; Pre-Production gate requires vertical slice (HARD gate) |
-| **Skill updates** | `/sprint-plan` — writes `sprint-status.yaml`; `/sprint-status` reads it |
-| **Skill updates** | `/story-done` — 8-phase completion review, updates story file, surfaces next ready story |
-| **Skill updates** | `/design-review` — removed architecture gap check (wrong stage) |
-| **Skill updates** | `/team-ui` — full UX pipeline (ux-design → ux-review → team phases) |
-| **Agent updates** | 14 specialist agents — `memory: project` added |
-| **Agent updates** | `prototyper` — `isolation: worktree` (throwaway work in isolated git branch) |
-| **Model routing** | Haiku/Sonnet/Opus tier assignments documented in coordination rules; skills declare their tier in frontmatter |
-| **Directory CLAUDE.md** | Scaffolded `design/CLAUDE.md`, `src/CLAUDE.md`, `docs/CLAUDE.md` — path-scoped instructions for each directory |
-| **Pipeline integrity** | TR-ID stability, manifest versioning, ADR status gates, TR-ID reference not quote |
-| **GDD template** | `## Game Feel` section added (input responsiveness, animation targets, impact moments) |
-
----
-
-### Files: Safe to Overwrite
-
-**New files to add:**
-```
-.claude/skills/ux-design/SKILL.md
-.claude/skills/ux-review/SKILL.md
-.claude/skills/help/SKILL.md
-.claude/skills/quick-design/SKILL.md
-.claude/skills/review-all-gdds/SKILL.md
-.claude/skills/story-readiness/SKILL.md
-.claude/skills/story-done/SKILL.md
-.claude/skills/sprint-status/SKILL.md
-.claude/skills/adopt/SKILL.md
-.claude/skills/create-architecture/SKILL.md
-.claude/skills/create-control-manifest/SKILL.md
-.claude/skills/create-epics/SKILL.md
-.claude/skills/create-stories/SKILL.md
-.claude/skills/dev-story/SKILL.md
-.claude/skills/propagate-design-change/SKILL.md
-.claude/skills/content-audit/SKILL.md
-.claude/skills/architecture-review/SKILL.md
-.claude/skills/qa-plan/SKILL.md
-.claude/skills/smoke-check/SKILL.md
-.claude/skills/soak-test/SKILL.md
-.claude/skills/regression-suite/SKILL.md
-.claude/skills/test-setup/SKILL.md
-.claude/skills/test-helpers/SKILL.md
-.claude/skills/test-evidence-review/SKILL.md
-.claude/skills/test-flakiness/SKILL.md
-.claude/skills/skill-test/SKILL.md
-.claude/skills/bug-triage/SKILL.md
-.claude/skills/team-live-ops/SKILL.md
-.claude/skills/team-qa/SKILL.md
-.claude/hooks/log-agent-stop.sh
-.claude/hooks/notify.sh
-.claude/hooks/post-compact.sh
-.claude/hooks/validate-skill-change.sh
-.claude/docs/workflow-catalog.yaml
-.claude/docs/templates/ux-spec.md
-.claude/docs/templates/hud-design.md
-.claude/docs/templates/accessibility-requirements.md
-.claude/docs/templates/interaction-pattern-library.md
-.claude/docs/templates/player-journey.md
-.claude/docs/templates/difficulty-curve.md
-design/CLAUDE.md
-src/CLAUDE.md
-docs/CLAUDE.md
-```
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/gate-check/SKILL.md
-.claude/skills/sprint-plan/SKILL.md
-.claude/skills/sprint-status/SKILL.md
-.claude/skills/design-review/SKILL.md
-.claude/skills/team-ui/SKILL.md
-.claude/skills/story-readiness/SKILL.md
-.claude/skills/story-done/SKILL.md
-.claude/docs/templates/game-design-document.md    ← adds Game Feel section
-README.md
-docs/WORKFLOW-GUIDE.md
-UPGRADING.md
-```
-
-**Agent files to overwrite** (if you haven't written custom prompts into them):
-```
-.claude/agents/prototyper.md         ← adds isolation: worktree
-.claude/agents/art-director.md       ← adds memory: project
-.claude/agents/audio-director.md     ← adds memory: project
-.claude/agents/economy-designer.md   ← adds memory: project
-.claude/agents/game-designer.md      ← adds memory: project
-.claude/agents/gameplay-programmer.md ← adds memory: project
-.claude/agents/lead-programmer.md    ← adds memory: project
-.claude/agents/level-designer.md     ← adds memory: project
-.claude/agents/narrative-director.md ← adds memory: project
-.claude/agents/systems-designer.md   ← adds memory: project
-.claude/agents/technical-artist.md   ← adds memory: project
-.claude/agents/ui-programmer.md      ← adds memory: project
-.claude/agents/ux-designer.md        ← adds memory: project
-.claude/agents/world-builder.md      ← adds memory: project
-```
-
----
-
-### Files: Merge Carefully
-
-#### `.claude/settings.json`
-
-Four new hooks are registered in this version. If you haven't customized `settings.json`, overwriting is safe. Otherwise, add the following hook entries manually:
-
-- `log-agent-stop.sh` — `SubagentStop` event (agent audit trail stop)
-- `notify.sh` — `Notification` event (Windows toast notification)
-- `post-compact.sh` — `PostCompact` event (session recovery reminder)
-- `validate-skill-change.sh` — `PostToolUse` event filtered to `.claude/skills/` writes
-
-#### Customized agent files
-
-If you've added project-specific knowledge to agent `.md` files, do a diff and manually add the `memory: project` line to the YAML frontmatter where appropriate. Creative and technical director agents intentionally keep `memory: user` — only specialist agents get `memory: project`.
-
----
-
-### New Features
-
-#### Complete Story Lifecycle
-
-Stories now have a formal lifecycle enforced by two skills:
-
-- **`/story-readiness`** — validates a story is implementation-ready before a developer picks it up. Checks Design (GDD req linked), Architecture (ADR accepted), Scope (criteria testable), and DoD (manifest version current). Verdict: READY / NEEDS WORK / BLOCKED.
-- **`/story-done`** — 8-phase completion review after implementation. Verifies each acceptance criterion, checks for GDD/ADR deviations, prompts code review, updates the story file to `Status: Complete`, and surfaces the next ready story.
-
-Flow: `/story-readiness` → implement → `/story-done` → next story
-
-#### Full UX/UI Pipeline
-
-- **`/ux-design`** — guided section-by-section UX spec authoring. Three modes: screen/flow, HUD, or interaction pattern library. Reads GDD UI requirements and player journey. Output to `design/ux/`.
-- **`/ux-review`** — validates UX specs against GDD alignment, accessibility tier, and pattern library. Verdict: APPROVED / NEEDS REVISION / MAJOR REVISION.
-- **`/team-ui`** updated: Phase 1 now runs `/ux-design` + `/ux-review` as a hard gate before visual design begins.
-
-#### Brownfield Adoption
-
-**`/adopt`** onboards existing projects to the template format. Audits internal structure of GDDs, ADRs, stories, systems-index, and infra. Classifies gaps (BLOCKING/HIGH/MEDIUM/LOW). Builds an ordered migration plan. Never regenerates existing artifacts — only fills gaps.
-
-Argument modes: `full | gdds | adrs | stories | infra`
-
-Also: `/design-system retrofit [path]` and `/architecture-decision retrofit [path]` detect existing files and add only missing sections.
-
-#### Sprint Tracking YAML
-
-`production/sprint-status.yaml` is now the authoritative story tracking format:
-- Written by `/sprint-plan` (initializes all stories) and `/story-done` (sets status to `done`)
-- Read by `/sprint-status` (fast snapshot) and `/help` (per-story status in production phase)
-- Status values: `backlog | ready-for-dev | in-progress | review | done | blocked`
-- Falls back gracefully to markdown scanning if file doesn't exist
-
-#### `/help` — Context-Aware Next Step
-
-`/help` reads your current stage and in-progress work, checks which artifacts are complete, and tells you exactly what to do next — one primary required step, plus optional opportunities. Distinct from `/start` (first-time only) and `/project-stage-detect` (full audit).
-
-#### Comprehensive QA and Testing Framework
-
-Nine new QA/testing skills covering the full testing lifecycle:
-
-- **`/test-setup`** — scaffolds the test framework and CI/CD pipeline for your engine
-- **`/test-helpers`** — generates engine-specific test helper libraries (GDUnit4, NUnit, etc.)
-- **`/qa-plan`** — generates a QA test plan for a sprint or feature, classifying stories by test type
-- **`/smoke-check`** — runs the critical path smoke test gate before QA hand-off
-- **`/soak-test`** — generates a soak test protocol for extended play sessions (stability, memory leaks)
-- **`/regression-suite`** — maps test coverage to GDD critical paths, identifies fixed bugs lacking regression tests
-- **`/test-evidence-review`** — quality review of test files and manual evidence documents
-- **`/test-flakiness`** — detects non-deterministic tests by reading CI run logs
-- **`/skill-test`** — validates skill files for structural compliance and behavioral correctness (three modes: lint, spec, catalog)
-
-Also new: **`/bug-triage`** re-evaluates all open bugs for priority, severity, and ownership.
-
-#### Skill Validator (`/skill-test`)
-
-`/skill-test` is a meta-skill for validating the harness itself. Run it after editing any skill file. Three modes:
-- `lint` — validates YAML frontmatter and required fields
-- `spec [skill-name]` — runs behavioral spec tests against a specific skill
-- `catalog` — checks that all skills in `.claude/skills/` are indexed in the catalog
-
-The new `validate-skill-change.sh` hook reminds you to run `/skill-test` automatically when a skill file is modified.
-
-#### Team Live-Ops and Team QA Orchestration
-
-- **`/team-live-ops`** — coordinates live-ops-designer + economy-designer + community-manager + analytics-engineer for post-launch content planning (seasonal events, battle pass, retention)
-- **`/team-qa`** — orchestrates qa-lead + qa-tester + gameplay-programmer + producer through a full QA cycle: strategy, execution, coverage, and sign-off
-
-#### Model Tier Routing
-
-Skills are now explicitly assigned to Haiku, Sonnet, or Opus tiers based on task complexity. Read-only status checks use Haiku; complex multi-document synthesis uses Opus; everything else defaults to Sonnet. Tier assignments are documented in `.claude/docs/coordination-rules.md`.
-
-#### Directory CLAUDE.md Files
-
-Three new directory-scoped CLAUDE.md files (`design/`, `src/`, `docs/`) provide path-specific instructions to agents working in those directories. These load automatically when Claude Code reads files in that directory.
-
----
-
-### After Upgrading
-
-1. **Verify new hooks** are registered in `.claude/settings.json` — check for all four: `log-agent-stop.sh`, `notify.sh`, `post-compact.sh`, `validate-skill-change.sh`.
-
-2. **Test the audit trail** by spawning any subagent — both start and stop events should appear in `production/session-logs/`.
-
-3. **Generate sprint-status.yaml** if you're in active production:
-   ```
-   /sprint-plan status
-   ```
-
-4. **Run `/adopt`** if you have existing GDDs or ADRs that predate this template version — it will identify which sections need to be added without overwriting your content.
-
-5. **Validate your skills** after any skill edits with `/skill-test` — the new `validate-skill-change.sh` hook will automatically remind you to do this.
-
----
-
-## v0.2.0 → v0.3.0
-
-**Released:** 2026-03-09
-**Commit range:** `e289ce9..HEAD`
-**Key themes:** `/design-system` GDD authoring, `/map-systems` rename, custom status line
-
-### Breaking Changes
-
-#### `/design-systems` renamed to `/map-systems`
-
-The `/design-systems` skill was renamed to `/map-systems` for clarity
-(decomposing = *mapping*, not *designing*).
-
-**Action required:** Update any documentation, notes, or scripts that invoke
-`/design-systems`. The new invocation is `/map-systems`.
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New skills** | `/design-system` (guided GDD authoring, section-by-section) |
-| **Renamed skills** | `/design-systems` → `/map-systems` (breaking rename) |
-| **New files** | `.claude/statusline.sh`, `.claude/settings.json` statusline config |
-| **Skill updates** | `/gate-check` — writes `production/stage.txt` on PASS, new phase definitions |
-| **Skill updates** | `brainstorm`, `start`, `design-review`, `project-stage-detect`, `setup-engine` — cross-reference fixes |
-| **Bug fixes** | `log-agent.sh`, `validate-commit.sh` — hook execution fixed |
-| **Docs** | `UPGRADING.md` added, `README.md` updated, `WORKFLOW-GUIDE.md` updated |
-
----
-
-### Files: Safe to Overwrite
-
-**New files to add:**
-```
-.claude/skills/design-system/SKILL.md
-.claude/statusline.sh
-```
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/map-systems/SKILL.md      ← was design-systems/SKILL.md
-.claude/skills/gate-check/SKILL.md
-.claude/skills/brainstorm/SKILL.md
-.claude/skills/start/SKILL.md
-.claude/skills/design-review/SKILL.md
-.claude/skills/project-stage-detect/SKILL.md
-.claude/skills/setup-engine/SKILL.md
-.claude/hooks/log-agent.sh
-.claude/hooks/validate-commit.sh
-README.md
-docs/WORKFLOW-GUIDE.md
-UPGRADING.md
-```
-
-**Delete (replaced by rename):**
-```
-.claude/skills/design-systems/   ← entire directory; replaced by map-systems/
-```
-
----
-
-### Files: Merge Carefully
-
-#### `.claude/settings.json`
-
-The new version adds a `statusLine` configuration block pointing to
-`.claude/statusline.sh`. If you haven't customized `settings.json`, overwriting
-is safe. Otherwise, add this block manually:
-
-```json
-"statusLine": {
-  "script": ".claude/statusline.sh"
-}
-```
-
----
-
-### New Features
-
-#### Custom Status Line
-
-`.claude/statusline.sh` displays a 7-stage production pipeline breadcrumb in
-the terminal status line:
-
-```
-ctx: 42% | claude-sonnet-5 | Systems Design
-```
-
-In Production/Polish/Release stages, it also shows the active Epic/Feature/Task
-from `production/session-state/active.md` if a `<!-- STATUS -->` block is present:
-
-```
-ctx: 42% | claude-sonnet-5 | Production | Combat System > Melee Combat > Hitboxes
-```
-
-The current stage is auto-detected from project artifacts, or can be pinned by
-writing a stage name to `production/stage.txt`.
-
-#### `/gate-check` Stage Advancement
-
-When a gate PASS verdict is confirmed, `/gate-check` now writes the new stage
-name to `production/stage.txt`. This immediately updates the status line for all
-future sessions without requiring manual file edits.
-
----
-
-### After Upgrading
-
-1. **Delete the old skill directory:**
-   ```bash
-   rm -rf .claude/skills/design-systems/
-   ```
-
-2. **Test the status line** by starting a Claude Code session — you should see
-   the stage breadcrumb in the terminal footer.
-
-3. **Verify hook execution** still works:
-   ```bash
-   bash .claude/hooks/log-agent.sh '{}' '{}'
-   bash .claude/hooks/validate-commit.sh '{}' '{}'
-   ```
-
----
-
-## v0.1.0 → v0.2.0
-
-**Released:** 2026-02-21
-**Commit range:** `ad540fe..e289ce9`
-**Key themes:** Context Resilience, AskUserQuestion integration, `/map-systems` skill
-
-### What Changed
-
-| Category | Changes |
-|----------|---------|
-| **New skills** | `/start` (onboarding), `/map-systems` (systems decomposition), `/design-system` (guided GDD authoring) |
-| **New hooks** | `session-start.sh` (recovery), `detect-gaps.sh` (gap detection) |
-| **New templates** | `systems-index.md`, 3 collaborative-protocol templates |
-| **Context management** | Major rewrite — file-backed state strategy added |
-| **Agent updates** | 14 design/creative agents — AskUserQuestion integration |
-| **Skill updates** | All 7 `team-*` skills + `brainstorm` — AskUserQuestion at phase transitions |
-| **CLAUDE.md** | Slimmed from ~159 to ~60 lines; 5 doc imports instead of 10 |
-| **Hook updates** | All 8 hooks — Windows compatibility fixes, new features |
-| **Docs removed** | `docs/IMPROVEMENTS-PROPOSAL.md`, `docs/MULTI-STAGE-DOCUMENT-WORKFLOW.md` |
-
----
-
-### Files: Safe to Overwrite
-
-These are pure infrastructure — you have not customized them. Copy the new
-versions directly with no risk to your project content.
-
-**New files to add:**
-```
-.claude/skills/start/SKILL.md
-.claude/skills/map-systems/SKILL.md
-.claude/skills/design-system/SKILL.md
-.claude/docs/templates/systems-index.md
-.claude/hooks/detect-gaps.sh
-.claude/hooks/session-start.sh
-production/session-state/.gitkeep
-docs/examples/README.md
-.github/ISSUE_TEMPLATE/bug_report.md
-.github/ISSUE_TEMPLATE/feature_request.md
-.github/PULL_REQUEST_TEMPLATE.md
-```
-
-**Existing files to overwrite (no user content):**
-```
-.claude/skills/brainstorm/SKILL.md
-.claude/skills/design-review/SKILL.md
-.claude/skills/gate-check/SKILL.md
-.claude/skills/project-stage-detect/SKILL.md
-.claude/skills/setup-engine/SKILL.md
-.claude/skills/team-audio/SKILL.md
-.claude/skills/team-combat/SKILL.md
-.claude/skills/team-level/SKILL.md
-.claude/skills/team-narrative/SKILL.md
-.claude/skills/team-polish/SKILL.md
-.claude/skills/team-release/SKILL.md
-.claude/skills/team-ui/SKILL.md
-.claude/hooks/log-agent.sh
-.claude/hooks/pre-compact.sh
-.claude/hooks/session-stop.sh
-.claude/hooks/validate-assets.sh
-.claude/hooks/validate-commit.sh
-.claude/hooks/validate-push.sh
-.claude/rules/design-docs.md
-.claude/docs/hooks-reference.md
-.claude/docs/skills-reference.md
-.claude/docs/quick-start.md
-.claude/docs/directory-structure.md
-.claude/docs/context-management.md
-docs/COLLABORATIVE-DESIGN-PRINCIPLE.md
-docs/WORKFLOW-GUIDE.md
-README.md
-```
-
-**Agent files to overwrite** (if you haven't written custom prompts into them):
-```
-.claude/agents/art-director.md
-.claude/agents/audio-director.md
-.claude/agents/creative-director.md
-.claude/agents/economy-designer.md
-.claude/agents/game-designer.md
-.claude/agents/level-designer.md
-.claude/agents/live-ops-designer.md
-.claude/agents/narrative-director.md
-.claude/agents/producer.md
-.claude/agents/systems-designer.md
-.claude/agents/technical-director.md
-.claude/agents/ux-designer.md
-.claude/agents/world-builder.md
-.claude/agents/writer.md
-```
-
-If you *have* customized agent prompts, see "Merge carefully" below.
-
----
-
-### Files: Merge Carefully
-
-These files contain both template structure and your project-specific content.
-Do **not** overwrite them — merge the changes manually.
-
-#### `CLAUDE.md`
-
-The template version was slimmed from ~159 lines to ~60 lines. The key
-structural change: 5 doc imports were removed because they're auto-loaded
-by Claude Code anyway (agent-roster, skills-reference, hooks-reference,
-rules-reference, review-workflow).
-
-**What to keep from your version:**
-- The `## Technology Stack` section (your engine/language choices)
-- Any project-specific additions you made
-
-**What to adopt from the new version:**
-- Slimmer imports list (drop the 5 redundant `@` imports if present)
-- Updated collaboration protocol wording
-
-#### `.claude/docs/technical-preferences.md`
-
-If you ran `/setup-engine`, this file has your engine config, naming
-conventions, and performance budgets. Keep all of it. The template version
-is just the empty placeholder.
-
-#### `.claude/docs/templates/game-concept.md`
-
-Minor structural update — a `## Next Steps` section was added pointing to
-`/map-systems`. Add that section to your copy if you want the updated
-guidance, but it's not required.
-
-#### `.claude/settings.json`
-
-Check whether the new version adds any permission rules you want. The change
-was minor (schema update). If you haven't customized your `settings.json`,
-overwriting is safe.
-
-#### Customized agent files
-
-If you've added project-specific knowledge or custom behavior to any agent
-`.md` file, do a diff and manually add the new AskUserQuestion integration
-sections rather than overwriting. The change in each agent is a standardized
-collaborative protocol block at the end of the system prompt.
-
----
-
-### Files: Delete
-
-These files were removed in v0.2.0. If present in your repo, you can safely
-delete them — they're replaced by better-organized alternatives.
-
-```
-docs/IMPROVEMENTS-PROPOSAL.md      → superseded by WORKFLOW-GUIDE.md
-docs/MULTI-STAGE-DOCUMENT-WORKFLOW.md → content merged into context-management.md
-```
-
----
-
-### After Upgrading
-
-1. **Run `/project-stage-detect`** to verify the system reads your project
-   correctly with the new detection logic.
-
-2. **Run `/start`** once if you haven't used it — it now correctly identifies
-   your stage and skips onboarding steps you've already done.
-
-3. **Check `production/session-state/`** exists and is gitignored:
-   ```bash
-   ls production/session-state/
-   cat .gitignore | grep session-state
-   ```
-
-4. **Test hook execution** — if you're on Windows, verify the new hooks run
-   without errors in Git Bash:
-   ```bash
-   bash .claude/hooks/detect-gaps.sh '{}' '{}'
-   bash .claude/hooks/session-start.sh '{}' '{}'
-   ```
-
----
-
-*Each future version will have its own section in this file.*
+## 버전별 절의 형식
+
+다음 버전부터는 버전마다 아래 형식의 절이 이 문서에 추가됩니다. 위의 전략은 이 절을 기준으로 움직입니다.
+
+- **릴리스 날짜**, **커밋 범위**, **핵심 주제**
+- `### 바뀐 것` — 영역별 변경 요약표
+- `### 덮어써도 안전한 파일` — 여러분의 내용이 없는 템플릿 파일
+- `### 주의해서 병합할 파일` — 섞여 있는 파일, 그리고 템플릿 헤딩·설정 키·판정 토큰 같은 계약이 바뀌었을 때
+  여러분의 문서와 설정에서 고칠 내용
+- `### 삭제된 파일` — 전략 A2와 C에서 손으로 지울 경로
+- `### 업그레이드 후` — 확인 절차와 `project.yaml`에 적을 `framework.version`, `framework.last_upgraded` 값

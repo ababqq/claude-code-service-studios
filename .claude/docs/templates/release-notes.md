@@ -1,103 +1,98 @@
-# Release Notes: [Game Title] v[Version]
+# Release Notes: [Product] [x.y.z]
 
-*Released: [Date]*
+**Version**: [x.y.z] · **Release date**: [YYYY-MM-DD]
+**Source**: `docs/CHANGELOG.md` `## [x.y.z]` — [N] of [M] commits in the range are customer-facing
+**Locales**: [ko-KR, en-US] (`localization.locales`)
+**Channels**: [In-App / Web · App Store · Google Play · API / Developers] — omitted: [channel — reason, e.g. "App Store, Google Play — release.distribution is 'web'"]
+**Style**: [brief | detailed | full]
+**Gaps**: [none | channel or locale that could not be completed — reason]
 
----
-
-## Headline
-
-> [One compelling sentence summarizing the most exciting part of this release.
-> This is what appears in store update notifications and social media.]
-
----
-
-## What's New
-
-### [Major Feature 1 Name]
-[2-4 sentences describing the feature. Focus on what players can DO, not
-how it works internally. Include a screenshot or GIF reference if applicable.]
-
-### [Major Feature 2 Name]
-[Description]
-
----
-
-## Gameplay Changes
-
-### Balance Adjustments
-
-| Target | Change | Before | After | Context |
-| ---- | ---- | ---- | ---- | ---- |
-| [Weapon/Ability/Item] | [What changed] | [Old value] | [New value] | [Why — 1 sentence] |
-| | | | | |
-
-### Mechanic Changes
-- **[Change Name]**: [What changed and how it affects gameplay. Be specific
-  about what players will experience differently.]
+<!--
+How to fill this template (read by /release-notes; delete these comments in the written file):
+- One locale block per entry of `localization.locales`, in that order. A block starts with the
+  `> **Locale**:` line and contains the headings below in this order. Headings stay in English exactly
+  as written; the text under them is written in the block's locale.
+- Content sections (Highlights … Known Issues) with nothing to say carry the single line
+  "None in this release." in the block's language — never delete the heading.
+- Channel sections (In-App / Web … API / Developers) appear only when the channel applies:
+  App Store and Google Play only when release.distribution is `stores` or `web+stores`;
+  API / Developers only when `api` is in platform.surfaces. An omitted channel is named on the
+  **Channels** line above.
+- Customer copy never contains ticket IDs, file paths, sprint numbers, commit hashes or people's names.
+-->
 
 ---
 
-## Quality of Life
+> **Locale**: [ko-KR]
 
-- [Improvement 1 — describe the player benefit, not the technical change]
-- [Improvement 2]
-- [Improvement 3]
+## Highlights
 
----
+[One or two sentences on the change users will care about most. This line is what store update
+notifications and the in-app "What's new" card show first.]
 
-## Bug Fixes
+## New
 
-### Critical Fixes
-- Fixed [describe what players experienced, e.g., "a crash when loading
-  saved games from version 1.0"]
+- **[Feature name]**: [What the user can now do, and the benefit — one sentence. Name the plan when the
+  feature is not on every plan.]
 
-### Gameplay Fixes
-- Fixed [describe the incorrect behavior and the correct behavior now]
+## Improved
 
-### UI Fixes
-- Fixed [description]
+- **[Area]**: [What got better from the user's point of view — faster, clearer, fewer steps. Quote a
+  number only when it was measured.]
 
-### Audio Fixes
-- Fixed [description]
+## Fixed
 
-### Platform-Specific Fixes
-- **[Platform]**: Fixed [description]
+- [The symptom the user experienced, fixed — e.g. "Fixed an issue where the savings goal progress did not
+  update after an automatic transfer." Describe the symptom, never the code.]
 
----
+## Security
 
-## Performance Improvements
+- [A security or privacy improvement described without exploit detail — e.g. "Strengthened protection of
+  your sign-in session." Coordinate wording and timing with security-engineer.]
 
-- [Improvement players will notice, e.g., "Reduced load times by approximately
-  30% on all platforms"]
-- [Improvement]
+## Changes to Plans & Pricing
 
----
+| Plan | What changes | Before | After | Effective |
+|---|---|---|---|---|
+| [Plus] | [monthly price / limit / entitlement] | [KRW 4,900] | [KRW 5,900] | [YYYY-MM-DD] |
+
+[Who is affected, what existing subscribers keep and until when, and how to cancel or change plans. Follow
+the regional notice items of the release checklist before publishing.]
+
+## Deprecations
+
+- **[Feature or version]**: [What is being retired, when, and what to use instead.]
 
 ## Known Issues
 
-We are aware of the following issues and are working on fixes for a future update:
+- **[Issue]**: [What the user may notice, and a workaround if one exists. "We're working on a fix." — no
+  dates promised.]
 
-- **[Issue]**: [Brief description and workaround if available]
-- **[Issue]**: [Description]
+## In-App / Web
+
+[The copy for the in-app "What's new" screen and the web changelog page: the Highlights sentence, three to
+five bullets drawn from the sections above, and a link to the help-center article when one exists.]
+
+## App Store
+
+[The "What's New in This Version" text for this locale — plain text, at most 4000 characters. No markdown,
+no links that need rendering, no mention of other mobile platforms. Character count: [n] / 4000]
+
+## Google Play
+
+[The release-notes text for this language — plain text, at most 500 characters. Play Console takes all
+languages in one field as `<ko-KR>…</ko-KR>` blocks; this section holds this language's text only.
+Character count: [n] / 500]
+
+## API / Developers
+
+- **Breaking**: [change — affected operations — migration steps — link to `docs/api/guides/[slug].md`]
+- **New**: [operation or field added]
+- **Deprecated**: [operation or field — `Sunset` date — replacement]
+- **API version**: [e.g. `/v1` unchanged]
 
 ---
 
-## Coming Next
+> **Locale**: [en-US]
 
-[Optional — tease upcoming content to build anticipation. Keep it vague enough
-to not create binding commitments.]
-
-> [1-2 sentences about what the team is working on next]
-
----
-
-## Thank You
-
-[Brief message thanking the community. Reference specific community feedback
-that influenced changes in this release if applicable.]
-
----
-
-*For the full changelog with technical details, see the [developer changelog](link).*
-*Report bugs: [link to bug report channel/form]*
-*Join the community: [link to Discord/forum]*
+[Repeat every heading above, in the same order, written in this locale.]

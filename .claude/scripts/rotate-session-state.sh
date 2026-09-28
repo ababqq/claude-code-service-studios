@@ -94,7 +94,7 @@ mkdir -p "$LOGDIR" 2>/dev/null
 # the archive stayed in active.md and got archived again on the next run.
 # mktemp in the state directory needs no external writable location and keeps
 # the mv on one filesystem, so it stays atomic.
-TMP=$(mktemp "$(dirname "$STATE")/.ccgs-rotate-XXXXXX" 2>/dev/null) || TMP=""
+TMP=$(mktemp "$(dirname "$STATE")/.ccss-rotate-XXXXXX" 2>/dev/null) || TMP=""
 if [ -z "$TMP" ]; then
   echo "rotate-session-state: FAILED — cannot create a temporary file in $(dirname "$STATE")" >&2
   echo "  $STATE is UNCHANGED. The narrative was appended to $ARCHIVE and is still" >&2

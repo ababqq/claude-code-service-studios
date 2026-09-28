@@ -4,10 +4,10 @@
 # Replaces a full read of every ADR (to extract one table row each) plus a manual
 # cycle trace. A model tracing A→B→C→A across a dozen ADRs will eventually miss an
 # edge; Kahn's algorithm cannot. This is the deterministic half of
-# /gate-check's pre-production "ADR Circular Dependency Check".
+# /gate-check's gate-validation "ADR Circular Dependency Check".
 #
 # EMITS OBSERVATIONS, NOT A VERDICT (per .claude/docs/context-management.md rule 2).
-# The caller (gate-pre-production) decides FAIL vs CONCERNS per tier. In
+# The caller (gate-validation) decides FAIL vs CONCERNS per tier. In
 # particular NO_DEPS_SECTION is load-bearing: it makes "no cycles because the
 # graph is clean" distinguishable from "no cycles because half the ADRs have no
 # dependency section".

@@ -1,80 +1,101 @@
-# Security Policy
+# 보안 정책
 
-## Supported Versions
+## 지원 버전
 
-Only the `main` branch receives security fixes. Forks and older releases are
-not supported.
+보안 수정은 `main` 브랜치의 최신 릴리스에만 적용합니다. 이전 릴리스와 포크는 지원하지 않습니다. 여러분
+프로젝트가 쓰는 프레임워크 버전은 `project.yaml`의 `framework.version`에서 확인할 수 있고, 새 버전으로 올리는
+방법은 [UPGRADING.md](UPGRADING.md)에 있습니다.
 
-## Reporting a Vulnerability
+## 취약점 신고
 
-**Do not report security vulnerabilities through public GitHub issues.**
+**보안 취약점은 공개 GitHub 이슈로 올리지 마세요.**
 
-Use GitHub's private vulnerability reporting instead:
+이 저장소의 **Security** 탭에서 **Report a vulnerability**를 눌러 GitHub의 비공개 취약점 신고 기능으로
+알려 주세요. 신고 내용은 메인테이너에게만 보입니다.
 
-**[Report a vulnerability →](https://github.com/Donchitos/Claude-Code-Game-Studios/security/advisories/new)**
+가능한 한 자세히 적어 주세요.
 
-Include as much detail as possible:
-- Description of the vulnerability and what it affects
-- Steps to reproduce
-- Potential impact and attack scenarios
-- Any suggested mitigations
+- 취약점 설명과 영향을 받는 파일(예: `.claude/hooks/validate-commit.sh`, `.claude/skills/<name>/SKILL.md`,
+  `.claude/agents/<name>.md`, `.claude/settings.json`)
+- 재현 절차 — 어떤 입력(파일 이름, 커밋 메시지, 설정 값, 프롬프트 등)이 문제를 일으키는지
+- 예상되는 영향과 공격 시나리오
+- 제안하는 완화 방법이 있다면 그 내용
+- 환경 — OS, 셸, Claude Code 버전(`claude --version`), 권한 모드, `framework.version`
 
-**What to expect:**
-- Acknowledgment within **48 hours**
-- Status update within **7 days**
-- Resolution within **90 days** for confirmed vulnerabilities
+**예상 일정**
 
-## What Is In Scope
+- 접수 확인: **48시간** 이내
+- 진행 상황 공유: **7일** 이내
+- 확인된 취약점의 해결: **90일** 이내
 
-CCGS is a **local development tool** — it installs shell hooks and coordinates
-AI agents that run directly on your machine. Security issues are primarily about
-contributed code that executes in users' environments without their awareness.
+## 범위
 
-### High Severity
-- Hooks (`.claude/hooks/*.sh`) that execute malicious or undisclosed shell
-  commands on user machines
-- Skills or agents that exfiltrate environment variables, API keys, or secrets
-- Prompt injection via skill or agent definitions that causes Claude to bypass
-  safety measures or take unauthorized destructive actions
-- Contributions that silently alter behavior in ways users cannot audit
+CCSS는 **로컬 개발 도구**입니다. 여러분의 컴퓨터에서 직접 실행되는 셸 훅과 스크립트를 설치하고, Claude Code가
+따르는 에이전트·스킬 정의와 권한 설정을 제공합니다. 그래서 보안 문제의 중심은 이 템플릿의 훅과 스크립트, 그리고
+사용자가 모르는 사이에 실행되거나 동작을 바꾸는 기여 코드입니다.
 
-### Medium Severity
-- Skills that make undisclosed outbound network requests
-- Agent definitions that escalate permissions or bypass user confirmation prompts
-- Hook patterns that behave differently across platforms to conceal behavior
-- Skills that write outside their documented scope without an explicit user
-  approval step
+### 높은 심각도
 
-### Out of Scope
-- The behavior of Claude or the Claude Code CLI itself
-  (report to [Anthropic](https://www.anthropic.com/security))
-- Bugs in the user's Claude Code installation or editor extension
-- Theoretical vulnerabilities with no realistic attack path
-- Issues requiring physical access to the user's machine
+- 훅(`.claude/hooks/*.sh`), 스크립트(`.claude/scripts/*.sh`), 상태 표시줄(`.claude/statusline.sh`)이 악의적이거나
+  공개되지 않은 셸 명령을 실행하는 경우
+- 훅이나 스크립트가 파일 이름, 커밋 메시지, 브랜치 이름, `project.yaml`·`project.local.yaml`의 값, 훅 입력 JSON
+  같은 입력을 명령으로 해석해 **명령 주입**이 가능한 경우(예: 설정 값을 `eval`하는 코드)
+- 스킬이나 에이전트가 환경 변수, API 키, 시크릿, 자격 증명 파일, 개인정보(PII)를 외부로 빼내는 경우
+- 스킬이나 에이전트 정의를 통한 프롬프트 인젝션으로 Claude가 안전 장치를 우회하거나, 승인 없이 파괴적인 작업 —
+  프로덕션 배포, IaC apply, 데이터베이스 삭제, 시크릿 변경 — 을 하게 만드는 경우
+- `.claude/settings.json`의 거부 목록을 약화시키거나, 프로덕션을 바꾸는 명령을 조용히 허용 목록에 넣는 변경
+- 사용자가 검토할 수 없는 방식으로 동작을 몰래 바꾸는 기여
 
-## Security Guidelines for Contributors
+### 중간 심각도
 
-When contributing hooks, skills, or agents:
+- 공개되지 않은 외부 네트워크 요청을 보내는 스킬이나 훅(실시간 소스를 조회한다고 명시된 `/setup-stack` 같은
+  스킬의 조회는 제외)
+- 권한을 올리거나, "May I write this to …?" 확인이나 `AskUserQuestion` 승인을 건너뛰게 만드는 에이전트·스킬 정의 —
+  특히 항상 협업해야 하는 스킬(`/gate-check`, `/hotfix`, `/incident`, `/rollout-plan`, `/setup-stack`, `/start`,
+  `/settings`)의 승인 단계를 우회하는 경우
+- `validate-commit.sh`의 시크릿·자격 증명 파일 차단을 의도적으로 우회할 수 있게 만드는 입력이나 변경
+- 동작을 숨기기 위해 플랫폼마다 다르게 행동하는 훅
+- 문서에 적힌 범위 밖의 경로에 사용자 승인 없이 쓰는 스킬
 
-- **Hooks must be POSIX-compatible** — use `grep -E`, not `grep -P`; avoid
-  platform-specific syntax that behaves differently across operating systems
-- **No silent network calls** from hooks or skills unless explicitly documented
-  and opt-in by the user
-- **No reading secrets or environment variables** beyond what is minimally
-  required and clearly documented in the skill's header
-- **Skills must not write outside their documented scope** without an explicit
-  user confirmation step
+### 범위 밖
 
-## Disclosure Policy
+- Claude나 Claude Code CLI 자체의 동작 — Anthropic의 취약점 신고 절차로 알려 주세요.
+- 사용자의 Claude Code 설치나 에디터 확장의 버그
+- 이 템플릿으로 **여러분이 만든 제품**의 취약점(여러분의 코드, 의존성, 인프라) — 제품 보안은 `/security-audit`과
+  여러분 조직의 절차로 다루세요.
+- `.claude/docs/compliance/*.md` 점검 목록 내용의 정확성 — 법률 자문이 아닌 주제 목록이므로 일반 이슈로
+  알려 주세요.
+- Playwright, k6, 각종 CLI 같은 제3자 도구의 취약점
+- 현실적인 공격 경로가 없는 이론상의 취약점, 사용자 컴퓨터에 물리적으로 접근해야 하는 문제
 
-We follow a **90-day coordinated disclosure** timeline:
+## 기여자를 위한 보안 지침
 
-1. You submit the vulnerability privately
-2. We acknowledge within 48 hours
-3. We confirm and assess severity within 7 days
-4. We develop and test a fix
-5. We notify you before any public disclosure
-6. Public disclosure happens after the fix ships, or at 90 days — whichever
-   comes first
+훅, 스크립트, 스킬, 에이전트를 기여할 때 지켜 주세요.
 
-We credit reporters in release notes unless you prefer to remain anonymous.
+- **훅은 이식성 있게** — `grep -P`가 아니라 `grep -E`를 쓰고, macOS bash 3.2와 Windows Git Bash에서 다르게
+  동작하는 문법을 피합니다. 입력 값은 항상 따옴표로 감싸고, 설정 값이나 파일 내용을 `eval`하지 않습니다.
+- **조용한 네트워크 호출 금지** — 훅은 네트워크를 쓰지 않습니다. 네트워크를 쓰는 스킬은 그 사실과 목적을 밝히고
+  사용자의 흐름 안에서만 씁니다.
+- **시크릿은 읽지 않습니다** — 최소한으로 필요한 것 이상의 환경 변수를 읽지 않고, 자격 증명 파일(`.env`,
+  `*.pem`, `*.keystore`, `*.jks`, `*.p12`, `*.mobileprovision`, 서비스 계정 JSON)은 열지 않습니다.
+  `.claude/settings.json`의 거부 목록이 이 파일들의 읽기를 막고 있습니다.
+- **프로덕션을 바꾸는 명령은 사람에게** — 에이전트는 프로덕션, 공유 인프라, 공유 데이터베이스, 시크릿을 바꾸는
+  명령을 실행하지 않고, 영향 범위와 롤백 명령을 붙여 사람에게 제안합니다. 이런 명령을 허용 목록에 넣는 PR은
+  받지 않습니다.
+- **문서화된 범위 안에서만 씁니다** — 스킬은 문서에 적힌 경로에만, "May I write this to …?" 확인을 거친 뒤 씁니다.
+- **예시에 진짜 시크릿을 쓰지 않습니다** — 예시 토큰은 `EXAMPLE`로 끝나게 쓰고, 검토한 오탐에는
+  `pragma: allowlist secret` 주석을 붙입니다. 예시 개인정보는 가짜 값을 씁니다.
+- **실제 저장소에서 시험하지 않습니다** — 훅과 스크립트는 임시로 복사한 fixture 저장소에서 실행해 봅니다.
+
+## 공개 정책
+
+**90일 조율 공개(coordinated disclosure)** 원칙을 따릅니다.
+
+1. 신고자가 취약점을 비공개로 알립니다.
+2. 48시간 안에 접수를 확인합니다.
+3. 7일 안에 취약점을 확인하고 심각도를 평가합니다.
+4. 수정을 만들고 시험합니다.
+5. 공개하기 전에 신고자에게 먼저 알립니다.
+6. 수정이 배포된 뒤, 또는 90일이 지난 시점 중 빠른 쪽에 공개합니다.
+
+신고자가 익명을 원하지 않으면 릴리스의 변경 이력에 신고자를 밝혀 감사를 표합니다.

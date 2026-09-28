@@ -7,18 +7,23 @@
 > contracts are authored today.
 >
 > The **Testing Evidence Required** and **Drift Monitoring** sections are
-> **aspirational** — the runners they name (`tests/smoke-tests/`,
-> `tests/golden-datasets/`, `tests/behavioral-tests/`, `tests/integration/`) and
-> `production/session-state/drift-monitor.md` do **not exist**, no skill has a
-> `TESTS.md`, and none of the seven shipped `CONTRACT.md` files use the ASI or
-> drift machinery. Treat them as a design sketch for a future skill-quality
-> system, not as steps to follow.
+> **aspirational** — the skill-quality runners they name
+> (`tests/smoke-tests/schema-validate.sh`, `tests/golden-datasets/`,
+> `tests/behavioral-tests/format-stability.sh`,
+> `tests/integration/story-to-devstory.sh`) and
+> `production/session-state/drift-monitor.md` do **not exist** (a product's own
+> `tests/integration/` suite is unrelated), no skill has a `TESTS.md`, and none of
+> the seven shipped `CONTRACT.md` files use the ASI or drift machinery. Treat them
+> as a design sketch for a future skill-quality system, not as steps to follow.
 >
 > The seven shipped contracts use a simpler shape than this template:
-> `Inputs Consumed` / `Files That Must Exist` / `Preconditions` /
-> `Outputs Produced` / `Output Guarantees` / `Immutability Rules`. Match an
-> existing contract (e.g. `.claude/skills/dev-story/CONTRACT.md`) rather than
-> this template's schema-heavy form until the two are reconciled.
+> `Role in Pipeline` / `Inputs Required` (`Files That Must Exist`,
+> `Preconditions`) / `Outputs Produced` (`Files Written`, `Output Guarantees`) /
+> `Immutability Rules` / `Hard Constraints` / `Downstream Skill Expects` /
+> `Known Fragile Points`. Match an existing contract (e.g.
+> `.claude/skills/dev-story/CONTRACT.md`, or `.claude/skills/create-stories/CONTRACT.md`
+> for a skill that spawns a director gate) rather than this template's
+> schema-heavy form until the two are reconciled.
 
 **Purpose:** Define formal handoff contract for a skill. Create as `.claude/skills/<skill-name>/CONTRACT.md`.
 
@@ -47,11 +52,12 @@
 [ROLE] — [ONE SENTENCE DESCRIBING WHAT THIS SKILL DOES]
 
 ### Example
-Story Author — Decomposes game design epics into atomic, testable user stories with clear acceptance criteria.
+Story Author — Decomposes product epics into atomic, testable user stories with clear acceptance criteria.
 
 ### Domain Boundaries
 **Can Read:**
-- `design/gdd/` (game design documents)
+- `design/prd/` (feature PRDs)
+- `docs/architecture/`, `docs/api/` (ADRs, the API contract)
 - `.claude/docs/` (architectural guidance)
 - `production/session-state/` (context from previous skills)
 
@@ -60,8 +66,8 @@ Story Author — Decomposes game design epics into atomic, testable user stories
 - `production/qa/evidence/` (creates test evidence stubs)
 
 **Cannot Touch:**
-- `src/` (no game code)
-- `assets/` (no asset modifications)
+- Application source and tests (no product code)
+- `design/brand/`, `design/inventory/` (no design-asset modifications)
 - Source data files (read-only)
 
 ---
@@ -78,13 +84,13 @@ Story Author — Decomposes game design epics into atomic, testable user stories
 
 ```yaml
 # Example input epic (YAML frontmatter in Markdown)
-epic_id: "COMBAT-BASIC"
-epic_goal: "Implement core melee attack system"
+epic_id: "GOALS-CORE"
+epic_goal: "Let users create savings goals and track progress toward them"
 epic_acceptance_criteria:
-  - "Player can attack with sword"
-  - "Damage is configurable"
-  - "Animation plays on hit"
-  - "Enemy health updates"
+  - "User can create a savings goal"
+  - "Active-goal limits follow the user's plan"
+  - "Progress updates when an auto-debit settles"
+  - "Goal list shows progress as a percentage"
 target_complexity: "medium"  # low | medium | high
 estimated_story_count: 3
 ```
@@ -133,7 +139,7 @@ estimated_story_count: 3
 
 ### Validation Rules
 
-- [ ] Epic ID matches pattern `^[A-Z]+-[A-Z0-9]+$` (e.g., `COMBAT-BASIC`)
+- [ ] Epic ID matches pattern `^[A-Z]+-[A-Z0-9]+$` (e.g., `GOALS-CORE`)
 - [ ] Epic goal is 10–500 characters (not too brief, not a novel)
 - [ ] At least 1, at most 20 acceptance criteria
 - [ ] Target complexity is one of: `low`, `medium`, `high`
@@ -144,13 +150,13 @@ estimated_story_count: 3
 ```markdown
 ## Valid Example 1: Simple Epic
 
-epic_id: COMBAT-BASIC
-epic_goal: Implement core melee attack system
+epic_id: GOALS-CORE
+epic_goal: Let users create savings goals and track progress toward them
 epic_acceptance_criteria:
-  - Player can attack with sword
-  - Damage is configurable from external data
-  - Attack animation plays when action triggered
-  - Target health decreases by damage amount
+  - User can create a savings goal with a name, target amount and target date
+  - Active-goal limits are configurable per plan (Free, Plus)
+  - Progress updates when an auto-debit settles
+  - Goal list shows each goal's progress as a percentage
 target_complexity: medium
 estimated_story_count: 3
 ```
@@ -158,14 +164,14 @@ estimated_story_count: 3
 ```markdown
 ## Valid Example 2: Large Epic
 
-epic_id: PROGRESSION-FULL
-epic_goal: Implement complete character progression system
+epic_id: PAYMENTS-AUTODEBIT
+epic_goal: Fund savings goals through Toss Payments auto-debit
 epic_acceptance_criteria:
-  - Player gains experience from defeated enemies
-  - Experience unlocks new abilities
-  - Player can level up manually
-  - Leveling resets some cooldowns
-  - New abilities appear in player menu
+  - User registers a bank account for auto-debit
+  - Debits run on the scheduled day in KST
+  - Failed debits retry twice and notify the user by push and 알림톡
+  - User can pause and resume auto-debit for a goal
+  - Every debit is idempotent on its schedule ID
 target_complexity: high
 estimated_story_count: 12
 ```
@@ -188,7 +194,7 @@ estimated_story_count: 12
 ## [STORY_ID]: [STORY_TITLE]
 
 ### Description
-[1-3 paragraph description of the user story, written from player/user perspective]
+[1-3 paragraph description of the user story, written from the user's perspective]
 
 ### Acceptance Criteria
 1. [Testable criterion 1 — imperative mood, specific observable behavior]
@@ -237,7 +243,7 @@ estimated_story_count: 12
             "type": "string",
             "minLength": 20,
             "maxLength": 1000,
-            "description": "1-3 paragraphs, player perspective"
+            "description": "1-3 paragraphs, user perspective"
           },
           "acceptance_criteria": {
             "type": "array",
@@ -269,10 +275,10 @@ estimated_story_count: 12
 ### Validation Rules
 
 - [ ] Each story has unique story ID matching pattern `^[A-Z]+-[A-Z0-9]+-[0-9]+$`
-- [ ] Story IDs are sequential by epic (e.g., `COMBAT-BASIC-1`, `COMBAT-BASIC-2`, etc.)
+- [ ] Story IDs are sequential by epic (e.g., `GOALS-CORE-1`, `GOALS-CORE-2`, etc.)
 - [ ] Story count matches epic estimate ± 1 (e.g., if epic estimated 3, produce 2–4)
 - [ ] Each story has ≥3 and ≤5 acceptance criteria
-- [ ] Acceptance criteria are in imperative mood ("Player can...", "System validates...")
+- [ ] Acceptance criteria are in imperative mood ("User can...", "System validates...")
 - [ ] No code suggestions in story description (remain abstract)
 - [ ] No modification to original epic acceptance criteria (can expand, not change)
 - [ ] Dependencies reference valid story IDs (not forward references)
@@ -280,18 +286,18 @@ estimated_story_count: 12
 ### Examples of Valid Output
 
 ```markdown
-# Stories for COMBAT-BASIC
+# Stories for GOALS-CORE
 
-## COMBAT-BASIC-1: Player Can Attack with Sword
+## GOALS-CORE-1: User Can Create a Savings Goal
 
 ### Description
-The player wields a sword and can trigger basic melee attacks against enemies. When the attack button is pressed, the player's character plays an attack animation and applies damage to the target if in range.
+A signed-in user sets up a savings goal from the goals screen on the web or in the app. They give it a name, a target amount in KRW and a target date, and the new goal appears in their goal list straight away so they can see what they are saving toward.
 
 ### Acceptance Criteria
-1. Player equips sword from starting inventory
-2. Attack action triggers when spacebar pressed
-3. Attack animation plays (2-frame simple swing)
-4. Damage applied to target if in melee range (2-unit radius)
+1. User submits a name, a target amount and a target date from the goal form
+2. System creates the goal through `POST /v1/goals` and returns it with 0% progress
+3. System rejects a target amount below 10,000원 or above 100,000,000원 with a field error
+4. The new goal appears at the top of the goal list without a manual refresh
 
 ### Complexity Estimate
 low
@@ -301,22 +307,22 @@ low
 
 ---
 
-## COMBAT-BASIC-2: Damage Values Are Configurable
+## GOALS-CORE-2: Active-Goal Limits Are Configurable per Plan
 
 ### Description
-All damage values (sword damage, enemy health) come from external configuration files. This allows designers to tune balance without changing code.
+How many active goals a user may hold depends on their plan: Free users get three, Plus users are unlimited. The limits come from plan configuration, so the business can change them without shipping new code.
 
 ### Acceptance Criteria
-1. Sword damage loaded from `data/weapons.json`
-2. Enemy health loaded from `data/enemies.json`
-3. Changing JSON values changes in-game behavior immediately
-4. Invalid values trigger error log and fall back to default
+1. System loads active-goal limits from the plan configuration (Free: 3, Plus: unlimited)
+2. Changing a configured limit changes behavior without a deploy
+3. Creating a goal beyond the limit returns 403 with the problem type `goal-limit-reached`
+4. Invalid configuration values trigger an error log and fall back to the documented default
 
 ### Complexity Estimate
 medium
 
 ### Dependencies
-- COMBAT-BASIC-1
+- GOALS-CORE-1
 ```
 
 ---
@@ -326,8 +332,8 @@ medium
 Violations automatically trigger intervention/rejection.
 
 - ❌ **Do not modify epic goals** — story must not contradict or rewrite the input epic's goal
-- ❌ **Do not change acceptance criteria sources** — if epic says "damage is configurable", don't remove this criteria
-- ❌ **Do not write game code** — stories remain abstract, no code suggestions like `player.attack()`
+- ❌ **Do not change acceptance criteria sources** — if epic says "limits are configurable per plan", don't remove this criteria
+- ❌ **Do not write application code** — stories remain abstract, no code suggestions like `goalService.create()`
 - ❌ **Do not modify input epic file** — treat as read-only immutable
 - ❌ **Do not produce invalid story IDs** — must match pattern `EPIC-ID-N`
 - ❌ **Do not produce stories without acceptance criteria** — minimum 3 required
@@ -472,7 +478,7 @@ Every story skill output must pass this test suite before handoff:
    - Alarm: >1 vague criterion per story
 
 4. **Behavioral Boundaries (20%)** — Skill stays in lane?
-   - Measure: No code suggestions, no modified epic goals, no assets touched
+   - Measure: No code suggestions, no modified epic goals, no source or design files touched
    - Baseline: 0 violations per output
    - Alarm: Any violation
 
@@ -516,5 +522,5 @@ ASI = (0.30 * consistency) + (0.25 * tool) + (0.25 * criteria) + (0.20 * boundar
 ---
 
 **Template Version:** 1.0
-**Last Updated:** 2026-03-26
+**Last Updated:** 2026-09-27
 **Audience:** Skill authors creating new skills or upgrading existing ones to include contracts

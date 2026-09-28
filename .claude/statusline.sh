@@ -13,24 +13,24 @@
 #   1. cwd holds project.yaml   -> cwd   (a project root)
 #   2. cwd holds .claude/       -> cwd   (a project root not yet configured)
 #   3. CLAUDE_PROJECT_DIR       -> that  (populated in the hook environment)
-#   4. this script's location   -> <root>/.claude/hooks/../.. by construction
+#   4. this script's location   -> <root>/.claude/.. by construction
 # Rule 4 always works and needs no environment at all; rules 1-2 stop it from
 # overriding a caller that legitimately means somewhere else.
 #
 # NOT an upward search: that resolves a nested project to its parent's config.
 if [ -f "project.yaml" ] || [ -d ".claude" ]; then
-  CCGS_ROOT="$PWD"
+  CCSS_ROOT="$PWD"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "${CLAUDE_PROJECT_DIR}" ]; then
-  CCGS_ROOT="$CLAUDE_PROJECT_DIR"
+  CCSS_ROOT="$CLAUDE_PROJECT_DIR"
 else
-  CCGS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
+  CCSS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." 2>/dev/null && pwd)"
 fi
-[ -n "$CCGS_ROOT" ] && cd "$CCGS_ROOT" 2>/dev/null || true
+[ -n "$CCSS_ROOT" ] && cd "$CCSS_ROOT" 2>/dev/null || true
 
-# Claude Code Game Studios — Status Line
+# Claude Code Service Studios — Status Line
 # Receives JSON on stdin, outputs a single-line status.
 #
-# Segments: ctx% | model | production stage [| Epic > Feature > Task]
+# Segments: ctx% | model | stage · rigor [| Epic > Feature > Task]
 
 input=$(cat)
 
@@ -57,105 +57,65 @@ else
   ctx_label="ctx: --"
 fi
 
-# --- Production stage ---
-# Priority 1: project.stage from project.yaml
+# --- Stage ---
+# One estimator for the whole framework: .claude/scripts/stage-estimate.sh.
+# Its STAGE line is project.stage when that is set to a valid stage, otherwise
+# its own estimate from fixed paths. The status line keeps no ladder of its own:
+# a private copy drifts, and then the status line, /help and the gates report
+# different stages for the same tree. --quick keeps the call inside the
+# per-turn budget (fixed-path globs only, no source-file count).
+#
+# $cwd is passed as the project root so the stage describes the same workspace
+# as every other segment below. The project's own copy of the estimator runs
+# when it has one; the copy next to this script otherwise.
 stage=""
 project_yaml="$cwd/project.yaml"
 yaml_helper="$cwd/.claude/hooks/yaml-helper.sh"
-if [ -f "$project_yaml" ] && [ -f "$yaml_helper" ]; then
-  source "$yaml_helper"
-  stage=$(get_yaml_key "$project_yaml" project.stage 2>/dev/null)
+stage_script="$cwd/.claude/scripts/stage-estimate.sh"
+[ -f "$stage_script" ] || stage_script="${CCSS_ROOT:-.}/.claude/scripts/stage-estimate.sh"
+if [ -f "$stage_script" ]; then
+  stage=$(bash "$stage_script" --quick "$cwd" 2>/dev/null | sed -n 's/^STAGE: //p' | head -1)
 fi
-# Priority 2: legacy stage.txt fallback
-if [ -z "$stage" ]; then
-  stage_file="$cwd/production/stage.txt"
-  if [ -f "$stage_file" ]; then
-    stage=$(head -1 "$stage_file" | tr -d '\r\n')
-  fi
-fi
-
-# Priority 3: Auto-detect from artifacts
-if [ -z "$stage" ]; then
-  concept_file="$cwd/design/gdd/game-concept.md"
-  systems_file="$cwd/design/gdd/systems-index.md"
-  tech_prefs="$cwd/.claude/docs/technical-preferences.md"
-
-  has_concept=false
-  has_systems=false
-  engine_configured=false
-  src_count=0
-
-  [ -f "$concept_file" ] && has_concept=true
-  [ -f "$systems_file" ] && has_systems=true
-
-  # Check if engine is configured (project.yaml first, fall back to technical-preferences.md)
-  if [ -f "$project_yaml" ] && [ -f "$yaml_helper" ]; then
-    # yaml-helper may have been sourced above for stage; sourcing again is idempotent
-    source "$yaml_helper"
-    engine_name=$(get_yaml_key "$project_yaml" engine.name 2>/dev/null)
-    [ -n "$engine_name" ] && engine_configured=true
-  fi
-  if [ "$engine_configured" = false ] && [ -f "$tech_prefs" ]; then
-    # Leading whitespace tolerated, matching detect-gaps.sh and the migrator.
-    # This is the THIRD copy of "is the engine configured in
-    # technical-preferences.md" in the tree, and it was the last one still
-    # anchored to column 0 -- an indented bullet read as unconfigured here while
-    # the other two read it as configured, so the auto-detect ladder below
-    # dropped the project to an earlier stage than the rest of the system saw.
-    engine_line=$(grep -m1 -E '^[[:space:]]*-[[:space:]]+\*\*Engine\*\*:' "$tech_prefs" 2>/dev/null || true)
-    if [ -n "$engine_line" ] && ! echo "$engine_line" | grep -q "TO BE CONFIGURED"; then
-      engine_configured=true
-    fi
-  fi
-
-  # Count source files (language-agnostic)
-  if [ -d "$cwd/src" ]; then
-    src_count=$(find "$cwd/src" -type f \( -name "*.gd" -o -name "*.cs" -o -name "*.cpp" -o -name "*.h" -o -name "*.py" -o -name "*.rs" -o -name "*.lua" -o -name "*.tscn" -o -name "*.tres" \) 2>/dev/null | wc -l | tr -d ' ')
-  fi
-
-  # Check for ADRs (signals Pre-Production phase)
-  has_adrs=false
-  if ls "$cwd/docs/architecture/"adr-*.md 2>/dev/null | head -1 | grep -q .; then
-    has_adrs=true
-  fi
-
-  # Determine stage (check from most-advanced backward)
-  if [ "$src_count" -ge 10 ] 2>/dev/null; then
-    stage="Production"
-  elif [ "$has_adrs" = true ]; then
-    stage="Pre-Production"
-  elif [ "$engine_configured" = true ]; then
-    stage="Technical Setup"
-  elif [ "$has_systems" = true ]; then
-    stage="Systems Design"
-  elif [ "$has_concept" = true ]; then
-    stage="Concept"
-  else
-    stage="Concept"
-  fi
-fi
+# No estimator, or it printed nothing: say "unknown" the same way the context
+# segment does, rather than inventing a stage.
+[ -z "$stage" ] && stage="--"
 
 # --- Process posture (modes.rigor) ---
 # Locked to project.yaml (not locally overridable) with a plain terminal default
-# of 'standard', so a direct get_yaml_key read + default is exact. Deliberately
-# NOT resolve_setting: that assumes PWD is the project root, unsafe here since the
-# status line works from an absolute $cwd and never cd's.
+# of 'minimal', so a direct get_yaml_key read + default is exact:
+#   Unset on an unconfigured project: `modes.rigor` defaults to `minimal`, which
+#   resolves `review_mode` to `solo`.
+# A value outside minimal|standard|full is treated as unset, exactly as
+# yaml-helper's resolution lets an enum-invalid value fall through to the
+# default — the status line must never show a posture the skills do not use.
+# Deliberately NOT resolve_setting: that resolves from the preamble's root,
+# while every segment of this line describes the workspace in $cwd.
 #
-# The 'standard' default applies ONLY when nothing contradicts it. If `rigor` is
-# unset but a knob it fronts is set explicitly, the project's real process weight
-# is whatever that knob says, and printing 'standard' actively misreports it —
-# migration is the common case, writing `modes.review_mode` and no `modes.rigor`,
-# so every v1.0 upgrader running full director reviews read 'Production · standard'.
-# Suppress instead of guessing, matching the unconfigured-project behaviour: no
-# config, no claim. Suppression is correct rather than lossy — the fronted knobs
-# disagree with each other in this state, so there is no single honest posture.
+# The 'minimal' default applies ONLY when nothing contradicts it. If `rigor` is
+# unset but a knob it fronts is set explicitly, the project's real process
+# weight is whatever that knob says, and printing 'minimal' actively misreports
+# it — a project that pins `modes.review_mode: full` by hand, with no
+# `modes.rigor`, runs full director reviews while the line would read
+# 'Build · minimal'. Suppress instead of guessing, matching the unconfigured-
+# project behaviour: no config, no claim. Suppression is correct rather than
+# lossy — the fronted knobs disagree with each other in this state, so there
+# is no single honest posture.
 rigor=""
 if [ -f "$project_yaml" ] && [ -f "$yaml_helper" ]; then
   source "$yaml_helper"
-  rigor=$(get_yaml_key "$project_yaml" modes.rigor 2>/dev/null)
+  # Cheap superset pre-filter: no indented `rigor:` line anywhere means
+  # modes.rigor cannot be set, so the interpreter start is skipped. It only
+  # ever skips the precise read below; it never decides the value.
+  if grep -qE '^[[:space:]]+rigor:' "$project_yaml" 2>/dev/null; then
+    rigor=$(get_yaml_key "$project_yaml" modes.rigor 2>/dev/null)
+  fi
+  case "$rigor" in
+    minimal|standard|full) ;;
+    *) rigor="" ;;
+  esac
   if [ -z "$rigor" ]; then
-    rigor="standard"
-    # Cheap pre-filter first. This hook runs every turn, and the common case
+    rigor="minimal"
+    # Cheap pre-filter first. This line renders every turn, and the common case
     # (nothing fronted set) must not cost a get_yaml_key subprocess per key.
     # The grep is a deliberate SUPERSET — it matches the leaf names anywhere at
     # depth, so a false positive only costs the precise checks below, while a
@@ -174,9 +134,9 @@ if [ -f "$project_yaml" ] && [ -f "$yaml_helper" ]; then
   fi
 fi
 
-# --- Epic/Feature/Task breadcrumb (Production+ only) ---
+# --- Epic/Feature/Task breadcrumb (Build and later only) ---
 breadcrumb=""
-if [ "$stage" = "Production" ] || [ "$stage" = "Polish" ] || [ "$stage" = "Release" ]; then
+if [ "$stage" = "Build" ] || [ "$stage" = "Hardening" ] || [ "$stage" = "Launch" ]; then
   state_file="$cwd/production/session-state/active.md"
   if [ -f "$state_file" ]; then
     # Parse structured STATUS block

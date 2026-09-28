@@ -1,7 +1,7 @@
 ---
 name: prototype
-description: "Concept prototype before GDDs — throwaway HTML, Engine or Paper build, PROCEED/PIVOT/KILL. After /brainstorm and /setup-engine."
-argument-hint: "[concept-description] [--path html|engine|paper] [--review full|lean|solo] [--spike]"
+description: "Concept prototype to test the riskiest assumption — clickable, fake-door, concierge or code spike. PROCEED/PIVOT/KILL."
+argument-hint: "[concept-description] [--path clickable|code|fake-door|concierge] [--review full|lean|solo] [--spike] | report <prototype-dir>"
 user-invocable: true
 allowed-tools: Read, Glob, Grep, Write, Edit, Bash, Agent, AskUserQuestion, Bash(bash "*/.claude/skills/prototype/../../hooks/yaml-helper.sh" resolve_config *)
 model: sonnet
@@ -10,576 +10,612 @@ isolation: worktree
 
 !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation`
 
+Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`.
 
-
-## Purpose
-
-This is the **concept prototype** — a fast, throwaway build that answers one question:
-*"Is this core idea actually fun to interact with?"*
-
-**Default use** — run right after `/brainstorm` and `/setup-engine`, before writing
-GDDs or architecture docs. Its verdict determines whether the concept is worth the
-investment of full design documentation.
-
-**Mid-production?** You can also run this at any stage to test a specific mechanic,
-design change, or technical question. Pass `--spike` to activate spike mode: a
-lightweight ~4-hour build with no GDD prerequisites and no phase gate implications.
-
-**Already have GDDs and architecture complete?** To validate the full game loop
-before committing to Production, run `/vertical-slice` instead.
-
----
-
-## Phase 1: Define the Question
-
-
-Every `AskUserQuestion` call follows `.claude/docs/automation-modes.md`
+**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →
+`project.yaml` → default `collaborative`). Every `AskUserQuestion` call and
+every file write follows `.claude/docs/automation-modes.md`
 (collaborative asks always · guided major-only · autonomous logs and proceeds;
 `automation_always_ask` categories always prompt).
 
-**Check for spike mode:** If `--spike` was passed, skip to the **Spike Mode** section
-at the bottom of this skill.
+# Concept Prototype
 
-Otherwise, use `AskUserQuestion` to confirm intent before proceeding:
+A concept prototype is the **cheapest test of the riskiest assumption** — built in a
+day, put in front of real target users within a week, and thrown away. It answers
+one question before anyone writes PRDs or production code: *is this worth building?*
+Its verdict is **PROCEED**, **PIVOT** or **KILL** — or **NOT ASSESSED** when the
+evidence supports none of the three.
 
-- **Prompt**: "How would you like to use this prototype session?"
+**Default use** — in Discovery, after `/brainstorm` has named the riskiest assumptions
+and before `/map-features` and the PRDs. **Any time later** — `--spike` answers one
+technical or design question in about four hours, with no verdict and no phase-gate
+implications. **Already have code for real?** Proving that the production stack works
+end to end on staging is the walking skeleton (`/walking-skeleton`), built as
+production code — not a prototype.
+
+### Outputs
+
+| Path | Mode | Content |
+|------|------|---------|
+| `prototypes/<name>-concept/` | concept (default) | The build, the session plan, `REPORT.md` (from `.claude/docs/templates/prototype-report.md`) and, on a PIVOT, `PIVOT-NOTE.md` |
+| `prototypes/<name>-spike-YYYY-MM-DD/SPIKE-NOTE.md` | `--spike` | The spike record — question, result YES / NO / PARTIAL, evidence, next action |
+| `REPORT.md` in an existing prototype directory | `report <prototype-dir>` | The record for a prototype that has none |
+
+`/gate-check definition` looks for `prototypes/*-concept/REPORT.md` with the verdict
+line `> **Verdict**: PROCEED` (a recommended Discovery artifact). Directory rules and
+relaxed standards: `.claude/rules/prototype-code.md`.
+
+**Isolation.** This skill declares `isolation: worktree`: where the host honours it,
+the build runs in an isolated git worktree, so throwaway code never lands on the
+working branch by accident. Files written there stay on the worktree's branch until
+the user brings `prototypes/<name>-…/` over — `/help` and `/gate-check` only see the
+record once it is in the main working tree. The summary (Phase 10) always names the
+branch and the paths written.
+
+### What this skill never does
+
+- **Use real personal data.** Fixtures are synthetic and obviously fake; real
+  participants appear only as participant IDs (P1, P2, …). Recordings, contact details
+  and concierge data stay in the team's approved research store, never in the
+  repository.
+- **Use production keys.** Sandbox or test credentials only, from a local `.env` that is
+  never committed. It never asks for, prints or pastes a production key or token.
+- **Collect real payments** or deploy to a production domain or shared infrastructure.
+  A preview deploy for remote sessions is proposed as a command for the user to run,
+  marked `noindex`, and torn down after the sessions.
+- **Mix prototype and product code.** Prototype code never imports from the product's
+  source, and product code never imports from `prototypes/`.
+- **Default to PROCEED.** A recommendation follows the evidence; thin evidence is
+  NOT ASSESSED or a directional PIVOT, never a PROCEED.
+
+---
+
+## Phase 1: Parse Arguments and Choose the Mode
+
+| `$ARGUMENTS` | Mode |
+|---|---|
+| `report <prototype-dir>` | **Report Mode** (section near the end) |
+| `--spike` (with or without a description) | **Spike Mode** (section near the end) |
+| `[concept-description]`, optionally `--path clickable\|code\|fake-door\|concierge` | Concept prototype — Phases 2–10 |
+| nothing | Ask below |
+
+`--review full|lean|solo` overrides the resolved `review_mode` for this run.
+
+When no mode flag was given, confirm intent with `AskUserQuestion`:
+
+- **Prompt**: "How would you like to use this session?"
 - **Options**:
-  - `Prototype this concept` — build a throwaway build to validate the core idea is fun before writing GDDs (1–3 days)
-  - `Skip — concept already proven` — I have enough evidence this works; log it and proceed directly to design
-  - `Mid-production spike` — I'm already in Production and want to test a specific mechanic or technical question quickly (~4 hours, no phase gate implications)
+  - `Prototype the riskiest assumption` — build the cheapest test (≤ 1 day), run it with
+    target users, and decide PROCEED / PIVOT / KILL.
+  - `Skip — already proven` — interviews, data or a live product already answer it; go
+    straight to PRDs.
+  - `Spike a technical question` — about four hours, one question, no verdict.
 
-**If "Skip — concept already proven":**
-Ask (plain text, not a widget): "What evidence do you have that the concept works?"
-Record the one-line answer, then stop. Note: "Concept prototype skipped — evidence:
-[answer]." Suggest next step: `/map-systems` or `/design-system [mechanic]`.
-
-**If "Mid-production spike"**: skip to the **Spike Mode** section below.
-
-**If "Prototype this concept"**: continue with Phase 1 below.
-
----
-
-**A note on prototype strategy:** The research on successful indie development
-is consistent — building 2-3 concept variants and letting the best one win is
-far more likely to succeed than iterating one concept until it works. This is
-your first prototype, not necessarily your only one. If this prototype produces
-a PIVOT verdict, consider whether to refine this concept OR start fresh with a
-different angle on the same game idea and prototype that instead.
-
-**Game jam as a prototype vehicle:** If you're planning a concept prototype anyway,
-consider timing it to a game jam (Ludum Dare, GMTK Game Jam, Global Game Jam). Jams
-provide a forced timebox (48-72 hours), instant distribution to thousands of players
-who rate and review early builds, and a deadline that prevents scope creep by design.
-Many shipped games (Celeste, VVVVVV) began as jam prototypes. Not required — but
-worth considering if the timing is right.
-
-Read the concept description from the argument. Before building anything, define
-the **falsifiable hypothesis** this prototype must answer:
-
-> *"If the player [does X], they will feel [Y] — we will know this is true if [measurable signal Z]."*
-
-Good: "If the player swings on grapple hooks, traversal will feel fluid — we'll know if
-players chain 3+ swings without stopping within 2 minutes of picking it up."
-
-Bad: "Does this feel fun?" ← not testable, not falsifiable.
-
-**If the concept is too vague to form a hypothesis, stop here.** Ask the user to
-narrow the question before proceeding. A prototype without a clear question wastes time.
-
-Also ask: **"What is the riskiest assumption in this concept?"** That is the first
-thing the prototype should test — not the easiest part, the riskiest.
+**Skip — already proven**: ask in plain text "What evidence answers the riskiest
+assumption?" State it back: "Concept prototype skipped — evidence: [answer]." Write no
+file. Suggest recording the evidence in the brief's `## Riskiest Assumptions` status
+column (`/brainstorm` resumes the brief for that) and continuing with `/prd-review
+design/product/product-brief.md` or `/map-features`. The Discovery → Definition gate
+lists the concept prototype as recommended, and accepts the riskiest assumption proven
+by other means.
 
 ---
 
-## Phase 2: Load Concept Context
+## Phase 2: Load Context
 
-Read `design/gdd/game-concept.md` if it exists. Extract:
-- Core fantasy (what the player is supposed to feel)
-- Core loop (the moment-to-moment action being tested)
-
-Determine the engine and language in use: read `engine.name` and
-`engine.language` from `project.yaml`. For each field, if its key is absent or
-empty (including when `project.yaml` has no `engine:` block), fall back to
-`CLAUDE.md` and `.claude/docs/technical-preferences.md`. Treat a
-`[TO BE CONFIGURED]` value as not set.
-
----
-
-## Phase 3: Choose the Prototype Path
-
-Select the prototype path. If `--path [html|engine|paper]` was passed, use that.
-Otherwise, use this quick-reference first, then read the full path details below:
-
-| Genre | Recommended path | Key reason |
-|-------|-----------------|------------|
-| Platformer / action / fighter | **Engine** | Feel IS the hypothesis; browser latency produces false results |
-| Racing / sports | **Engine** | Same — timing and physics feedback are the point |
-| Top-down shooter / twin-stick | **Engine** | Aim feel is timing-sensitive |
-| Puzzle (logic) | **HTML** or **Paper** | Timing is not the point; logic and clarity are |
-| Card game | **Paper** first | Fastest iteration by hand before touching code |
-| Narrative / visual novel | **Paper** (Twine / Ink / Yarn Spinner) | Story is the mechanic — test it without code overhead |
-| Strategy / 4X / city builder | **Paper** (spreadsheet sim) | Validate economy and progression rules before building |
-| Roguelike (systems-heavy) | **Paper** → Engine | Validate that the ruleset is interesting before building |
-| Idle / clicker / incremental | **HTML** | Turn-based logic, no feel sensitivity required |
-| Rhythm game | **Paper** first (design levels in audio) | Design levels before the engine exists |
-| RPG / open world | **Paper** → Engine | Systems complexity: validate rules, then validate feel |
-| Horror / atmospheric | **Engine** | Atmosphere requires real rendering |
-
-**Rule of thumb:** "Does this feel right?" → Engine. "Are these rules interesting?" → Paper. "Is this logic correct?" → HTML or Paper.
-
-### Path: HTML (browser-playable)
-
-**Best for:** Puzzle games, card games, turn-based strategy, word games, idle games,
-top-down logic games. Anything where timing precision doesn't matter.
-
-**Reliability:** ~85–90% one-shot. The agent writes a single self-contained HTML
-file the user opens in a browser — no install required.
-
-**Limitation — browser latency lies about game feel.** Browsers introduce
-50–133ms of rendering variance. This makes HTML prototypes fundamentally unreliable
-for action games, platformers, fighting games, or anything where input timing,
-jump arcs, or collision feel are what you're testing. If feel is the hypothesis,
-use the Engine path instead.
-
-**Alternative tools for this path:** PICO-8 (extreme constraints, great for retro
-arcade concepts, web-export in one command), Phaser.js (more capable browser game
-framework, still no install needed), or Twine (narrative/choice-based games).
-These are faster than raw HTML for their respective genres — suggest them if appropriate.
-
-**Output:** A single `prototype.html` (or PICO-8/Phaser equivalent) the user opens in any browser.
-
-**Distribution — the HTML path's biggest advantage:** Unlike Engine prototypes, this
-build can reach real players globally in minutes. Use this actively:
-- **itch.io** — upload the file, share the link, get play counts and written feedback
-  within hours. Free. The indie community plays rough builds here without expecting
-  polish. This is genuine external validation at zero cost.
-- **Loom + file share** — share via Google Drive/Dropbox, ask someone to record their
-  screen + audio with Loom while playing. You get a video of real first-impression
-  reactions and confusion without synchronous scheduling.
-- **r/playmygame or r/WebGames** (Reddit) — active communities that specifically
-  test early builds and give unsolicited honest feedback.
-- **Game dev Discord servers** (GMTK, Brackeys, GameDev.tv) — members test each
-  other's prototypes routinely; an HTML file is the easiest possible ask.
+1. **The bet** — read `design/product/product-brief.md` (or `design/product/one-pager.md`
+   at `minimal`): `## Riskiest Assumptions`, the target segment, the value proposition
+   and the principles. With neither, work from the argument and say that the prototype
+   will test an unwritten bet — on PROCEED, write the brief next.
+2. **What was already tried** — the history is derived from the records, not kept in an
+   index: Glob `prototypes/*-concept/REPORT.md` and read each verdict line and
+   hypothesis; Glob `prototypes/*-concept/PIVOT-NOTE.md`. When a PIVOT-NOTE belongs to
+   this concept, start from its revised hypothesis instead of forming one from scratch,
+   and count the PIVOTs in that chain (Phase 10 uses the count).
+3. **Evidence that already exists** — `production/qa/usability/*.md` and personas in
+   `design/product/personas/` may already answer part of the question; use them.
 
 ---
 
-### Path: Engine (engine project)
+## Phase 3: Define the Hypothesis
 
-**Best for:** Action games, platformers, physics-heavy games, anything where
-moment-to-moment feel IS the hypothesis. Use this when HTML latency would lie about
-the result.
+**Test the riskiest assumption, not the easiest.** Pick the assumption with the highest
+impact-if-wrong × uncertainty, across the four risks: **Value** (will they want it),
+**Usability** (can they use and trust it), **Feasibility** (can we build and operate
+it, third parties included), **Viability** (does it work for the business). Ask the
+user in plain text: "Which assumption, if wrong, sinks this product?" — and compare
+with the brief's ranking.
 
-**Reliability:** ~50–60% one-shot. Expect 2–4 rounds of iteration — this is
-normal, not a failure.
+Write the **falsifiable hypothesis** — a behaviour, a metric and a threshold, decided
+**before** building:
 
-**Limitation — requires engine installed and running.** This path is a
-multi-turn collaborative loop:
-1. Agent writes the code
-2. User runs it in the engine
-3. User reports errors or observations
-4. Agent fixes and iterates
+> "We believe [target segment] will [observable behaviour] when [condition]. We will
+> know this is true when [metric] reaches [threshold] across [n participants / visits /
+> days]."
 
-**Sunk cost rule:** If the user has been iterating for more than 2 hours without
-reaching a playable state, stop. The scope is too large or the question is wrong.
-Reframe the hypothesis and simplify aggressively, or switch to Paper path.
+- Good: "We believe salaried 25–34-year-olds will authorise an automatic payday
+  transfer in their first session when the screen shows exactly when and how much will
+  move. We will know when at least 4 of 5 target participants complete authorisation
+  without help."
+- Good: "We believe at least 8% of Free users who see a 'Plus — shared goals' entry
+  will tap it and join the waitlist within two weeks (≥ 300 exposed users)."
+- Bad: "Do people like the app?" — no behaviour, no threshold, cannot fail.
 
-**Output:** A minimal runnable engine project in `prototypes/[name]-concept/`.
-
-**Lighter alternative — Love2D (Lua):** If the project engine (Godot, Unity, Unreal)
-feels too heavy to stand up for a throwaway build, consider Love2D — a minimal 2D
-framework that installs in minutes, requires no project scaffolding, and renders
-natively with no browser latency. Used by many indie devs for rapid 2D action and
-platformer prototypes (Balatro prototyped in Love2D; Nuclear Throne's early builds
-used it). It sits between HTML overhead and full engine overhead: heavier than
-opening a browser, lighter than setting up a full engine project. Best for 2D
-action/platformer feel validation when the project engine is 3D-first or takes
-significant time to configure.
+**If the concept is too vague to state a hypothesis, stop here** and narrow the
+question with the user. A prototype without a question wastes the day.
 
 ---
 
-### Path: Paper (rules document + play log)
+## Phase 4: Choose the Path
 
-**Best for:** Strategy games, card games, board game-style mechanics, economy
-systems, progression loops, any game where the logic can be simulated by hand.
-Works for any genre when you need to validate rules, not feel.
+If `--path` was given, use it. Otherwise match the path to the kind of question:
 
-**Reliability:** 100%. No code, no engine, no install.
+| The question is… | Path | Why |
+|---|---|---|
+| Will they understand it, find their way, trust the step? | **clickable** | Comprehension and flow need a screen, not a backend |
+| Will they take the first step — want it, click it, pay for it? | **fake-door** | Measures demand from real behaviour before building anything |
+| Is the outcome valuable when delivered? | **concierge** | Delivers the value by hand before automating it |
+| Can we build it, does it integrate, is it fast enough? | **code** | Only running code against the real third party answers it |
 
-**Limitation — cannot validate moment-to-moment feel.** Paper prototypes prove
-that the rules are internally consistent and the decisions are interesting. They
-cannot tell you whether jumping feels right or whether explosions feel satisfying.
+### Path: clickable
 
-**Paper playtest observation protocol (run this with 5+ people):**
-1. Brief the rules once. Hand them the rule summary sheet. Then step back.
-2. Do NOT explain further. Do NOT help. Do NOT clarify. Confusion is data.
-3. Watch silently. Note every moment they slow down, re-read, or ask a question.
-4. After the session, ask one question only: "What was confusing?" — not "Did you like it?"
-5. Use fresh testers for each iteration. The same person cannot give new first-impression data.
-6. If 3+ testers hit the same confusion point, that rule is broken — redesign it before re-testing.
+- **Build**: a Figma or ProtoPie prototype the user owns, or — built here — a single
+  self-contained `index.html` (all styles and data inline, opens by double-click, no
+  server), or a local Vite or Expo app with hard-coded data when touch and gesture feel
+  on a real phone matter (Expo Go).
+- **Sessions**: moderated think-aloud with target users; per-task success criteria;
+  task success, time on task, errors, SEQ after each task. Five participants per
+  segment find most usability problems in a formative test — they do not measure rates.
+- **Cannot tell you**: real latency, real data edge cases, whether users come back.
 
-**Output:** A printable rules document + a completed play log showing one simulated session.
+### Path: fake-door
 
-**Narrative tools for this path:** For dialogue-heavy and story-driven games, skip the
-generic rules doc — use a dedicated narrative scripting tool instead:
-- **Twine** — zero-code hypertext fiction; ideal for branching structure experiments and choice-impact testing
-- **Ink** (Inkle) — plain-text scripting language used in *80 Days*, *Heaven's Vault*, and *Overboard*; exports directly to Unity and Godot
-- **Yarn Spinner** — dialogue scripting used in *A Short Hike*, *DREDGE*, and *Night in the Woods*; integrates natively with Unity and Godot
+- **Build**: a standalone landing page, or an entry point inside an existing product
+  (a "Plus" button, a menu item), that leads to an honest "not available yet" page with
+  an optional waitlist.
+- **Traffic**: existing users (email or push only to users who consented to marketing
+  messages — in Korea advertising messages need prior opt-in consent and separate
+  consent for night-time sending), a capped ad budget, communities where the segment
+  gathers. Decide the minimum sample before launching; below it the read is
+  directional.
+- **Measures**: impressions → click-through → waitlist sign-up (or pre-order intent);
+  price variants for willingness-to-pay.
+- **Ethics**: the follow-up says plainly the feature does not exist yet; a waitlist
+  collects an email only with explicit consent and a stated deletion date; never
+  collect payment details; no dark patterns.
+- **Cannot tell you**: retention, satisfaction, whether they keep paying.
 
-All three let you write and playtest branching dialogue in minutes. Key metric for
-narrative prototypes: **time to first emotional beat** — how many exchanges before
-the player feels something? If it takes more than 3-4 exchanges, the opening is too slow.
+### Path: concierge
+
+- **Build**: an operator script, message templates and a checklist for delivering the
+  value by hand to 5–15 consenting users for one to three weeks (a person computes the
+  weekly savings plan and sends it; a person books the appointment and confirms it).
+- **Measures**: continuation (still participating in week 2 / week 4), requests for
+  more, manual effort per user (the first cost signal).
+- **Wizard of Oz** (the user believes it is automated) is acceptable only for low-stakes
+  flows and must be disclosed afterwards; anything that moves money or touches
+  sensitive decisions runs as a disclosed concierge.
+- **Cannot tell you**: unit economics at scale, automated edge cases.
+
+### Path: code
+
+- **Build**: the thinnest runnable slice against sandboxes and fixtures — the payment
+  provider's sandbox, the identity provider's test app, a messaging test sender — built
+  by the `prototyper` agent (Phase 6).
+- **Measures**: does it work end to end, success and error rates across N runs,
+  latency, the failure modes the third party exposes.
+- **Loop**: the user runs it, reports what happened; two to four fix rounds are normal.
+  Two hours without a runnable state ⇒ stop, shrink the question or switch paths.
+- **Cannot tell you**: whether users want it.
+
+Recommend a path with one sentence of reasoning, then capture the choice with
+`AskUserQuestion` (options: the four paths, recommended first with ` (Recommended)`).
+A path choice is a major decision in `guided` mode.
 
 ---
 
-Assess which path best fits the hypothesis, then use `AskUserQuestion` with your
-recommendation pre-stated:
+## Phase 5: Plan the Prototype
 
-- **Prompt**: "Which prototype path would you like to use? (Based on your concept, I'd recommend [path] — [one sentence reason].)"
-- **Options**:
-  - `HTML — browser prototype` — puzzle, card, turn-based, strategy, idle. Opens by double-clicking, no install. 85–90% reliable. **Not suitable for action games** — browser latency lies about feel.
-  - `Engine — native prototype` — action, platformer, physics, or anything where feel IS the hypothesis. 50–60% one-shot; 2–4 iteration rounds are normal. Requires engine installed.
-  - `Paper — rules document + play log` — strategy, economy, logic, board-game-style mechanics. 100% reliable. Cannot validate feel.
+Present the plan in 3–5 bullets and confirm it before building:
 
----
+- **Hypothesis and threshold** (Phase 3) and the assumption it retires.
+- **Minimum build** — the least that answers the question; everything else is cut
+  (settings, account pages, error states, animations, polish — unless one of them *is*
+  the question).
+- **Participants or traffic** — segment, how they are recruited, n, consent.
+- **Measures** — what is recorded, by whom, where (session notes by participant ID;
+  analytics events for a fake door).
+- **Time box** — build ≤ 1 day; sessions or traffic within about a week.
+- **Data and keys** — synthetic fixtures, sandbox credentials from a local `.env`, the
+  preview URL plan if sessions are remote.
 
-## Phase 4: Plan the Prototype
+**Scope rule**: one prototype tests one assumption. If the plan covers more, split it
+into two prototypes or cut.
 
-Define in 3–5 bullet points the minimum viable prototype:
+Confirm with `AskUserQuestion`: `Build it` / `Adjust the plan` / `Stop here`.
 
-- What is the falsifiable hypothesis?
-- What is the riskiest assumption — and how does this prototype test it first?
-- What is the absolute minimum needed to answer the question?
-- What is explicitly cut? (menus, save systems, error handling, polish, architecture — all of it)
-
-**Scope constraint:** A concept prototype tests ONE mechanic — not the whole game.
-If scope covers more than one mechanic, cut it down. When in doubt, cut more.
-
-Present this plan to the user before building. Get confirmation before proceeding.
-
-Once confirmed, write a session checkpoint to `production/session-state/active.md`
-(create `production/session-state/` if it does not exist). Include: concept name,
-hypothesis, path chosen, scope bullet points, and current phase ("Phase 5 —
-Implement"). This lets the next session resume without starting over if the session
-ends mid-build — especially important for multi-day Engine path work.
+Then checkpoint the session: ask "May I write this to
+`production/session-state/active.md`?" and record the concept name, directory,
+hypothesis, path, scope bullets and "Phase 6 — Build", so a new session can resume a
+multi-day build.
 
 ---
 
-## Phase 5: Implement
+## Phase 6: Build
 
-Ask: "May I create the prototype directory at `prototypes/[concept-name]-concept/`
-and begin implementation?"
+**Name** — `<name>` is a short kebab-case slug of the concept (`payday-autodebit`,
+`plus-shared-goals`); the directory is `prototypes/<name>-concept/`. If it already
+exists from an earlier attempt, pick a new slug (`payday-autodebit-v2`) — the `-concept`
+suffix always comes last.
 
-If yes, create the directory. Every file must begin with:
+Ask: "May I create `prototypes/<name>-concept/` and write [file list]?"
+
+**Every file starts with the prototype header** in its comment syntax
+(`<!-- … -->` in HTML, `#` in YAML or Python):
 
 ```
 // PROTOTYPE - NOT FOR PRODUCTION
-// Question: [Core question being tested]
-// Date: [Current date]
+// Question: [the hypothesis being tested]
+// Date: [YYYY-MM-DD]
 ```
 
-Standards are intentionally relaxed:
+**Relaxed on purpose**: hard-coded values, copy-paste, one file, faked steps, no tests,
+no error handling beyond what the hypothesis needs. **Never relaxed**: the data, keys
+and exposure rules above.
 
-- Hardcode values freely
-- Use placeholder assets (colored rectangles, debug shapes)
-- Skip error handling entirely
-- Use the simplest approach that works
-- Copy code rather than importing from production
-- No architecture, no patterns, no abstractions
+By path:
 
-**Do not add polish.** No menus, no game over screens, no music, no tutorial text
-unless the tutorial IS the mechanic being tested. Every addition beyond the
-hypothesis is waste.
+- **clickable** — write `index.html` (or the minimal Vite/Expo app) yourself. For a
+  Figma prototype the user builds, write only the session plan (Phase 7) and a
+  `prototype-link.md` with the share link.
+- **fake-door** — write the page(s) and the analytics event list (`fake-door-events.md`:
+  event names, what each proves). Hand the preview deploy command to the user; do not
+  run it.
+- **concierge** — write `operator-script.md`, `message-templates.md` and
+  `checklist.md`.
+- **code** — spawn `prototyper` via `Agent`. The prompt carries the hypothesis, the
+  path, the scope bullets, the directory, the time box and which sandbox credentials
+  exist. The prototyper proposes its build (scope, file list, the commands the user
+  will run) and asks before writing — relay the proposal and its questions to the user
+  with `AskUserQuestion`; on approval, spawn it again (or continue it, where the host
+  supports that) with the approval and the exact file list. Then run the loop: the
+  user runs the command, pastes errors or observations, the prototyper fixes. Two
+  hours without a runnable state triggers the stop rule.
 
-**Playtesting tip:** If you have access to anyone who hasn't seen the game —
-friends, family, strangers online — watching them play without explanation gives
-far better signal than testing it yourself. Watch silently; don't guide them.
-Confusion is data. Ask one question after: "What was confusing?" Not "Did you
-like it?"
-
-**No external testers available?** Use rotation: if you built system A, you're a
-naive tester for system B. In a two-person team this works well. Solo developer?
-Step away for 2-3 days before playing fresh — you won't have perfect first-impression
-signal, but you'll surface the worst blockers. Another option: play your own
-prototype as a speedrun (force yourself through it in 5 minutes without stopping
-to fix things) — the friction you feel is what strangers will hit.
-
-**Want more granular UX data?** Ask the tester to **think aloud** as they play —
-narrate their thoughts in real time: "I'm pressing space... nothing happened... is
-that the jump key?" This surfaces confusion the moment it happens rather than
-waiting for a post-play debrief. Best for UI/UX and onboarding clarity. Silent
-observation is still better for testing raw feel; think-aloud changes how people
-play slightly but gives much richer data about why they're confused.
-
-**HTML prototype?** itch.io, Reddit (r/playmygame), and Discord (GMTK, Brackeys)
-let you reach strangers today at zero cost — see the distribution options in the
-HTML path section above.
-
-**Testing AI, NPC, or complex system behavior before writing the code?** Use the
-**Wizard of Oz** technique: one person plays normally while a second person secretly
-controls the NPC, enemy, or system behavior in real time — making the decisions a
-human would make, not an algorithm. The player believes it's automated. This lets
-you validate whether your AI design *feels right* before writing a single line of
-pathfinding or decision tree code. When you observe what responses the human
-controller naturally produces, you learn exactly what the AI needs to do.
-
-### Engine path: multi-turn loop
-
-After writing the initial code:
-
-> "The prototype files are written. Run the project in your engine now.
-> If there are errors, paste them here and I'll fix them. If it runs,
-> describe what you see and whether it feels like it's answering the question."
-
-Iterate until the prototype is playable. Each loop:
-1. User runs → reports errors or observations
-2. Agent fixes errors or adjusts the mechanic
-3. Repeat until playable or sunk cost rule triggers
-
-### HTML path: single output
-
-Write a single `prototype.html` to `prototypes/[concept-name]-concept/`. Include
-all styles, logic, and assets inline. The file must be openable by double-clicking
-with no server required.
-
-### Paper path: document + log
-
-Write `prototypes/[concept-name]-concept/rules.md` (the game rules) and
-`prototypes/[concept-name]-concept/play-log.md` (a simulated session walking
-through one complete play cycle step by step with dice rolls, decisions, and
-outcomes narrated).
+Update the session checkpoint to "Phase 7 — Sessions" when the build is usable.
 
 ---
 
-## Phase 6: Playtest Debrief
+## Phase 7: Run the Sessions and Collect Evidence
 
-The prototype is built. Now hand it to the user and capture what they actually
-experienced. Do NOT skip to report generation — the report is only as good as the
-observations you collect here.
+**Session plan** — spawn `ux-researcher` via `Agent` with the hypothesis, the threshold,
+the segment, the path and the build. Ask it to **return** a session plan: screener,
+tasks with explicit success criteria (or the fake-door exposure plan, or the concierge
+schedule), a non-leading discussion guide, the consent script, and what to record.
+Show it; ask "May I write this to `prototypes/<name>-concept/session-plan.md`?".
 
-**For HTML path:** Say exactly this:
-> "The prototype is ready. Open `prototypes/[name]-concept/prototype.html` in your
-> browser and play it. Take as long as you need. Don't rush through it — try to
-> approach it the way a new player would. Come back here when you're done."
+**Running** — the sessions are run by people (the user, the team, the researcher); this
+skill waits for the evidence. Recommend: participants who match the segment and have
+not seen the product; do not explain or help during a task — confusion is data;
+think-aloud for comprehension questions; after the task ask "What was confusing?" rather
+than "Did you like it?".
 
-**For Engine path:** The multi-turn iteration loop already captured errors and
-behavior. Now ask for the overall assessment:
-> "Now that it's running — play through it a few times as if you're the player,
-> not the developer. Come back when you have a feel for it."
+**No external participants available?** Hallway sessions with people outside the team
+are weaker but real. A builder's own walkthrough surfaces blockers but is **not**
+evidence for PROCEED — a report based only on it is NOT ASSESSED or a directional PIVOT.
 
-**For Paper path:** Say exactly this:
-> "Read through `prototypes/[name]-concept/rules.md` and walk through the
-> `play-log.md` as if you're playing it for the first time. If you have someone
-> nearby, try running the rules with them. Come back when you've seen at least one
-> full play cycle."
+**Synthesis** — give `ux-researcher` the raw observations (participant IDs only) and ask
+it to return per-task success, measures against the threshold, issues by severity,
+verbatim quotes with IDs, and the hypothesis outcome (SUPPORTED / REFUTED /
+INCONCLUSIVE), with the sample's limits stated.
 
-Once the user returns, ask these questions **one at a time** — wait for each answer
-before asking the next:
+**Debrief** — then ask the user these questions **one at a time**, in plain text,
+waiting for each answer:
 
-1. **Hypothesis check:**
-   > "The hypothesis was: [restate the hypothesis from Phase 1]. Did it hold up —
-   > CONFIRMED, PARTIALLY CONFIRMED, or REFUTED? Tell me what you saw."
+1. "The hypothesis was: [hypothesis]. Did it hold — SUPPORTED, REFUTED or INCONCLUSIVE?
+   What did you see?"
+2. "What was the moment — if any — where it clearly worked? Be specific."
+3. "What was the most confusing or broken moment? Not 'it felt slow' but 'three of five
+   stopped at the account-connection step and asked whether the app could withdraw
+   more than the goal amount'."
+4. "Did anything happen you did not expect — good or bad?"
+5. "PROCEED, PIVOT or KILL — and one sentence why?"
 
-2. **Best moment:**
-   > "What was the moment — if any — where it felt like it was working? Be specific."
-
-3. **Worst moment:**
-   > "What was the most frustrating, confusing, or broken moment? Be specific —
-   > not 'it felt slow' but 'the jump took about half a second to respond and it
-   > felt like I was fighting the controls'."
-
-4. **Surprise:**
-   > "Did anything happen that you didn't expect — good or bad?"
-
-5. **Verdict:**
-   > "PROCEED, PIVOT, or KILL — and one sentence why."
-
-Collect all answers before moving to report generation. If any answer is vague
-("it felt fine", "pretty good"), ask a follow-up: "Can you be more specific?
-What exactly felt fine about it?" Precise observations make the report useful.
-Vague ones make it useless.
+A vague answer ("it went fine") gets one follow-up: "What exactly went fine — which
+task, which participant?"
 
 ---
 
-## Phase 7: Generate Prototype Report
+## Phase 8: Write the Report
 
-Read `.claude/docs/templates/prototype-report.md` to get the report structure.
-Fill in every section based on what was observed during this session. Replace all
-placeholder text with real observations — no generic filler.
+Read `.claude/docs/templates/prototype-report.md` and fill every section from the
+evidence collected — no generic filler:
 
-Ask: "May I write this report to `prototypes/[concept-name]-concept/REPORT.md`?"
+- `## Hypothesis` — as written in Phase 3, with the date it was written.
+- `## Path` — the path, why, what it cannot tell you, what was built, deliberate
+  shortcuts.
+- `## Method` — participants or traffic, consent and data handling, tasks or scenario,
+  measures, time box kept or exceeded.
+- `## Results` — participants table, measures against the threshold, observations and
+  quotes by participant ID, the hypothesis outcome.
+- `## Verdict` — the recommendation reasoned from the results:
+  - **PROCEED** — the threshold was met by target-segment participants with sound
+    evidence.
+  - **PIVOT** — partly met, or met for a different segment or job than intended;
+    something close to working is worth changing and re-testing.
+  - **KILL** — refuted by sound evidence, or the Phase 10 kill check applies.
+  - **NOT ASSESSED** — the evidence supports none of the three (sessions not run,
+    off-segment participants only, sample below the planned minimum, sandbox never
+    reached); name the missing evidence and how to get it.
+- `## Next Step` — per the verdict (Phase 10).
 
-If yes, write the file. Then update `prototypes/index.md` (create if it does not
-exist) — append one row to the concept prototype table: concept name, date, path
-used, verdict (PROCEED/PIVOT/KILL), and a link to the REPORT.md. If a PIVOT chain
-exists (prior PIVOT-NOTE.md in a related concept folder), note the chain. This file
-is the project's complete history of what was tried and what was learned.
+Directly under the H1, after one blank line, the verdict line:
+`> **Verdict**: PROCEED` (or `PIVOT`, `KILL`, `NOT ASSESSED`), followed by the review
+line and the remaining status lines. When Phase 9 will not spawn the gate — the review
+mode skips it, or the verdict is NOT ASSESSED — write the Phase 9 note in place of the
+review line now, so the report needs no second write; otherwise leave the placeholder
+for Phase 9 to fill.
+
+Show the report; ask "May I write this to `prototypes/<name>-concept/REPORT.md`?".
 
 ---
 
-## Phase 8: Creative Director Review
+## Phase 9: User Validation Review (PD-USER-VALIDATION)
 
-**Review mode check:**
-- `solo` → skip. Note: "CD-PLAYTEST skipped — Solo mode."
-- `lean` → skip. Note: "CD-PLAYTEST skipped — Lean mode."
-- `full` → spawn `creative-director` via `Agent` using gate **CD-PLAYTEST** if
-  `design/gdd/game-concept.md` exists with game pillars defined. If pillars are
-  not yet defined, note: "CD-PLAYTEST skipped — game pillars not yet defined at
-  concept prototype stage."
+**Review mode check** — apply before spawning PD-USER-VALIDATION (`--review` overrides
+the resolved `review_mode`):
+- `full` → spawn as normal.
+- `lean` → **skip every gate whose ID does not end in `-PHASE-GATE`**. Note: `[GATE-ID] skipped — Lean mode`
+- `solo` → skip all gates. Note: `[GATE-ID] skipped — Solo mode`
 
-Pass: the full REPORT.md content, the original hypothesis, and game pillars /
-core fantasy from `design/gdd/game-concept.md`.
+PD-USER-VALIDATION does not end in `-PHASE-GATE`, so `lean` and `solo` skip it: the
+report's review line is the skip note `> [PD-USER-VALIDATION] skipped — Lean mode` (or
+`— Solo mode`), written in Phase 8; continue. A report whose verdict is NOT ASSESSED
+has no recommendation to review: its review line is
+`> [PD-USER-VALIDATION] not run — verdict NOT ASSESSED`, and the summary prints
+`NOT CHECKED — PD-USER-VALIDATION (no PROCEED / PIVOT / KILL to review)`.
 
-The creative director evaluates the result against the game's creative vision and
-confirms, modifies, or overrides the recommendation. Their verdict is final. Update
-REPORT.md if the verdict differs.
+When it runs, spawn `product-director` via `Agent`:
+- Gate: **PD-USER-VALIDATION** — the prompt instructs the agent to read
+  `.claude/docs/director-gates/pd-user-validation.md` first (do not read it yourself).
+- Pass: report path (usability report, prototype REPORT.md or walking-skeleton report) · hypotheses tested · target segment · brief path
+- Fill: `prototypes/<name>-concept/REPORT.md`; the hypothesis and threshold; the segment
+  from the brief (or as the user stated it); `design/product/product-brief.md`,
+  `design/product/one-pager.md`, or "none".
+
+Parse the first line as `[PD-USER-VALIDATION]: TOKEN` (APPROVE / CONCERNS / REJECT) and
+map it with `.claude/docs/director-gates.md` § Standard Verdict Format:
+
+- **APPROVE-class** (`APPROVE`) → record
+  `> **Product Director Review (PD-USER-VALIDATION)**: APPROVED <YYYY-MM-DD>` and continue.
+- **CONCERNS-class** (`CONCERNS`) → present the gaps and the cheapest test that would
+  close each, then `AskUserQuestion`: `Revise flagged items` (update the report or run
+  more sessions, then re-run the gate → `REVISED`) / `Accept and proceed`
+  (`CONCERNS (accepted)`) / `Discuss further`.
+- **REJECT-class** (`REJECT`) → the value is not landing. Present the blockers; do not
+  act on the verdict (no next-step hand-off as if PROCEED) until the user decides how
+  to resolve it.
+- A first line that does not parse is not an approval: treat it as CONCERNS-class and
+  say the verdict line was missing.
+
+The outcome line replaces the report's review-line placeholder — one update, together
+with any verdict change below, after "May I write this to
+`prototypes/<name>-concept/REPORT.md`?".
+
+**The gate never changes the report's verdict by itself.** When it disagrees — REJECT
+on a PROCEED, APPROVE on a KILL — surface the conflict with `AskUserQuestion`:
+`Keep [verdict]` / `Change to [suggested verdict]` / `Run more sessions first`. The
+user decides; a change is written to the report (verdict line and `## Verdict`, where
+the disagreement and the decision are recorded) after "May I write this to
+`prototypes/<name>-concept/REPORT.md`?". Neither side is silently kept.
 
 ---
 
-## Phase 9: Summary and Next Steps
+## Phase 10: Act on the Verdict
 
-Output a summary: the hypothesis, the result, and the final recommendation.
-Link to `prototypes/[concept-name]-concept/REPORT.md`.
+### PROCEED
 
-**If PROCEED:**
-Your concept prototype validated the core idea. Now design it properly, informed by
-what you just learned.
+The riskiest assumption held. Carry the learning forward:
 
-Recommended path (in order):
-1. `/design-review design/gdd/game-concept.md` — validate the concept doc against what the prototype revealed
-2. `/gate-check` — confirm readiness to advance to Systems Design
-3. `/art-bible` — define visual identity (optional but worth doing before GDDs)
-4. `/map-systems` — decompose the concept into all game systems
-5. `/design-system [mechanic]` — GDD for each MVP system; use prototype learnings
-   in the Tuning Knobs and Formulas sections
-6. `/review-all-gdds` — cross-system consistency check
+- The brief's `## Riskiest Assumptions` row becomes `Validated` with a link to the
+  report (`/brainstorm` resumes the brief to record it).
+- Production code is written from scratch; nothing here is refactored into the product.
+- No brief yet (a prototype-first project): `/reverse-document brief
+  prototypes/<name>-concept` drafts one from this evidence with
+  `.claude/docs/templates/product-brief-from-prototype.md` — it never overwrites an
+  existing brief without asking.
+- A clickable or fake-door PROCEED says nothing about feasibility: if a feasibility
+  risk remains, name the spike that would retire it.
 
-**Note:** If you used the HTML path and feel is still uncertain, consider running
-a quick engine path prototype targeting feel before writing GDDs.
+### PIVOT
 
-**If PIVOT:**
+Capture the carry-forward before routing on. Ask in plain text, one at a time:
 
-Before routing to the next prototype, capture the carry-forward note. Ask these
-two questions (plain text, one at a time):
-
-1. "What specifically worked in this prototype that we should preserve in the next version?"
+1. "What specifically worked that the next version must keep?"
 2. "What is the single most important thing to change?"
 
-Ask: "May I write this to `prototypes/[concept-name]-concept/PIVOT-NOTE.md`?"
+Draft `PIVOT-NOTE.md`: the original hypothesis, what to keep, what to change, the
+revised hypothesis with its threshold, and the suggested path. Ask "May I write this to
+`prototypes/<name>-concept/PIVOT-NOTE.md`?". The next `/prototype` run starts from it
+(Phase 2).
 
-If yes, write the file with: original hypothesis, what to keep, what to change, and
-the revised hypothesis for the next prototype. When `/prototype` is next run, check
-`prototypes/` for any `PIVOT-NOTE.md` files — if found, read them and use the
-revised hypothesis as the starting point rather than forming one from scratch.
+**Third PIVOT on the same concept** (count from Phase 2): put KILL on the table
+explicitly — "Is this still the right idea, or the sunk-cost trap?" A fresh concept
+prototyped cleanly usually beats a fourth iteration of a struggling one; two or three
+different variants tested side by side beat iterating one to death.
 
-- Run `/prototype [revised-concept]` to test the adjusted direction
-- Or `/brainstorm [hint]` if the concept needs more fundamental rethinking
+### KILL
 
-**If KILL:**
+Check that the verdict is sound, not end-of-week frustration:
 
-Before moving on, run this check to confirm the verdict is sound and not temporary frustration:
+- [ ] Target-segment participants did not complete the core step, or did not take the
+      first step, across two or more rounds.
+- [ ] No moment of value observed — nobody asked to keep using it, sign-ups stayed
+      below the threshold.
+- [ ] Three or more PIVOTs with no clear improvement.
+- [ ] It only works when the team explains it or guides the user.
+- [ ] Viability breaks: unit cost, a third party's terms or regulation make it
+      unworkable as designed.
 
-- [ ] Core mechanic still unclear to testers after 2+ playtests?
-- [ ] No "fun moment" (smile, laugh, or retry by choice) observed in any session?
-- [ ] 3+ PIVOT iterations on the same concept with no clear improvement?
-- [ ] Concept only works when heavily explained or when the dev guides the player?
-- [ ] Building this feels like obligation, not excitement?
+Two or more boxes → the KILL is sound. Zero or one → offer one more focused PIVOT first.
 
-If 2+ boxes apply → KILL verdict is sound. If 0–1 apply → consider one more focused PIVOT before killing.
+Record the kill in the report's `## Verdict` — the specific reason (not "it was boring"
+but "participants never trusted an app to move salary money automatically"), what
+worked and is worth carrying to the next concept, what failed, and what to try
+differently next time. The history of killed concepts is the set of reports whose
+verdict line reads KILL — no separate list to maintain. Update the report with "May I
+write this to `prototypes/<name>-concept/REPORT.md`?".
 
-**Document the kill in `prototypes/GRAVEYARD.md`** (create if it doesn't exist).
-Ask: "May I append this concept to `prototypes/GRAVEYARD.md`?" If yes, add one entry:
+### Summary and next steps
 
 ```
-## [Concept Name] — YYYY-MM-DD
-- **Kill reason:** [specific blocker — not "it was boring" but "players never understood the core action"]
-- **What worked:** [2-3 things worth carrying forward to future concepts]
-- **What failed:** [the specific mechanic, design decision, or scope issue]
-- **Next time:** [one explicit action to try differently on a similar concept]
+Concept Prototype — [name]
+==========================
+Hypothesis:  [hypothesis] (threshold: [threshold])
+Path:        [clickable | code | fake-door | concierge]
+Evidence:    [n participants / visits / days] — [key measure vs threshold]
+Review:      PD-USER-VALIDATION [outcome | skipped — mode | not run — NOT ASSESSED]
+Record:      prototypes/[name]-concept/REPORT.md [+ PIVOT-NOTE.md]
+Worktree:    [branch name] — bring prototypes/[name]-concept/ into the main working tree
+Not checked: [every NOT CHECKED line of this run, or "none"]
+
+Verdict: [PROCEED | PIVOT | KILL | NOT ASSESSED]
 ```
 
-This file exists so the same mistake doesn't get made twice on the next concept.
+Fill `Worktree:` from `git branch --show-current` and `git status --short prototypes/`
+(when the run did not happen in a separate worktree, say "main working tree").
 
-- Run `/brainstorm open` or `/brainstorm [new-hint]` to explore a different concept
-- The prototype report is the deliverable — no further action needed
+Close with `AskUserQuestion` offering the next steps that apply:
 
----
-
----
-
-## Spike Mode
-
-**Triggered by:** `--spike` flag OR "Mid-production spike" entry choice in Phase 1.
-
-**Purpose:** Test a specific technical or design question mid-production, without
-the overhead of a full concept prototype workflow. No GDD prerequisites. No phase
-gate implications. Hard cap: ~4 hours.
-
-**When to use:**
-- You're in Production and want to test whether a new mechanic should be added
-- You're unsure if a technical approach will work before building it properly
-- A design change is being considered and you want a quick before/after comparison
-- A GDD system is proving harder than expected and you want to prototype the hard part
-- You need to confirm target hardware can sustain the required framerate before writing gameplay code (**performance spike** — see below)
-
-**Spike Mode workflow (replaces Phases 1–9):**
-
-1. **Define the spike question** (plain text, not a widget): "What specific question does this spike answer? Give me one sentence: 'Can we [do X] using [approach Y]?'"
-
-2. **Choose path** — same AskUserQuestion widget as Phase 3 (HTML / Engine / Paper).
-
-3. **Scope** — maximum 2-3 bullet points. One mechanic, one technical question, nothing else.
-
-4. **Build** — same relaxed standards as concept prototype. Hard cap: 4 hours. If not demonstrable in 4 hours, the question is too large. Split it.
-
-5. **Observe and decide** — no formal playtest debrief. Ask: "Did the spike answer the question? YES or NO, and why in one sentence."
-
-6. **Write a spike note** (not a full report) to `prototypes/[concept-name]-spike-[date]/SPIKE-NOTE.md`:
-   - Question tested
-   - Result (YES it works / NO it doesn't / PARTIAL — needs more investigation)
-   - What to do next (add to current sprint / investigate further / abandon the idea)
-
-7. **Update `production/session-state/active.md`** to clear the spike and return to the current sprint state.
-
-**No CD gate. No phase gate. No PROCEED/PIVOT/KILL.** Spike results inform decisions; they don't make them. The developer decides whether to add the mechanic/approach to the sprint backlog based on what the spike revealed.
-
-**Performance spike (special case):** If the game involves demanding rendering —
-large open worlds, hundreds of simultaneous physics bodies, heavy particle systems,
-complex shaders — run a performance spike before writing gameplay code to confirm
-the target hardware can sustain the required framerate. This is distinct from other
-spikes in two ways:
-- The question is "can the engine render [scene X] at 60fps on [minimum spec hardware]?"
-  not "does this mechanic feel good?"
-- The output is a benchmark number, not a feel verdict
-- No gameplay logic is needed — just the maximum intended scene load (terrain, draw
-  calls, physics objects, particles) running at once
-- Build time stays within the ~4-hour cap; the spike is setting up the rendering
-  load, not the game
-- If the answer is NO at this scope, this is an architecture or scope constraint
-  that affects everything downstream — better to surface it now than during Sprint 8
+- **PROCEED** — `/prd-review design/product/product-brief.md` (review the brief with
+  this evidence) → `/gate-check definition` → `/map-features`; at `minimal`:
+  `/create-stories`; without a brief: `/reverse-document brief prototypes/<name>-concept`.
+- **PIVOT** — `/prototype [revised concept]` (starts from `PIVOT-NOTE.md`), or
+  `/brainstorm` when the bet itself needs rethinking.
+- **KILL** — `/brainstorm open` or `/brainstorm [new direction]`.
+- **NOT ASSESSED** — run the missing sessions, then `/prototype report
+  prototypes/<name>-concept`.
 
 ---
 
-### Important Constraints
+## Spike Mode (`--spike`)
 
-- Prototype code must NEVER import from production source files
-- Production code must NEVER import from prototype directories
-- If the recommendation is PROCEED, production implementation is written from
-  scratch — prototype code is never refactored into production
-- Total effort is hard-capped at 1 day (concept prototypes test one mechanic)
-- Test ONE mechanic — if scope grows, stop and simplify the question
-- No polish. No menus, no game over, no music, no UI unless it IS the mechanic
-- If stuck after 2 hours of engine iteration, reframe the question or switch paths
-- **3 PIVOT iterations → force a KILL decision.** If this is the third time the
-  same concept has produced a PIVOT verdict, the concept likely doesn't work.
-  Ask: "Is this the right idea, or am I in the sunk cost trap?" A new concept
-  prototyped fresh will almost always beat a fourth iteration of a struggling one.
-- Building 2-3 different concept variants and picking the best one is a healthier
-  strategy than iterating one concept to death. Natural selection between prototypes
-  beats willpower.
-- **Networked/multiplayer games:** A local prototype cannot validate the feel of a
-  networked mechanic. Latency fundamentally changes how combat, movement, and
-  prediction feel — a prototype running at 0ms local will feel entirely different at
-  80ms network delay. Use a local prototype to validate that the mechanic is
-  *interesting*. Do not use it as evidence that it *feels good* under real network
-  conditions. Network feel requires real peers or simulated latency (e.g., throttle
-  tools, network condition simulators).
+A spike answers **one** technical or design question in about four hours. No
+prerequisites, no phase-gate implications, no PROCEED / PIVOT / KILL — the result
+informs a decision; the team makes it.
+
+**When to use**: an integration nobody on the team has done (recurring charges on a
+billing key, 알림톡 template variables, deep links from a push notification), a
+performance question ("can the list render 1,000 transactions smoothly on a mid-range
+Android phone?"), a design question that needs a real device, or a technical approach
+before a story commits to it.
+
+1. **Question** — plain text: "Give me one sentence: can we [do X] using [approach Y]?"
+2. **Path** — code (default) or clickable, with the Phase 4 widget if unclear.
+3. **Scope** — two or three bullets; one question, nothing else.
+4. **Build** — directory `prototypes/<name>-spike-YYYY-MM-DD/` (today's date); ask "May
+   I create `prototypes/<name>-spike-YYYY-MM-DD/` and write [file list]?"; the same
+   header, relaxed standards and never-relaxed data rules as a concept prototype; code
+   via `prototyper` as in Phase 6. **Hard cap about four hours** — if it is not
+   demonstrable by then, the question is too large: split it and say so.
+5. **Decide** — ask: "Did the spike answer the question — YES, NO or PARTIAL, and why in
+   one sentence?" Collect the evidence: request/response samples with tokens redacted,
+   benchmark numbers with device and conditions, screenshots.
+6. **Record** — write `SPIKE-NOTE.md` after "May I write this to
+   `prototypes/<name>-spike-YYYY-MM-DD/SPIKE-NOTE.md`?":
+
+   ```markdown
+   # Spike: [question in a few words]
+
+   > **Verdict**: [YES | NO | PARTIAL | NOT ASSESSED]
+   > **Date**: [YYYY-MM-DD] · **Time spent**: [hours]
+
+   ## Question
+   ## Approach
+   ## Result
+   ## Evidence
+   ## Next Action
+   ```
+
+   `NOT ASSESSED` when the spike could not run (no sandbox access, the time box ran out
+   before any result). `## Next Action`: add a story to the sprint, investigate further,
+   abandon the approach, or record the decision as an ADR with
+   `/architecture-decision`.
+7. **Checkpoint** — update `production/session-state/active.md` (ask first) to clear the
+   spike and return to the current work.
+
+**Performance spike** — the question is a number, not a feeling: "can [component]
+handle [load or data size] within [budget] on [the smallest planned device or
+instance]?" Build only the load (a list with 1,000 rows, a burst of 50 requests per
+second against a local endpoint), measure, and record the number with its conditions.
+It is a feasibility signal, not a load test — load tests against staging belong to
+`/load-test`. A NO here is an architecture or scope constraint worth surfacing before
+the PRDs, not during a sprint.
+
+---
+
+## Report Mode (`report <prototype-dir>`)
+
+Completes the record for a prototype directory that has none — the remediation the
+session-start gap check suggests for an unrecorded prototype.
+
+1. **Validate** — the directory exists under `prototypes/`. If it already has
+   `REPORT.md` (or, for a spike directory, `SPIKE-NOTE.md`), ask "May I overwrite
+   `[dir]/REPORT.md`?" — default no; on no, stop.
+2. **Spike directories** (`prototypes/<name>-spike-YYYY-MM-DD/`) get `SPIKE-NOTE.md` in
+   the Spike Mode format instead of a report.
+3. **Reconstruct** — read everything in the directory: the file headers
+   (`// Question:`), a README, notes, the code. Draft `## Hypothesis`, `## Path` and
+   what was built from them, and mark the hypothesis "written after the fact" — weaker
+   evidence.
+4. **Ask for the evidence** in plain text: who used it, what they did, what was
+   measured, what was decided at the time. Everything nobody can supply is written
+   `NOT DETERMINED — <reason>`.
+5. **Verdict** from the evidence, as in Phase 8; with no usable evidence the verdict is
+   NOT ASSESSED.
+6. **Write** — show the report; ask "May I write this to `[dir]/REPORT.md`?".
+7. **Directory name** — `/gate-check` and `/help` count only
+   `prototypes/*-concept/REPORT.md`. If the directory lacks the `-concept` suffix and was
+   a concept prototype, tell the user the directory would need to be renamed to
+   `prototypes/<name>-concept/` to be counted; do not rename it yourself.
+8. **Review** — run Phase 9 when the verdict is PROCEED, PIVOT or KILL.
+9. **The brief is not touched here.** For a product brief drafted from this prototype:
+   `/reverse-document brief [dir]`.
+
+---
+
+## Important Constraints
+
+- One prototype tests one assumption; if the scope grows, stop and split the question.
+- Time boxes: a concept build takes at most a day; a spike about four hours; two hours
+  without a runnable state means shrink or switch paths — say so, never continue
+  silently past a time box.
+- Prototype code never imports from the product's source, and the product never
+  imports from `prototypes/`. On PROCEED, production code is written from scratch.
+- Perceived speed on a laptop is not perceived speed on a phone on a mobile network:
+  when speed is the question, test on a mid-range device with network throttling
+  (browser developer tools, the Android emulator's network profiles, Apple's Network
+  Link Conditioner).
+- Small samples are directional. Five sessions find usability problems; they do not
+  prove demand — say "3 of 5 participants", never "60% of users".
+- The verdict is a recommendation to the product manager and the user, reviewed by the
+  product director through PD-USER-VALIDATION when the review mode runs it.
+
+---
+
+## Collaborative Protocol
+
+1. **Question → Options → Decision → Draft → Approval** — the hypothesis, the path, the
+   plan and the verdict are the user's decisions; this skill brings the method and the
+   evidence.
+2. **"May I write this to `<path>`?"** before every write — the prototype files, the
+   session plan, the session checkpoint, `REPORT.md`, `PIVOT-NOTE.md`, `SPIKE-NOTE.md`.
+3. **Evidence over opinion** — observations by participant ID, measures against a
+   threshold decided in advance, `NOT DETERMINED` where nothing was observed.
+4. **Skips announce themselves** — a gate skipped by review mode leaves its skip note in
+   the report and a line in the summary.
+5. **No auto-execution** — deploy commands and next skills are offered, never run.
+6. **No commits** — committing is the user's decision.
+7. **Language** — converse in the user's conversation language; in every file written,
+   template headings, bold field labels, verdict tokens, IDs and paths stay in English
+   exactly as the template spells them (root `CLAUDE.md` § Language Policy).

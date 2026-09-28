@@ -1,40 +1,61 @@
 ---
-name: Feature Request
-about: Suggest a new agent, skill, hook, or improvement
+name: 기능 요청
+about: 새 에이전트, 스킬, 훅, 규칙, 템플릿을 제안하거나 기존 구성 요소의 개선을 요청할 때
 title: "[Feature] "
 labels: enhancement
 assignees: ''
 ---
 
-## Summary
+## 요약
 
-A brief description of what you'd like added or changed.
+무엇을 추가하거나 바꾸고 싶은지 짧게 적어 주세요.
 
-## Type
+## 유형
 
-- [ ] New agent
-- [ ] New skill (slash command)
-- [ ] New hook
-- [ ] New rule
-- [ ] New template
-- [ ] Improvement to existing component
-- [ ] Other:
+- [ ] 새 에이전트
+- [ ] 새 스킬(슬래시 명령)
+- [ ] 새 훅 또는 스크립트
+- [ ] 새 규칙
+- [ ] 새 템플릿
+- [ ] 디렉터 게이트
+- [ ] 설정 키
+- [ ] 기존 구성 요소 개선
+- [ ] 기타:
 
-## Problem / Motivation
+## 문제와 동기
 
-What problem does this solve? What workflow does it improve?
+어떤 문제를 해결하거나 어떤 워크플로를 개선하나요? 실제로 겪은 상황을 적어 주세요. 예) "웹과 앱을 함께
+출시할 때 스토어 심사 일정이 롤아웃 계획에 반영되지 않는다."
 
-## Proposed Solution
+## 영향받는 단계
 
-How do you think this should work? Include details like:
-- For agents: what domain, what tier, what tools
-- For skills: what the workflow looks like, what it outputs
-- For hooks: what event triggers it, what it validates
+- [ ] Discovery
+- [ ] Definition
+- [ ] Architecture
+- [ ] Validation
+- [ ] Build
+- [ ] Hardening
+- [ ] Launch(출시 후 운영·반복 전달 포함)
+- [ ] 단계와 무관
 
-## Alternatives Considered
+## 제안
 
-Any other approaches you've thought about.
+어떻게 동작하면 좋을지 적어 주세요. 해당하는 항목만 채우면 됩니다.
 
-## Additional Context
+- **에이전트**: 담당 영역, 보고 대상(`Reports to`), 위임 대상, 협업 템플릿(Strategic Decision / Question-First /
+  Implementation / Operations), 필요한 도구, 모델 등급
+- **스킬**: 인자, 실행되는 단계, 산출물 경로, 판정 토큰(`NOT ASSESSED` 포함), 부르는 에이전트와 디렉터 게이트,
+  읽는 설정 키, 항상 협업해야 하는지 여부
+- **훅·스크립트**: 트리거 이벤트, 무엇을 감지하는지, 차단하는지 경고만 하는지
+- **규칙**: 적용할 경로 glob과 규칙 내용
+- **템플릿**: 헤딩 목록과 그 템플릿을 쓰는 스킬
+- **설정 키**: 키 이름, 값의 범위, 기본값이 필요한지, 누가 쓰고 누가 읽는지
 
-Examples, references, or screenshots that help explain the request.
+## 기존 구성 요소로 해결되지 않는 이유
+
+이미 있는 스킬이나 에이전트로 해결해 보았다면 무엇이 부족했는지 적어 주세요. 고려한 다른 방법도 함께 적어
+주세요.
+
+## 추가 정보
+
+예시, 참고 자료, 스크린샷 등 요청을 이해하는 데 도움이 될 내용을 붙여 주세요.

@@ -1,462 +1,765 @@
 ---
 name: brainstorm
-description: "Guided concept ideation using professional studio techniques, player psychology, creative exploration."
-argument-hint: "[genre or theme hint, or 'open'] [--review full|lean|solo]"
+description: "Guided product discovery: problem, JTBD, users, alternatives, value proposition, business model, principles, metrics, riskiest assumptions."
+argument-hint: "[open | <problem space> | pitch] [--review full|lean|solo]"
 user-invocable: true
-allowed-tools: Read, Glob, Grep, Write, WebSearch, Agent, AskUserQuestion, Bash(bash "*/.claude/skills/brainstorm/../../hooks/yaml-helper.sh" resolve_config *)
+allowed-tools: Read, Glob, Grep, Write, Edit, WebSearch, Agent, AskUserQuestion, Bash(bash "*/.claude/skills/brainstorm/../../hooks/yaml-helper.sh" resolve_config *)
 model: sonnet
 ---
 
-!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,docs.density,workflow`
+!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,docs.density,workflow,surfaces,stack,compliance,team.size`
 
-Resolved above — use as-is. No block → defaults in
-`.claude/docs/config-resolution.md`.
+Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`.
 
-
-`--review` overrides `review_mode`; store it for all gate spawns this run. See
-`.claude/docs/director-gates.md` for the full check pattern. Individual gate definitions live in `.claude/docs/director-gates/[gate-id].md` — the spawned agent reads its own gate file; do not read it in the parent session.
-
-Every `AskUserQuestion` call follows `.claude/docs/automation-modes.md`
+**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →
+`project.yaml` → default `collaborative`). Every `AskUserQuestion` call and
+every file write follows `.claude/docs/automation-modes.md`
 (collaborative asks always · guided major-only · autonomous logs and proceeds;
 `automation_always_ask` categories always prompt).
 
-**`docs.density`** — it controls per-section *depth*, where `workflow`
-controls which sections exist. `modes.rigor` sets both together; set
-`docs.density` explicitly to vary depth alone: `terse` = pillar bullets + concept bullets;
-`balanced` = pillars + concept with brief rationale (default); `thorough` =
-pillars + concept + extensive rationale + alternatives. Apply it to every section
-you author.
+# Product Discovery
+
+This skill turns a problem space — or no idea at all — into a written product bet the
+rest of the pipeline can build on: who has the problem, what they use today, why a new
+product is worth switching to, how it makes money, the principles that will settle
+future arguments, how success is measured, which assumptions could sink it and how to
+test them, and the smallest product that tests the bet with real users.
+
+The AI is a **facilitator**, not the author of the user's product. Explore together,
+bring techniques and evidence, draft on request — the decisions are the user's.
+
+### Outputs
+
+| Path | When | Template |
+|------|------|----------|
+| `design/product/product-brief.md` | `workflow` = `standard` or `full` | `.claude/docs/templates/product-brief.md` |
+| `design/product/one-pager.md` | `workflow` = `minimal` | `.claude/docs/templates/one-pager.md` |
+| `design/product/personas/<slug>.md` | optional, `standard`/`full` (drafted by `ux-researcher`) | `.claude/docs/templates/persona.md` |
+| `design/product/pitch.md` | `pitch` mode | `.claude/docs/templates/pitch-document.md` |
+| `project.yaml` | `project.name`, `project.category` only — asked first | — |
+
+The brief and the one-pager are the two tier alternatives of the Discovery step
+`product-brief`: `/gate-check definition` reads the brief at `standard`/`full` and the
+one-pager at `minimal`.
+
+### What this skill never does
+
+- **Write any other `project.yaml` key.** Never `project.stage`, `stack.*` or
+  `modes.*`, and never one of the six knobs `modes.rigor` fronts (`modes.review_mode`,
+  `modes.workflow`, `docs.density`, `qa.level`, `modes.story_granularity`,
+  `team.size`) — a written value would shadow the rigor expansion.
+- **Invent evidence.** Market sizes, competitor facts and user numbers come from a
+  source fetched in this run (`Source: <url>, retrieved YYYY-MM-DD`), from files on
+  disk, or from the user — otherwise they are written as a labelled hypothesis or
+  `NOT SOURCEABLE — <what was searched>`. Interview findings cite participant IDs,
+  never names.
+- **Read a gate definition file.** The spawned agent reads it; this skill passes the
+  path and the context items (`.claude/docs/director-gates.md`).
+- **Choose the stack.** Technology preferences the user mentions are recorded as
+  input for `/setup-stack`, which pins them from live sources.
 
 ---
 
-## Tier branch — check `workflow` FIRST
+## Phase 0: Configuration, Mode and Resume
 
-The `workflow` tier resolved above governs this skill's output:
+### 0a. Parse the arguments
 
-- **`standard` / `full`** → run the full flow ("When this skill is invoked" through
-  Phase 5 and the concept-document generation). No change.
-- **`minimal`** → run the **Lean Brief flow** immediately below and **STOP** — skip
-  Phases 1–5, the director gates (CD-PILLARS / AD-CONCEPT-VISUAL / TD-FEASIBILITY /
-  PR-SCOPE), and the full-length concept document entirely. Output is the one-page
-  `design/game-brief.md`, not `game-concept.md`.
+| `$ARGUMENTS` | Mode |
+|---|---|
+| `open` or empty | Open exploration — start from the person and the problems they notice |
+| `pitch` | **Pitch Mode** (section at the end) — needs an existing brief or one-pager |
+| anything else | A problem space or a concept hint (e.g. `small clinics' phone bookings`, `a savings app that saves on payday`) |
 
-### Lean Brief flow (`workflow: minimal` only)
+`--review full|lean|solo` may follow any mode; it overrides the resolved
+`review_mode` for every gate this run.
 
-A jam / small-scope session: capture the load-bearing thinking in one page, then get
-to code. Keep prompting light — a few exchanges, not fifteen. Author from the
-one-page template `.claude/docs/templates/game-brief.md` (6 required fields + 2
-one-liners). If `design/game-brief.md` already exists, read it and resume/refine
-rather than restart.
+**Fast path.** When the hint or the user's first answer already states a clear
+concept — who it is for, the problem, what the product does — do not re-explore it.
+Phases 1–4 become confirmation steps: draft each section from what the user said,
+show it, and ask what to correct. Spend the time on principles, metrics, riskiest
+assumptions and scope, where a clear concept is usually thinnest.
 
-1. **Concept** — from the argument hint (or one quick open question if none), propose
-   **2–3 one-line concepts** (verb-first or mashup, per Phase 2's techniques). One
-   `AskUserQuestion` to pick or combine — the only guaranteed creative prompt.
-2. **Fill the brief fields** conversationally (not one prompt each):
-   - **One-sentence pitch** — the excited one-liner.
-   - **Core loop** — the 2–4 step cycle the player repeats.
-   - **MVP** — the ruthlessly short feature list that makes it *the game* (each becomes
-     a story downstream). If it runs past ~7, push back on scope.
-   - **Out of scope** — what they're deliberately NOT building.
-   - **Build order** — sequence to build the MVP, risky / core-fun thing first.
-   - **Who it's for / what they feel** and **Art & audio direction** — one line each
-     (offer, don't force).
-   Present the filled brief back in full for a single confirmation.
-3. **Write approval** — `AskUserQuestion`: "Brief is ready. May I write it to
-   `design/game-brief.md`?" → `[A] Yes — write it` / `[B] Revise a field first`. On
-   [B], revise the named field, show before/after, re-ask; repeat until [A]. Then
-   write `design/game-brief.md` from the template, creating directories as needed.
-   Honor `modes.automation` for this write as elsewhere in the framework.
-4. **Next steps** (short — this is the point). **Read `engine.name` from
-   `project.yaml` first and list `/setup-engine` only if it is absent or empty:**
-   1. *(only when `engine.name` is absent or empty)* "`/setup-engine` — configure
-      the engine (required before code)"
-   2. "`/create-stories` — turn the brief's MVP list into implementable stories. The
-      epic is implicit at `minimal`; there is no separate `/create-epics` or
-      `/sprint-plan` — the brief's build order is the plan."
-   3. "`/dev-story` — first line of game code"
+### 0b. Tier branch — check `workflow` first
 
-   > **Why the condition.** `/start`'s `minimal` path runs `/setup-engine`
-   > *before* `/brainstorm`, and `/setup-engine` Section 2 states that a missing
-   > brief is expected because the brief is authored afterwards. Listing engine
-   > setup unconditionally here tells a user who just followed that path to go
-   > back and redo step one — the only skill in the four-step path that assumes
-   > it runs first.
-   Then output a one-line summary (pitch + MVP feature count + `design/game-brief.md`).
+- **`minimal`** → run the **One-Pager Flow** below and stop. Output:
+  `design/product/one-pager.md`.
+- **`standard` / `full`** → run Phases 1–12. Output:
+  `design/product/product-brief.md`. `full` adds the optional brand direction step
+  (Phase 6) when a UI surface ships.
 
-Verdict: **COMPLETE** — game brief created; next stop is code. Do NOT run Phases 1–5,
-spawn any director gate, or write `game-concept.md` at this tier.
+Announce it in one line: "Workflow tier `[value]` — this run writes `[path]`."
 
----
+### 0c. Depth — `docs.density`
 
-When this skill is invoked (`standard` / `full` tier — `minimal` uses the Lean Brief
-flow above):
+`workflow` decides which document exists; `docs.density` decides how deep each
+section goes. Apply it to every section you draft:
 
-1. **Parse the argument** for an optional genre/theme hint (e.g., `roguelike`,
-   `space survival`, `cozy farming`). If `open` or no argument, start from
-   scratch.
+- `terse` — principle and brief bullets; one line per table cell.
+- `balanced` — principles and brief with short rationale.
+- `thorough` — principles and brief with extensive rationale and the alternatives
+  considered for each decision.
 
-2. **Check for existing concept work**:
-   - Read `design/gdd/game-concept.md` if it exists (resume, don't restart)
-   - Read `design/gdd/game-pillars.md` if it exists (build on established pillars)
+### 0d. Surfaces
 
-3. **Run through ideation phases** interactively, asking the user questions at
-   each phase. Do NOT generate everything silently — the goal is **collaborative
-   exploration** where the AI acts as a creative facilitator, not a replacement
-   for the human's vision.
+The resolved `surfaces` line says where the product ships (`web`, `ios`, `android`,
+`api`). A **UI surface** is any of `web`, `ios`, `android`. When the line is unset,
+the answer is unknown — never "no UI". Ask the user when a step depends on it (the
+one-line concept for TD-FEASIBILITY, Phase 6); keep the answer for this run only —
+`platform.surfaces` is written by `/setup-stack`.
 
-   **Use `AskUserQuestion`** at key decision points throughout brainstorming:
-   - Constrained taste questions (genre preferences, scope, team size)
-   - Concept selection ("Which 2-3 concepts resonate?") after presenting options
-   - Direction choices ("Develop further, explore more, or prototype?")
-   - Pillar ranking after concepts are refined
-   Write full creative analysis in conversation text first, then use
-   `AskUserQuestion` to capture the decision with concise labels.
+### 0e. Gate context lines
 
-   Professional studio brainstorming principles to follow:
-   - Withhold judgment — no idea is bad during exploration
-   - Encourage unusual ideas — outside-the-box thinking sparks better concepts
-   - Build on each other — "yes, and..." responses, not "but..."
-   - Use constraints as creative fuel — limitations often produce the best ideas
-   - Time-box each phase — keep momentum, don't over-deliberate early
+TD-FEASIBILITY needs the resolved `stack` and `compliance` lines, DM-SCOPE the
+`team.size` line, and the one-pager's `## Stack` section the `stack` line — all printed
+by the block above. Use them as printed, including their unset forms:
+`stack: unset — run /setup-stack` is "unset", and a compliance part printed
+`(unset -- ask)` is an open question, never "no obligations". No block ⇒ pass "unset",
+`(unset -- ask)` and "unresolved" and say so in the summary.
 
----
+### 0f. Resume, don't restart
 
-### Phase 1: Creative Discovery
+Before asking anything:
 
-Start by understanding the person, not the game. Ask these questions
-conversationally (not as a checklist):
+- If the output file for this tier exists, read it. Ask with `AskUserQuestion`:
+  `Refine the existing [brief / one-pager]` / `Start a new one` (a new one replaces
+  the file — confirm with "May I overwrite `[path]`?" before any write). When refining,
+  jump to the first phase whose section is missing, thin or `NOT DETERMINED`, and let
+  the user pick the others to revisit.
+- If the *other* tier's file exists (a one-pager on a project now at `standard`),
+  read it and use it as the starting draft.
+- Read `design/product/personas/*.md`, and the verdict lines of
+  `prototypes/*-concept/REPORT.md` and `production/qa/usability/*.md` — existing
+  evidence is used, not re-asked.
+- Read `project.name` and `project.category` from `project.yaml`; if set, use them
+  as the working name and category.
 
-**Emotional anchors**:
-- What's a moment in a game that genuinely moved you, thrilled you, or made
-  you lose track of time? What specifically created that feeling?
-- Is there a fantasy or power trip you've always wanted in a game but never
-  quite found?
+### 0g. Facilitation rules
 
-**Taste profile**:
-- What 3 games have you spent the most time with? What kept you coming back?
-  *(Ask this as plain text — the user must be able to type specific game names freely.
-  Do NOT put this in an AskUserQuestion with preset options.)*
-- Are there genres you love? Genres you avoid? Why?
-- Do you prefer games that challenge you, relax you, tell you stories,
-  or let you express yourself? *(Use `AskUserQuestion` for this — constrained choice.)*
-
-**Practical constraints** (shape the sandbox before brainstorming).
-Bundle these into a single multi-tab `AskUserQuestion` with these exact tab labels:
-- Tab "Experience" — "What kind of experience do you most want players to have?" (Challenge & Mastery / Story & Discovery / Expression & Creativity / Relaxation & Flow)
-- Tab "Timeline" — "What's your realistic development timeline?" (Weeks / Months / 1-2 years / Multi-year)
-- Tab "Dev level" — "Where are you in your dev journey?" (First game / Shipped before / Professional background)
-
-Use exactly these tab names — do not rename or duplicate them.
-
-**Synthesize** the answers into a **Creative Brief** — a 3-5 sentence
-summary of the person's emotional goals, taste profile, and constraints.
-Read the brief back and confirm it captures their intent.
+- **Explain, then capture.** Write the analysis in conversation first; then use
+  `AskUserQuestion` with concise labels to capture the decision.
+- **Open answers stay open.** Questions whose answer is free text — "tell me about the
+  last time this happened", "which apps do you use for this today" — are asked as
+  plain text, never as `AskUserQuestion` with preset options.
+- **A single choice is a plain list.** Use `prompt` + `options`; use tabs only when
+  several independent fields are captured at once.
+- **Past behaviour over opinions.** "When did this last happen and what did you do?"
+  beats "Would you use an app that…?" — people are reliably poor predictors of their
+  own future behaviour.
+- **Withhold judgement while exploring**; converge only when a phase asks for a
+  decision. Build on the user's ideas ("yes, and…") rather than replacing them.
+- **Section approval** follows the automation mode: `collaborative` approves each
+  section; `guided` asks only for the major decisions marked below and states the
+  rest inline; `autonomous` picks the recommended option and records it with
+  `log_decision`.
 
 ---
 
-### Phase 2: Concept Generation
+## Director Gates in This Skill
 
-Using the creative brief as a foundation, generate **3 distinct concepts**
-that each take a different creative direction. Use these ideation techniques:
+| Gate | Owner | Where | Condition |
+|------|-------|-------|-----------|
+| PD-PRINCIPLES | `product-director` | Phase 5 (One-Pager Flow: step M7) | always offered |
+| DD-BRAND-DIRECTION | `design-director` | Phase 6 | only at `full` with a UI surface, and only when the user wants brand direction now |
+| TD-FEASIBILITY | `technical-director` | Phase 9, in parallel with DM-SCOPE (M7) | always offered |
+| DM-SCOPE | `delivery-manager` | Phase 9, in parallel with TD-FEASIBILITY (M7) | always offered |
 
-**Technique 1: Verb-First Design**
-Start with the core player verb (build, fight, explore, solve, survive,
-create, manage, discover) and build outward from there. The verb IS the game.
+Every spawn follows `.claude/docs/director-gates.md`:
 
-**Technique 2: Mashup Method**
-Combine two unexpected elements: [Genre A] + [Theme B]. The tension between
-the two creates the unique hook. (e.g., "farming sim + cosmic horror",
-"roguelike + dating sim", "city builder + real-time combat")
+1. **Apply the review-mode check** written at the spawn point, first.
+2. **Spawn the owner via `Agent`.** The prompt tells the agent to read
+   `.claude/docs/director-gates/<gate-id>.md` first; the parent never reads it. The
+   `Pass:` line lists the gate's context items, filled in at run time.
+3. **Parse the first line of the reply as `[GATE-ID]: TOKEN`** and map TOKEN to its
+   class (`.claude/docs/director-gates.md` § Standard Verdict Format):
+   - **APPROVE-class** (`APPROVE`, `VIABLE`, `REALISTIC`, `STRONG`) → continue.
+   - **CONCERNS-class** (`CONCERNS`) → present the findings, then `AskUserQuestion`:
+     `Revise flagged items` / `Accept and proceed` / `Discuss further`.
+   - **REJECT-class** (`REJECT`, `HIGH RISK`, `UNREALISTIC`) → present the blockers.
+     Do not write the affected section or move past the phase until the content is
+     revised and the gate re-run. If the user stops here, the run ends INCOMPLETE and
+     the draft keeps its last approved state.
+   - **Selection** (`OPTIONS`, DD-BRAND-DIRECTION only) → present the directions, the
+     user selects, then continue as APPROVE-class.
+   - A first line that does not parse, names another gate, or carries a token not on
+     that gate's verdict line is not an approval: treat it as CONCERNS-class and say
+     the verdict line was missing.
+4. **Record the outcome** in the draft's status block, one line per gate:
+   `> **Product Director Review (PD-PRINCIPLES)**: APPROVED <YYYY-MM-DD>` — or
+   `CONCERNS (accepted)`, or `REVISED` after a re-run on revised content. When the
+   review mode skipped the gate, write its skip note there instead (for example
+   `> [PD-PRINCIPLES] skipped — Solo mode`) — it is the evidence the mode was applied.
 
-**Technique 3: Experience-First Design (MDA Backward)**
-Start from the desired player emotion (aesthetic goal from MDA framework:
-sensation, fantasy, narrative, challenge, fellowship, discovery, expression,
-submission) and work backward to the dynamics and mechanics that produce it.
+---
 
-For each concept, present:
-- **Working Title**
-- **Elevator Pitch** (1-2 sentences — must pass the "10-second test")
-- **Core Verb** (the single most common player action)
-- **Core Fantasy** (the emotional promise)
-- **Unique Hook** (passes the "and also" test: "Like X, AND ALSO Y")
-- **Primary MDA Aesthetic** (which emotion dominates?)
-- **Estimated Scope** (small / medium / large)
-- **Why It Could Work** (1 sentence on market/audience fit)
-- **Biggest Risk** (1 sentence on the hardest unanswered question)
+## One-Pager Flow (`workflow: minimal`)
 
-Present all three. Then use `AskUserQuestion` to capture the selection.
+A hackathon-to-seed-sized session: capture the load-bearing thinking on one page, then
+get to code. Keep the prompting light — a handful of exchanges, not fifteen. Author
+from `.claude/docs/templates/one-pager.md`; its seven headings are a contract.
 
-**This decision asks regardless of `modes.automation`.** Concept selection
-is the creative heart of `/brainstorm` and has no defensible autonomous
-default — there is no algorithmic way to pick which creative direction
-resonates with the user. Per `.claude/docs/automation-modes.md`, treat
-this site as exempt (it overrides the mode the same way
-`automation_always_ask` categories do).
+**M1. Pitch** — from the hint (or one open question if there is none), propose **2–3
+one-line pitches**, each a different angle on the problem (a different segment, a
+different job, a different mechanism). Capture the choice with `AskUserQuestion`:
+the pitches, `Combine elements`, `Something else — I'll describe it`. **This choice
+is asked in every automation mode**: which product the user wants to build has no
+defensible automatic default.
 
-**CRITICAL**: This MUST be a plain list call — no tabs, no form fields. Use exactly this structure:
+**M2. Problem & Target User** — who, concretely; what goes wrong for them today, in
+their words; what they use today (including "doing nothing").
+
+**M3. Core User Journey** — 3–5 steps from first open to the moment of value, and what
+brings the user back.
+
+**M4. Success Signal** — one measurable signal that the product works; it is what
+every story's acceptance criteria trace back to.
+
+**M5. Scope & Non-Goals** — the short "in" list (push back past about seven items),
+the "not now" list, and optionally one principle the team will not trade away.
+
+**M6. Stack and Build Order** — `## Stack`: when the resolved `stack` line (0e)
+shows a pinned stack, restate it in one line; otherwise record the user's preference
+as a proposal and name `/setup-stack` as the next step. `## Build Order`: the sequence
+to build the scope, riskiest or most valuable item first; each item becomes a story.
+
+**M7. Draft and review.** Show the filled one-pager in full. Ask "May I write this to
+`design/product/one-pager.md`?" and write it (Status `Draft`, directories created as
+needed). Then the gates, in parallel, each after its own review-mode check:
+
+**Review mode check** — apply to PD-PRINCIPLES, TD-FEASIBILITY and DM-SCOPE, each separately
+before its spawn (`--review` overrides the resolved `review_mode`):
+- `full` → spawn as normal.
+- `lean` → **skip every gate whose ID does not end in `-PHASE-GATE`**. Note: `[GATE-ID] skipped — Lean mode`
+- `solo` → skip all gates. Note: `[GATE-ID] skipped — Solo mode`
+
+At the `minimal` tier the review mode usually resolves to `solo`, so the usual outcome
+is three skip notes in the one-pager's status block — the record that the mode was
+applied. When gates run, spawn the surviving ones simultaneously:
+
+- `product-director` — gate **PD-PRINCIPLES**
+  - Pass: brief path (draft) · drafted principles & anti-goals text · target users & JTBD summary · named alternatives
+  - Fill: `design/product/one-pager.md`; the `## Scope & Non-Goals` principle line and
+    "not now" list; `## Problem & Target User`; the alternatives it names.
+- `technical-director` — gate **TD-FEASIBILITY**
+  - Pass: one-line concept "<category> service on <surfaces> using <stack>" · riskiest assumptions list · resolved `stack` line (or "unset") · resolved `compliance` line
+  - Fill: the concept line; the first `## Build Order` item and anything the user
+    called uncertain; the 0e lines.
+- `delivery-manager` — gate **DM-SCOPE**
+  - Pass: MVP scope text (brief, one-pager or feature map path) · resolved `team.size` · target milestone/date (or "none given")
+  - Fill: `design/product/one-pager.md`; the 0e `team.size` line; the date the user
+    gave, or "none given".
+
+Handle each verdict as in § Director Gates in This Skill, revise the one-pager with the
+user where needed, and record the outcomes.
+
+**M8. Finalize** — show what changed since the draft; ask "May I write this to
+`design/product/one-pager.md`?"; set Status `Approved` when the user confirms the
+content is final. Then run Phase 11 (project name and category) and Phase 12 (summary
+and next steps), and stop.
+
+---
+
+## Phase 1: Problem & Evidence
+
+Understand the problem before any solution. Ask conversationally, not as a checklist:
+
+- **The moment it hurts** — "Tell me about the last time you (or someone you know)
+  ran into this. What happened? What did you do?" (plain text)
+- **Who else** — "Who has this problem worst? Who has it but doesn't care?"
+- **Cost** — money, time, stress, risk; how often it recurs.
+- **Workarounds** — what people already do, pay for or build themselves (a strong
+  signal: people who hack a workaround have a real problem).
+- **Why now** — what changed (regulation, a platform or payment rail, behaviour,
+  cost of a technology) that makes this solvable or urgent now.
+- **Evidence** — what the user already has: interviews, support tickets, analytics,
+  their own experience. Rate each high / medium / low confidence.
+
+**When evidence is thin** (the usual case at this point), say so plainly and carry it
+forward as a riskiest assumption (Phase 8) — do not smooth it over. Offer a quick
+market-context search with `WebSearch` if the user wants it; cite each fact with its
+source and retrieval date.
+
+**Open mode** (no hint): start from the person, not the product — which problems do
+they keep noticing at work or in daily life, which customers do they understand
+unusually well, what have they built workarounds for? Collect 3–5 problem candidates,
+then ask with `AskUserQuestion` which one to pursue.
+
+Synthesize a **Problem Statement** draft (template section of the same name). Read it
+back and ask the user to correct it.
+
+---
+
+## Phase 2: Users & Jobs-to-be-Done
+
+- **Primary segment** — concrete enough that a recruiter could screen for it. Push
+  back on "everyone", "young people", "SMBs".
+- **Jobs-to-be-Done** — 2–5 job statements in the form "When [situation], I want to
+  [motivation], so I can [expected outcome]", tagged functional / emotional / social,
+  each with its evidence.
+- **Forces of progress** — push (away from today's way), pull (toward a new way),
+  anxiety (about switching), habit (keeping them in place). Anxiety and habit are
+  where products that look obviously better lose.
+- **Secondary segments and who this is not for.**
+
+**Personas (offer at `standard` and `full`).** Ask with `AskUserQuestion`:
+`Draft personas now` / `Later` / `Not needed`. On "now", spawn `ux-researcher` via
+`Agent` with the segment, the job statements, the forces and the evidence gathered so
+far; ask it to **return** one persona draft per distinct segment in the headings of
+`.claude/docs/templates/persona.md`, citing evidence by participant ID and labelling
+unsupported statements `Hypothesis:` — and not to write files itself. Show each draft,
+then ask "May I write this to `design/product/personas/<slug>.md`?" (`<slug>` =
+kebab-case of the persona name). Link the written personas in the brief's
+`### Personas`.
+
+Record the section draft for `## Target Users & Jobs-to-be-Done`.
+
+---
+
+## Phase 3: Alternatives & Positioning
+
+- List every alternative the segment uses today, **including doing nothing** and
+  non-product workarounds (a spreadsheet, a group chat, a manual transfer, an agency).
+- For each: what users hire it for, where it falls short, how this product would
+  differ.
+- **Competitor scan (optional)** — with the user's agreement, use `WebSearch` for
+  direct and adjacent products in the target market (for the Korean market include
+  the incumbents' own apps and the super-apps). Cite each fact with its source and
+  retrieval date; mark anything unverifiable `NOT SOURCEABLE`.
+- Draft a **positioning statement**: "For [target segment] who [need], [product] is a
+  [market category] that [key benefit]. Unlike [best alternative], we [primary
+  differentiator]." Test it: if the differentiator also describes the main
+  alternative, it is not a differentiator.
+
+---
+
+## Phase 4: Value Proposition & Business-Model Hypothesis
+
+### 4a. Generate candidate bets
+
+Unless the fast path applies, generate **2–3 distinct bets** — each a different answer
+to "what would make the segment switch?". Useful techniques:
+
+- **Outcome-first** — pick the job's most underserved outcome and design backward from
+  it.
+- **10× on one dimension** — radically better on the one attribute the segment cares
+  most about (effort, speed, trust, price), acceptable on the rest.
+- **Unbundle or rebundle** — take one job out of a heavy incumbent, or combine jobs
+  users currently stitch together across products.
+- **Service first** — deliver the value by hand (concierge) and automate what proves
+  valuable.
+- **Shift-enabled** — build on a recent change in regulation, platform capability or
+  payment rails (name the change and its source).
+- **Cross-market analog** — a model proven in another market or category, adapted to
+  this segment (state what differs locally — payments, identity, messaging channels,
+  regulation).
+
+For each bet present: **working name** · **one-line value proposition** · **target
+segment** · **core user journey** (3–5 steps) · **success moment** · **business-model
+sketch** · **why now** · **biggest risk**.
+
+Then capture the choice with a plain-list `AskUserQuestion`:
 
 ```
 AskUserQuestion(
-  prompt: "Which concept resonates with you? You can pick one, combine elements, or ask for fresh directions.",
+  prompt: "Which bet do you want to develop? You can pick one, combine elements, or ask for fresh directions.",
   options: [
-    "Concept 1 — [Title]",
-    "Concept 2 — [Title]",
-    "Concept 3 — [Title]",
-    "Combine elements across concepts",
+    "Bet 1 — [name]",
+    "Bet 2 — [name]",
+    "Bet 3 — [name]",
+    "Combine elements across bets",
     "Generate fresh directions"
   ]
 )
 ```
 
-Do NOT use a `tabs` field here. The `tabs` form is for multi-field input only — using it here causes an "Invalid tool parameters" error. This is a plain `prompt` + `options` call.
+**This choice is asked in every automation mode.** Which product the user wants to
+build has no defensible automatic default; the site overrides the mode the same way
+the always-ask categories do.
 
-Never pressure toward a choice — let them sit with it.
+### 4b. Value proposition
 
----
+Draft `## Value Proposition` for the chosen bet: the value hypothesis ("We believe
+[segment] will [behaviour] because [value]; we will know when [signal]"), pains
+relieved, gains created, the success moment, and why this team.
 
-### Phase 3: Core Loop Design
+### 4c. Business-model hypothesis
 
-For the chosen concept, use structured questioning to build the core loop.
-The core loop is the beating heart of the game — if it isn't fun in
-isolation, no amount of content or polish will save the game.
+Work through the template's table: revenue model, price point, who pays, key costs,
+acquisition channels, unit economics targets, constraints. Everything here is a
+hypothesis with a confidence and a test. Name regulatory questions that change the
+model (for example whether the product holds customer money) as open questions — this
+skill does not give legal conclusions.
 
-**30-Second Loop** (moment-to-moment):
+### 4d. Create the draft brief
 
-Ask these as `AskUserQuestion` calls — derive the options from the chosen concept, don't hardcode them:
-
-1. **Core action feel** — prompt: "What's the primary feel of the core action?" Generate 3-4 options that fit the concept's genre and tone, plus a free-text escape (`I'll describe it`).
-
-2. **Key design dimension** — identify the most important design variable for this specific concept (e.g., world reactivity, pacing, player agency) and ask about it. Generate options that match the concept. Always include a free-text escape.
-
-After capturing answers, analyze: Is this action intrinsically satisfying? What makes it feel good? (Audio feedback, visual juice, timing satisfaction, tactical depth?)
-
-**5-Minute Loop** (short-term goals):
-- What structures the moment-to-moment play into cycles?
-- Where does "one more turn" / "one more run" psychology kick in?
-- What choices does the player make at this level?
-
-**Session Loop** (30-120 minutes):
-- What does a complete session look like?
-- Where are the natural stopping points?
-- What's the "hook" that makes them think about the game when not playing?
-
-**Progression Loop** (days/weeks):
-- How does the player grow? (Power? Knowledge? Options? Story?)
-- What's the long-term goal? When is the game "done"?
-
-**Player Motivation Analysis** (based on Self-Determination Theory):
-- **Autonomy**: How much meaningful choice does the player have?
-- **Competence**: How does the player feel their skill growing?
-- **Relatedness**: How does the player feel connected (to characters,
-  other players, or the world)?
+The gates from Phase 5 on review the brief on disk, so create it now. Show the drafted
+sections (`## Elevator Pitch` through `## Business Model Hypothesis`) and ask "May I
+write this to `design/product/product-brief.md`?". Write it from
+`.claude/docs/templates/product-brief.md` with Status `Draft`, the filled sections,
+and the remaining sections left as the template's placeholders. From here on, each
+approved section is written into this file as the phase that produces it completes —
+so the draft on disk is always the latest approved state. In `collaborative` mode ask
+"May I write this section to `design/product/product-brief.md`?" before each update;
+in `guided` mode updates to this existing file proceed after a short summary; in
+`autonomous` mode they are written directly and logged.
 
 ---
 
-### Phase 4: Pillars and Boundaries
+## Phase 5: Product Principles & Anti-Goals
 
-Game pillars are used by real AAA studios (God of War, Hades, The Last of
-Us) to keep hundreds of team members making decisions that all point the
-same direction. Even for solo developers, pillars prevent scope creep and
-keep the vision sharp.
+Collaboratively define **3–5 product principles**. Each principle has:
 
-Collaboratively define **3-5 pillars**:
-- Each pillar has a **name** and **one-sentence definition**
-- Each pillar has a **design test**: "If we're debating between X and Y,
-  this pillar says we choose __"
-- Pillars should feel like they create tension with each other — if all
-  pillars point the same way, they're not doing enough work
+- a **name** and a **one-sentence definition**;
+- a **decision test** — "When [X] conflicts with [Y], we choose [X] — even though it
+  costs [Z]" — so two people who disagree about a feature can settle it by citing
+  the principle;
+- the **job it serves** from Phase 2.
 
-Then define **3+ anti-pillars** (what this game is NOT):
-- Anti-pillars prevent the most common form of scope creep: "wouldn't it
-  be cool if..." features that don't serve the core vision
-- Frame as: "We will NOT do [thing] because it would compromise [pillar]"
+Quality bar: a principle nobody could violate ("user first", "simple and fast")
+carries no weight; a principle every alternative already follows is table stakes, not
+positioning; a set where every principle points the same way resolves no real
+trade-off. Principles should create productive tension with each other, with a
+priority order when they collide.
 
-**Pillar confirmation**: After presenting the full pillar set, use `AskUserQuestion`:
-- Prompt: "Do these pillars feel right for your game?"
-- Options: `[A] Lock these in` / `[B] Rename or reframe one` / `[C] Swap a pillar out` / `[D] Something else`
+Then define **3+ anti-goals** — what the product will never become, even if asked —
+each naming the principle it protects ("We will not [thing] because it would
+compromise [principle]"). Anti-goals must rule out things a reasonable team would be
+tempted to build, not strawmen.
 
-If the user selects B, C, or D, make the revision, then use `AskUserQuestion` again:
-- Prompt: "Pillars updated. Ready to lock these in?"
-- Options: `[A] Lock these in` / `[B] Revise another pillar` / `[C] Something else`
+**Confirmation** — present the full set, then `AskUserQuestion`:
+`Lock these in` / `Rename or reframe one` / `Swap one out` / `Something else`.
+- **`collaborative`** — revise and ask again until the user picks `Lock these in`.
+- **`guided`** — principles are a major decision: ask once, apply the chosen revision,
+  then lock without a second round.
+- **`autonomous`** — do not ask; lock the drafted set and record it with
+  `log_decision`, listing the alternatives considered (an unasked question has no
+  "until" to wait for).
 
-**At `collaborative`** — repeat until the user selects [A] Lock these in.
-**At `guided`** — pillars are a major decision, so ask once; apply the chosen
-revision and lock them in without a second confirmation round.
-**At `autonomous`** — do not ask. Lock in the drafted pillars and record them via
-`log_decision` with the alternatives considered.
-
-> An `autonomous` run never issues the question, so "repeat until [A]" has no
-> exit condition (`automation-modes.md:56`).
-
-**Review mode check** — apply before spawning CD-PILLARS and AD-CONCEPT-VISUAL:
-- `solo` → skip both. Note: "CD-PILLARS skipped — Solo mode. AD-CONCEPT-VISUAL skipped — Solo mode." Proceed to Phase 5.
-- `lean` → skip both (not PHASE-GATEs). Note: "CD-PILLARS skipped — Lean mode. AD-CONCEPT-VISUAL skipped — Lean mode." Proceed to Phase 5.
+**Review mode check** — apply before spawning PD-PRINCIPLES (`--review` overrides the
+resolved `review_mode`):
 - `full` → spawn as normal.
+- `lean` → **skip every gate whose ID does not end in `-PHASE-GATE`**. Note: `[GATE-ID] skipped — Lean mode`
+- `solo` → skip all gates. Note: `[GATE-ID] skipped — Solo mode`
 
-**After pillars and anti-pillars are agreed, spawn BOTH `creative-director` AND `art-director` via `Agent` in parallel before moving to Phase 5. Issue both `Agent` calls simultaneously — do not wait for one before starting the other.**
+PD-PRINCIPLES does not end in `-PHASE-GATE`, so `lean` and `solo` skip it: write
+`> [PD-PRINCIPLES] skipped — Lean mode` (or `— Solo mode`) into the brief's status
+block and continue.
 
-- **`creative-director`** — gate **CD-PILLARS** (`.claude/docs/director-gates/cd-pillars.md`)
-  Pass: full pillar set with design tests, anti-pillars, core fantasy, unique hook.
+When it runs, spawn `product-director` via `Agent`:
+- Gate: **PD-PRINCIPLES** — the prompt instructs the agent to read
+  `.claude/docs/director-gates/pd-principles.md` first.
+- Pass: brief path (draft) · drafted principles & anti-goals text · target users & JTBD summary · named alternatives
+- Fill: `design/product/product-brief.md`; the principles and anti-goals exactly as
+  locked; the segment and job statements from Phase 2; the alternatives from Phase 3.
 
-- **`art-director`** — gate **AD-CONCEPT-VISUAL** (`.claude/docs/director-gates/ad-concept-visual.md`)
-  Pass: game concept elevator pitch, full pillar set with design tests, target platform (if known), any reference games or visual touchstones the user mentioned.
+Parse `[PD-PRINCIPLES]: TOKEN` (APPROVE / CONCERNS / REJECT) and handle it per
+§ Director Gates in This Skill. On CONCERNS the agent suggests rewrites — show them
+side by side with the locked text before the user chooses. On REJECT the principles do
+not constrain decisions yet: rewrite them with the user and re-run the gate before
+Phase 6.
 
-Collect both verdicts, then present them together using a two-tab `AskUserQuestion`:
-- Tab **"Pillars"**: present creative-director feedback. Options mirror the standard CD-PILLARS handling — `Lock in as-is` / `Revise [specific pillar]` / `Discuss further`.
-- Tab **"Visual anchor"**: present the art-director's 2-3 named visual direction options. Options: each named direction (one per option) + `Combine elements across directions` + `Describe my own direction`.
-
-The user's selected visual anchor (the named direction or their custom description) is stored as the **Visual Identity Anchor** — it will be written into the game-concept document and becomes the foundation of the art bible.
-
-If the creative-director returns CONCERNS or REJECT on pillars, resolve pillar issues before asking for the visual anchor selection — visual direction should flow from confirmed pillars.
-
----
-
-### Phase 5: Player Type Validation
-
-Using the Bartle taxonomy and Quantic Foundry motivation model, validate
-who this game is actually for:
-
-- **Primary player type**: Who will LOVE this game? (Achievers, Explorers,
-  Socializers, Competitors, Creators, Storytellers)
-- **Secondary appeal**: Who else might enjoy it?
-- **Who is this NOT for**: Being clear about who won't like this game is as
-  important as knowing who will
-- **Market validation**: Are there successful games that serve a similar
-  player type? What can we learn from their audience size?
+Write `## Product Principles & Anti-Goals` and the review line into the brief.
 
 ---
 
-### Phase 6: Scope and Feasibility
+## Phase 6: Brand Direction Anchor (optional)
 
-Ground the concept in reality:
+The brief's `## Brand Direction Anchor` is optional; when it is absent,
+`/design-language` runs brand direction itself later. Offer this step only when all
+of these hold — otherwise omit the section (heading included), delete the template's
+DD-BRAND-DIRECTION review line, and say why in one line:
 
-- **Target platform**: Use `AskUserQuestion` — "What platforms are you targeting for this game?"
-  Options: `PC (Steam / Epic)` / `Mobile (iOS / Android)` / `Console` / `Web / Browser` / `Multiple platforms`
-  Record the answer — it directly shapes the engine recommendation and will be passed to `/setup-engine`.
-  Note platform implications if relevant (e.g., mobile means Unity is strongly preferred; console means Godot has limitations; web means Godot exports cleanly).
+- `workflow` is `full` (at `standard`: "Brand direction is set in `/design-language`.");
+- the product has a UI surface — from the `surfaces` line, or, when it is unset, from
+  asking the user "Will people use this through a web or mobile interface?" (an `api`-
+  only product: "No UI surface — no brand direction needed.");
+- the user wants it now — ask with `AskUserQuestion`: `Set brand direction now` /
+  `Defer to /design-language`.
 
-- **Engine experience**: Use `AskUserQuestion` — "Do you already have an engine you work in?"
-  Options: `Godot` / `Unity` / `Unreal Engine 5` / `No preference — help me decide`
-  - **This decision always prompts regardless of `modes.automation` —
-    including `autonomous` mode.** Engine choice is a project-wide
-    architectural commitment that downstream tooling depends on and is
-    effectively irreversible mid-project, so this skill guards it
-    unconditionally (it is NOT left to the configurable
-    `automation_always_ask` list). The model must NOT silently pick an engine.
-  - If they pick an engine → record it as their preference and move on. Do NOT second-guess it.
-  - If "No preference" → tell them: "Run `/setup-engine` after this session — it will walk you through the full decision based on your concept and platform target." Do not make a recommendation here.
-- **Art pipeline**: What's the art style and how labor-intensive is it?
-- **Content scope**: Estimate level/area count, item count, gameplay hours
-- **MVP definition**: What's the absolute minimum build that tests "is the
-  core loop fun?"
-- **Biggest risks**: Technical risks, design risks, market risks
-- **Scope tiers**: What's the full vision vs. what ships if time runs out?
-
-**Review mode check** — apply before spawning TD-FEASIBILITY:
-- `solo` → skip. Note: "TD-FEASIBILITY skipped — Solo mode." Proceed directly to scope tier definition.
-- `lean` → skip (not a PHASE-GATE). Note: "TD-FEASIBILITY skipped — Lean mode." Proceed directly to scope tier definition.
+**Review mode check** — apply before spawning DD-BRAND-DIRECTION (`--review` overrides
+the resolved `review_mode`):
 - `full` → spawn as normal.
+- `lean` → **skip every gate whose ID does not end in `-PHASE-GATE`**. Note: `[GATE-ID] skipped — Lean mode`
+- `solo` → skip all gates. Note: `[GATE-ID] skipped — Solo mode`
 
-**After identifying biggest technical risks, spawn `technical-director` via `Agent` using gate TD-FEASIBILITY (`.claude/docs/director-gates/td-feasibility.md`) before scope tiers are defined.**
+When skipped, write the skip note (`> [DD-BRAND-DIRECTION] skipped — Lean mode`) into
+the brief's status block and omit the section: brand directions come from the
+design director, and `/design-language` will ask for them when the brief has no
+anchor.
 
-Pass: core loop description, platform target, engine choice (or "undecided"), list of identified technical risks.
+When it runs, spawn `design-director` via `Agent`:
+- Gate: **DD-BRAND-DIRECTION** — the prompt instructs the agent to read
+  `.claude/docs/director-gates/dd-brand-direction.md` first.
+- Pass: brief path · product principles text · target users · resolved `surfaces` line
+- Fill: `design/product/product-brief.md`; the locked principles; the primary segment
+  and personas; the `surfaces` line as resolved, or the user's answer marked "(asked
+  in this run)".
 
-Present the assessment to the user. If HIGH RISK, offer to revisit scope before finalising. If CONCERNS, note them and continue.
+Parse `[DD-BRAND-DIRECTION]: TOKEN` (OPTIONS / STRONG / CONCERNS):
+- **OPTIONS** — present the 2–3 directions with `AskUserQuestion`: one option per
+  named direction, `Combine elements across directions`, `Describe my own direction`.
+- **STRONG** — present the dominant direction with the runner-up; the user still
+  chooses.
+- **CONCERNS** — the principles do not differentiate a brand yet: offer to revise the
+  named principle (re-running PD-PRINCIPLES if it changes), accept and defer the
+  anchor to `/design-language`, or discuss. A gate that ran keeps its review line even
+  when the anchor is deferred and the section omitted.
 
-**Review mode check** — apply before spawning PR-SCOPE:
-- `solo` → skip. Note: "PR-SCOPE skipped — Solo mode." Proceed to document generation.
-- `lean` → skip (not a PHASE-GATE). Note: "PR-SCOPE skipped — Lean mode." Proceed to document generation.
-- `full` → spawn as normal.
-
-**After scope tiers are defined, spawn `producer` via `Agent` using gate PR-SCOPE (`.claude/docs/director-gates/pr-scope.md`).**
-
-Pass: full vision scope, MVP definition, timeline estimate, team size.
-
-Present the assessment to the user. If UNREALISTIC, offer to adjust the MVP definition or scope tiers before writing the document.
+Write the chosen direction into `## Brand Direction Anchor` (direction, brand rule,
+personality, color philosophy, typography direction, platform stance, rejected
+directions) and record the review line.
 
 ---
 
-4. **Generate the game concept document** using the template at
-   `.claude/docs/templates/game-concept.md`. Fill in ALL sections from the
-   brainstorm conversation, including the MDA analysis, player motivation
-   profile, and flow state design sections.
+## Phase 7: Success Metrics
 
-   **Include a Visual Identity Anchor section** in the game concept document with:
-   - The selected visual direction name
-   - The one-line visual rule
-   - The 2-3 supporting visual principles with their design tests
-   - The color philosophy summary
+- **North Star metric** — one metric that captures value *delivered* to users, not
+  activity (for a savings product: users with a successful automatic transfer this
+  week, not app opens). Give its exact definition (event or query), baseline (for a
+  new product: "none — new product"), target and date, and data source.
+- **Guardrail metrics** — at least one: what must not get worse while the North Star
+  rises (payment failure rate, opt-out or unsubscribe rate, support contacts per
+  1,000 active users, refund rate, crash-free sessions).
+- **Input metrics** (optional) — leading indicators per lifecycle stage: acquisition,
+  activation (the success moment), retention (D1 / D7 / D30), monetization.
 
-   This section is the seed of the art bible — it captures the "everything must
-   move" decision before it can be forgotten between sessions.
+Targets are hypotheses; label them so. Offer `WebSearch` benchmarks only with sources.
+Write `## Success Metrics`.
 
-5. Use `AskUserQuestion` for write approval:
-- Prompt: "Game concept is ready. May I write it to `design/gdd/game-concept.md`?"
-- Options: `[A] Yes — write it` / `[B] Not yet — revise a section first`
+---
 
-If [B]: ask which section to revise using `AskUserQuestion` with options: `Elevator Pitch` / `Core Fantasy & Unique Hook` / `Pillars` / `Core Loop` / `MVP Definition` / `Scope Tiers` / `Risks` / `Something else — I'll describe`
+## Phase 8: Riskiest Assumptions & Tests
 
-After revising, show the updated section as a diff or clear before/after, then use `AskUserQuestion` — "Ready to write the updated concept document?"
-Options: `[A] Yes — write it` / `[B] Revise another section`
-**At `collaborative`** — repeat until the user selects [A].
-**At `guided`** — ask once; apply the requested revision and write the document
-without a further confirmation round.
-**At `autonomous`** — do not ask; write the document and record the decision via
-`log_decision`.
+List the beliefs that would sink the product if wrong, across the four risks:
 
-> Same exit-condition problem as the pillars loop above (`automation-modes.md:56`).
+- **Value** — will the segment want it enough to switch?
+- **Usability** — can they figure it out and trust it?
+- **Feasibility** — can we build and operate it — including third parties (payment
+  providers, identity providers, messaging channels, app store review)?
+- **Viability** — does it work for the business — costs, pricing, regulation?
 
-If yes, generate the document using the template at `.claude/docs/templates/game-concept.md`, fill in ALL sections from the brainstorm conversation, and write the file, creating directories as needed.
+Rank by impact × uncertainty. For each, name the **cheapest test** that would retire
+it — a clickable prototype, interviews, a fake door, a concierge run, existing data, a
+vendor call, a sandbox spike — and its pass signal. Every assumption gets a test (the
+Discovery → Definition gate checks this at `full`). Set Status `Untested` unless
+evidence on disk already answers it (link it).
 
-**Scope consistency rule**: The "Estimated Scope" field in the Core Identity table must match the full-vision timeline from the Scope Tiers section — not just say "Large (9+ months)". Write it as "Large (X–Y months, solo)" or "Large (X–Y months, team of N)" so the summary table is accurate.
+Recommend `/prototype` for the top assumption when it is a value or usability risk.
+Write `## Riskiest Assumptions`.
 
-6. **Suggest next steps** (in this order — this is the professional studio
-   pre-production pipeline). List ALL steps — do not abbreviate or truncate:
+---
 
-**Path A — Design-First** (recommended if the concept is well-defined):
-   1. "Run `/setup-engine` to configure the engine and populate version-aware reference docs"
-   2. "Run `/art-bible` to create the visual identity specification — do this BEFORE writing GDDs. **The art bible is required before the Technical Setup gate.** It gates asset production and shapes technical architecture decisions (rendering, VFX, UI systems)."
-   3. "Use `/design-review design/gdd/game-concept.md` to validate concept completeness before going downstream"
-   4. "Discuss vision with the `creative-director` agent for pillar refinement"
-   5. "Decompose the concept into individual systems with `/map-systems` — maps dependencies, assigns priorities, and creates the systems index"
-   6. "Author per-system GDDs with `/design-system` — guided, section-by-section GDD writing for each system identified in step 5"
-   7. "Plan the technical architecture with `/create-architecture` — produces the master architecture blueprint and Required ADR list"
-   8. "Record key architectural decisions with `/architecture-decision (×N)` — write one ADR per decision in the Required ADR list from `/create-architecture`"
-   9. "Run `/architecture-review` — bootstraps the TR registry and Requirements Traceability Matrix from your GDDs and ADRs (required before the Pre-Production gate)"
-   10. "Validate readiness to advance with `/gate-check` — phase gate before committing to production"
+## Phase 9: MVP Scope & Non-Goals
 
-**Path B — Prototype-First** (use if the core mechanic is unproven or the concept needs validation):
-   1. "Run `/setup-engine` to configure the engine"
-   2. "Run `/prototype [core-mechanic]` — validate the core idea is fun before writing any GDDs (1–3 days throwaway code)"
-   3. "If prototype PROCEEDS: run `/art-bible`, then continue with Path A steps 5–10 above, using prototype learnings to inform your GDDs"
-   4. "If prototype PIVOTS: return to `/brainstorm` with the learnings and reshape the concept"
-   5. "After full design and architecture, build the `/vertical-slice` to validate production readiness before committing to sprints"
+- **MVP scope** — the smallest product that tests the value hypothesis with real users
+  and can be released to them. Each capability traces to a job or an assumption; push
+  back on capabilities that trace to neither. Note the work outside feature code that
+  early teams forget: sign-up and account deletion, consent and privacy notices,
+  support tooling, analytics instrumentation, app store and payment-provider review
+  lead times.
+- **Target** — ask for a milestone and date (plain text); "none given" is a valid
+  answer.
+- **After the MVP** — one line per later tier (Beta, GA, Later); `/map-features`
+  formalizes them.
+- **Non-goals** — what is out of this release and why ("not now"; anti-goals are
+  "never").
 
-7. **Output a summary** with the chosen concept's elevator pitch, pillars,
-   primary player type, engine recommendation, biggest risk, and file path.
+Show the scope; confirm it with `AskUserQuestion` (`Looks right` / `Cut more` /
+`Add something` / `Something else`) — a major decision in `guided` mode.
 
-Verdict: **COMPLETE** — game concept created and handed off for next steps.
+**Review mode check** — apply to TD-FEASIBILITY and to DM-SCOPE, each separately before
+its spawn (`--review` overrides the resolved `review_mode`):
+- `full` → spawn as normal.
+- `lean` → **skip every gate whose ID does not end in `-PHASE-GATE`**. Note: `[GATE-ID] skipped — Lean mode`
+- `solo` → skip all gates. Note: `[GATE-ID] skipped — Solo mode`
+
+Neither ID ends in `-PHASE-GATE`: under `lean` or `solo` write both skip notes into the
+brief's status block and continue.
+
+When they run, spawn both in parallel — issue both `Agent` calls before waiting for
+either:
+
+- `technical-director` — gate **TD-FEASIBILITY** (the agent reads
+  `.claude/docs/director-gates/td-feasibility.md` first)
+  - Pass: one-line concept "<category> service on <surfaces> using <stack>" · riskiest assumptions list · resolved `stack` line (or "unset") · resolved `compliance` line
+  - Fill: the concept line from the category, the surfaces (resolved or asked) and the
+    stack (or "an undecided stack"); the Phase 8 table; the 0e lines as printed.
+- `delivery-manager` — gate **DM-SCOPE** (the agent reads
+  `.claude/docs/director-gates/dm-scope.md` first)
+  - Pass: MVP scope text (brief, one-pager or feature map path) · resolved `team.size` · target milestone/date (or "none given")
+  - Fill: `design/product/product-brief.md` plus the scope text; the 0e `team.size`
+    line; the target, or "none given".
+
+Parse `[TD-FEASIBILITY]: TOKEN` (VIABLE / CONCERNS / HIGH RISK) and
+`[DM-SCOPE]: TOKEN` (REALISTIC / CONCERNS / UNREALISTIC). Apply the escalation rule:
+the strictest class decides the next action, and each gate's line is recorded
+separately.
+
+- **HIGH RISK** — the assumption that fails goes to the top of `## Riskiest
+  Assumptions` with the director's cheapest test; revise the concept or the scope with
+  the user, then re-run TD-FEASIBILITY.
+- **UNREALISTIC** — present both options the director gives: the cut list and a date
+  that fits the current scope. Revise scope or target with the user, then re-run
+  DM-SCOPE.
+- **CONCERNS** from either — the standard revise / accept / discuss question.
+
+Write `## MVP Scope`, `## Non-Goals` and the review lines into the brief.
+
+---
+
+## Phase 10: Finalize the Brief
+
+1. **Completeness pass** — every section of the template has real content or an
+   explicit `NOT DETERMINED — <what would answer it>`; `## Open Questions` collects
+   every open item raised during the run (owner, how it will be answered, by when).
+   The seven sections `/gate-check definition` requires — `## Problem Statement`,
+   `## Target Users & Jobs-to-be-Done`, `## Value Proposition`,
+   `## Product Principles & Anti-Goals`, `## Success Metrics`,
+   `## Riskiest Assumptions`, `## MVP Scope` — must not be left as placeholders.
+2. **Status block** — Owner, Last Updated, Category, Workflow Tier, and one review
+   line (or skip note) per gate that applied. Status stays `Draft` until
+   `/prd-review` has reviewed the brief.
+3. **Headings** — exactly the template's, in order, in English; body in the user's
+   conversation language. Remove the template's guidance comments and unused example
+   rows.
+4. Show the complete brief (or, in `guided` mode, a summary of what changed since the
+   last approved write) and ask "May I write this to
+   `design/product/product-brief.md`?".
+
+---
+
+## Phase 11: Project Name and Category
+
+Propose the two values the rest of the framework reads:
+
+- `project.name` — the product's working name (`/onboard` and `/release-notes` use it).
+- `project.category` — a short market category such as `B2C fintech (subscription
+  savings)` or `B2B SaaS (clinic scheduling)` (`/setup-stack` and the settings
+  guidance use it).
+
+If both are already set to these values, skip this phase. Otherwise show the lines
+that will change (old → new where a value exists) and ask — in every automation mode,
+because `project.yaml` is the team's shared configuration — "May I set `project.name`
+and `project.category` in `project.yaml`?"
+
+On yes: Read `project.yaml`, then Edit it — add the two keys inside the existing
+`project:` block, or create that block directly after the `framework:` block. Change
+nothing else. Re-read the file and confirm both values are present; say so in one
+line. On no: leave `project.yaml` untouched and say that `/settings` can set them later.
+
+---
+
+## Phase 12: Summary, Verdict and Next Steps
+
+```
+Product Discovery — [brief | one-pager]
+=======================================
+Product:        [name] — [category]
+Bet:            [one-line value proposition]
+Segment:        [primary segment]
+Principles:     [names] (one-pager: [the principle line or "none"])
+North Star:     [metric] · guardrails: [metrics]   (one-pager: success signal)
+Top risk:       [assumption] → test: [test]
+MVP:            [n capabilities] · target: [date or "none given"]
+Gates:          PD-PRINCIPLES [outcome] · DD-BRAND-DIRECTION [outcome | not applicable — reason] · TD-FEASIBILITY [outcome] · DM-SCOPE [outcome]
+Written:        [paths written this run]
+Not checked:    [every NOT SOURCEABLE item, unset input and skipped step, or "none"]
+
+Verdict: [COMPLETE | INCOMPLETE | NOT ASSESSED]
+```
+
+- **COMPLETE** — the brief (or one-pager) is written with every required section
+  filled or explicitly `NOT DETERMINED`, and no REJECT-class gate verdict is
+  unresolved.
+- **INCOMPLETE** — the run stopped before the final write, or a REJECT-class verdict
+  is unresolved. Name what is missing; the draft on disk is the resume point for the
+  next `/brainstorm` run.
+- **NOT ASSESSED** — nothing could be produced because a required input is missing:
+  `pitch` with neither a brief nor a one-pager (Pitch Mode step 1). Name the input and
+  `/brainstorm`.
+
+Precedence: INCOMPLETE > NOT ASSESSED > COMPLETE.
+
+Then close with `AskUserQuestion` offering the next steps for the resolved tier — only
+the ones that apply, in this order:
+
+**`standard` / `full`**
+1. `/setup-stack` — when the stack is not pinned yet: choose and pin the stack layers
+   already decided.
+2. `/prd-review design/product/product-brief.md` — review the brief (the Discovery →
+   Definition gate requires a review at these tiers).
+3. `/prototype` — test the top riskiest assumption before writing PRDs (recommended
+   when it is a value or usability risk).
+4. `/gate-check definition` — once the brief is reviewed and the stack is pinned.
+5. `/map-features` — decompose the brief into features, dependencies and MVP / Beta /
+   GA / Later tiers.
+
+**`minimal`**
+1. `/setup-stack` — when the stack is not pinned yet.
+2. `/create-stories` — turn the one-pager's `## Build Order` into stories.
+3. `/dev-story` — implement the first story.
+4. `/prototype` — optional, when the first Build Order item is really a question.
+
+**Any tier**: `/brainstorm pitch` — turn the brief into an investor or stakeholder
+pitch.
+
+---
+
+## Pitch Mode (`/brainstorm pitch`)
+
+Writes `design/product/pitch.md` from `.claude/docs/templates/pitch-document.md` using
+the brief. It spawns no director gate.
+
+1. **Source** — read `design/product/product-brief.md`; at `minimal`, or when no brief
+   exists, `design/product/one-pager.md`. With neither, stop: "There is no brief to
+   pitch from — run `/brainstorm` first. Verdict: NOT ASSESSED — no brief or one-pager
+   to pitch from." When the brief is `Draft` and has not been
+   reviewed, say so; the pitch inherits its gaps.
+2. **Audience** — ask who the pitch is for (seed investors, an accelerator, an internal
+   investment committee, a partner); it changes emphasis, not facts.
+3. **Evidence** — read `prototypes/*-concept/REPORT.md` (verdict lines and results) and
+   `production/qa/usability/*.md` for traction. Ask the user for traction figures and
+   team details that are not on disk.
+4. **Market** — size TAM / SAM / SOM bottom-up (people who could buy × what they would
+   pay), with the user's agreement to search: every input carries
+   `(Source: <url>, retrieved YYYY-MM-DD)` or is labelled `Assumption:`. Never present
+   an unsourced number as fact.
+5. **Draft** section by section at the resolved `docs.density`: Problem, Solution,
+   Why Now, Market, Traction, Business Model, Team, The Ask. Where the brief and the
+   pitch would disagree, fix the brief first.
+6. Show the pitch and ask "May I write this to `design/product/pitch.md`?". Summarize
+   with the verdict (COMPLETE, or INCOMPLETE with the missing sections), then offer
+   next steps: `/prd-review design/product/product-brief.md` if the brief is
+   unreviewed, `/prototype` to add traction evidence.
 
 ---
 
 ## Context Window Awareness
 
-This is a multi-phase skill. If context reaches or exceeds 70% during any phase,
-append this notice to the current response before continuing:
+This is a long, multi-phase skill. From Phase 4d on, the approved state lives in the
+draft brief on disk, so progress survives a new session. If context reaches or exceeds
+70%, append this notice to the current response before continuing:
 
-> **Context is approaching the limit (≥70%).** The game concept document is saved
-> to `design/gdd/game-concept.md`. Open a fresh Claude Code session to continue
-> if needed — progress is not lost.
+> **Context is approaching the limit (≥70%).** The approved sections are saved in
+> `design/product/product-brief.md` (Status: Draft). Open a fresh session and run
+> `/brainstorm` again — it resumes from the first missing section.
 
 ---
 
-## Recommended Next Steps
+## Collaborative Protocol
 
-After the game concept is written, follow the pre-production pipeline in order:
-1. `/setup-engine` — configure the engine and populate version-aware reference docs
-2. `/art-bible` — establish visual identity before writing any GDDs
-3. `/map-systems` — decompose the concept into individual systems with dependencies
-4. `/design-system [first-system]` — author per-system GDDs in dependency order
-5. `/create-architecture` — produce the master architecture blueprint
-6. `/architecture-review` — bootstrap TR registry and Requirements Traceability Matrix
-7. `/gate-check pre-production` — validate readiness before committing to production
+1. **Question → Options → Decision → Draft → Approval** at every phase; the user owns
+   every product decision, the AI brings techniques, evidence and drafts.
+2. **"May I write this to `<path>`?"** before every write — the draft brief, each
+   section update (per the automation mode), each persona, the one-pager, the pitch —
+   and "May I set `project.name` and `project.category` in `project.yaml`?" before the
+   configuration write.
+3. **Evidence over assertion** — sourced facts, participant IDs, confidence levels;
+   `NOT SOURCEABLE` and `NOT DETERMINED` instead of plausible guesses.
+4. **Skips announce themselves** — a gate skipped by review mode leaves its skip note
+   in the artifact and a line in the summary; a step that did not apply (brand
+   direction at `standard`, no UI surface) is named with its reason.
+5. **No auto-execution** — next steps are offered, never run.
+6. **No commits** — committing is the user's decision.
+7. **Language** — converse in the user's conversation language; in every file written,
+   template headings, bold field labels, verdict tokens, IDs and paths stay in English
+   exactly as the template spells them (root `CLAUDE.md` § Language Policy).

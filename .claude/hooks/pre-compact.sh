@@ -19,13 +19,13 @@
 #
 # NOT an upward search: that resolves a nested project to its parent's config.
 if [ -f "project.yaml" ] || [ -d ".claude" ]; then
-  CCGS_ROOT="$PWD"
+  CCSS_ROOT="$PWD"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "${CLAUDE_PROJECT_DIR}" ]; then
-  CCGS_ROOT="$CLAUDE_PROJECT_DIR"
+  CCSS_ROOT="$CLAUDE_PROJECT_DIR"
 else
-  CCGS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  CCSS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
 fi
-[ -n "$CCGS_ROOT" ] && cd "$CCGS_ROOT" 2>/dev/null || true
+[ -n "$CCSS_ROOT" ] && cd "$CCSS_ROOT" 2>/dev/null || true
 
 # Claude Code PreCompact hook: Dump session state before context compression
 # This output appears in the conversation right before compaction, ensuring
@@ -97,8 +97,8 @@ echo "## Files Modified (git working tree)"
 # unbounded, so the hook still dumped whatever the working tree happened to
 # contain at the moment context was scarcest. Measured on a tree with ~5k
 # untracked files: 181,125 bytes, roughly 45,000 tokens, of which ~4,984 lines
-# were this section. A fresh asset import or un-gitignored build output is
-# enough to trigger it.
+# were this section. A vendored dependency tree or un-gitignored build output
+# is enough to trigger it.
 #
 # A count plus a sample is what this section is actually for -- orienting the
 # agent after compaction -- and the full list is one `git status` away.
@@ -126,6 +126,11 @@ if [ -z "$CHANGED" ] && [ -z "$STAGED" ] && [ -z "$UNTRACKED" ]; then
 fi
 
 # --- Work-in-progress design docs ---
+# The documents a session is most likely to be midway through: PRDs and the
+# product brief / one-pager / feature map (design/prd/, design/product/), ADRs,
+# the API contract and its guidelines (docs/api/), and the data model
+# (docs/data/). Depth 1 of each -- review logs and change records in their
+# subdirectories are finished records, not work in progress.
 echo ""
 echo "## Design Docs — Work In Progress"
 
@@ -133,7 +138,7 @@ WIP_FOUND=false
 # BOUNDED and BATCHED. One `grep -n` per design doc, printing every matching
 # line from every file, fails twice over -- the same two ways as above:
 # unbounded OUTPUT into a compacting context, and unbounded
-# COST -- ~85ms per file, crossing this hook's 10s budget at roughly 90 GDDs.
+# COST -- ~85ms per file, crossing this hook's 10s budget at roughly 90 PRDs.
 # Measured: 220 docs 18262ms, 420 docs killed at the timeout.
 #
 # `xargs -0` bounds the spawn count by ARG_MAX rather than by file count, and
@@ -141,8 +146,12 @@ WIP_FOUND=false
 # and the pipeline swallows that error silently. The
 # report is capped. What the agent needs after compaction is "these docs are
 # unfinished", not every TODO line in the project.
-_WIP_HITS=$(printf '%s\n' design/gdd/*.md | tr '\n' '\0' \
-    | xargs -0 grep -lE "TODO|WIP|PLACEHOLDER|\[TO BE|\[TBD\]" 2>/dev/null || true)
+# Unmatched globs stay literal and directories under docs/api/ are not files;
+# both are dropped before grep sees them, so neither costs a spawn or an error.
+_WIP_HITS=$(for _f in design/prd/*.md design/product/*.md docs/architecture/adr-*.md \
+                      docs/api/* docs/data/*.md; do
+                [ -f "$_f" ] && printf '%s\0' "$_f"
+            done | xargs -0 grep -lE "TODO|WIP|PLACEHOLDER|\[TO BE|\[TBD\]" 2>/dev/null || true)
 if [ -n "$_WIP_HITS" ]; then
     WIP_FOUND=true
     _wn=$(printf '%s\n' "$_WIP_HITS" | grep -c .)

@@ -1,171 +1,240 @@
-# Game World Entity Registry
+# Product Glossary & Business-Fact Registry
 #
-# PURPOSE: Single source of truth for all named game-world facts that appear
-# in more than one document. Skills check this before writing new content to
-# detect cross-doc inconsistencies at authoring time.
+# PURPOSE: Single source of truth for the named product facts that appear in more
+# than one PRD — domain terms, plans, business rules, constants and events. Skills
+# read it before writing so that a price, a limit or a term defined in one PRD is
+# not contradicted by another at authoring time.
 #
 # RULES:
-#   - Only register facts that cross system boundaries. Internal-only facts
-#     (a formula used in one GDD only) do NOT need to be registered.
-#   - Never delete entries — set status: deprecated instead.
-#   - When a value changes: update the value, set revised: to today's date,
-#     and add a comment with the old value and which GDD changed it.
-#   - source: is the authoritative GDD — the one that "owns" this fact.
-#     Other GDDs that reference it list themselves in referenced_by.
-#   - When a new GDD references an existing entry, append its path to
-#     referenced_by. Do not create a duplicate entry.
+#   - Register only facts that cross feature boundaries. A rule or constant used by
+#     one PRD only stays in that PRD; register it when a second PRD references it.
+#   - Never delete an entry — set status: deprecated instead.
+#   - When a value changes: update the value, set revised: to today's date, and add
+#     a comment with the old value and the PRD that changed it.
+#   - source: is the authoritative PRD (design/prd/<slug>.md) — the one that owns
+#     the fact. PRDs that use it list themselves under referenced_by:.
+#   - When another PRD starts using an existing entry, append its path to
+#     referenced_by:. Never create a second entry for the same fact.
+#   - Prices are integer KRW (no minor unit) and say whether VAT is included.
 #
-# WRITTEN BY: /design-system (Phase 5 — after GDD sections are approved)
-#             /consistency-check (when resolving conflicts)
-# READ BY:    /design-system (Phase 2 — before authoring begins, and after
-#               Section C/D writes to conflict-check new entities/formulas)
-#             /consistency-check (primary input — grep-first, GDD-second)
-#             /review-all-gdds (Phase 1 — baseline for Phase 2 checks)
-#             /design-review (Phase 1 — cross-doc facts, in place of sibling GDDs)
-#             /content-audit (Step 2 — planned named-content count)
-#             /balance-check (Phase 3 — intended constant/formula values)
-#             /propagate-design-change (Step 3 — downstream GDD impact via referenced_by)
+# WRITTEN BY: /write-prd (after the PRD's sections are approved, asking first)
+#             /consistency-check (when resolving conflicts, stale or missing entries)
+# READ BY:    /write-prd (before authoring, and after Functional Requirements and
+#               Business Rules & Calculations are written, to conflict-check them)
+#             /consistency-check (primary input — grep the registry first, then PRDs)
+#             /review-all-prds (baseline for the cross-PRD consistency pass)
+#             /prd-review (cross-document facts, instead of reading sibling PRDs)
+#             /propagate-prd-change (downstream PRDs through referenced_by)
+#             /business-rules-check (plans, rules and constants as intended values)
+#             /feature-audit (events, cross-checked against the tracking plan)
+#             /team-content (terminology, through the DD-CONTENT-VOICE gate)
 #
 # SEARCH PATTERNS (for skills using Grep):
-#   All entity names:        Grep pattern="^  - name:" path="design/registry/entities.yaml"
-#   Specific entity:         Grep pattern="  - name: goblin" path="design/registry/entities.yaml"
-#   All items:               Grep pattern="^  - name:" path="design/registry/entities.yaml" (items section)
-#   What combat.md owns:     Grep pattern="source: design/gdd/combat.md"
-#   What inventory.md uses:  Grep pattern="referenced_by.*inventory"
-#   All gold values:          Grep pattern="value_gold:"
-#   Deprecated entries:      Grep pattern="status: deprecated"
+#   Every entry name:          Grep pattern="^  - name:" path="design/registry/entities.yaml"
+#   One entry:                 Grep pattern="^  - name: free_active_goal_limit$" path="design/registry/entities.yaml"
+#   What goals.md owns:        Grep pattern="source: design/prd/goals.md" path="design/registry/entities.yaml"
+#   What notifications.md uses: Grep pattern="^      - design/prd/notifications.md" path="design/registry/entities.yaml"
+#   Every KRW amount:          Grep pattern="unit: KRW" path="design/registry/entities.yaml"
+#   Deprecated entries:        Grep pattern="status: deprecated" path="design/registry/entities.yaml"
+#   Match live entries only — every example below is a comment line starting with "#".
 #
-# FORMAT: YAML. Consistent indentation is critical for grep reliability.
-#   Sections: entities | items | formulas | constants
-#   Each entry: name, status, source, referenced_by[], attributes{}, added, revised
+# FORMAT: YAML, block style. Indentation is a grep contract, never reformat:
+#   section key at column 0; each entry starts with exactly two spaces then
+#   "- name:"; entry fields at four spaces; referenced_by: is a block list whose
+#   items sit at six spaces ("      - design/prd/<slug>.md").
+#   Sections: entities | plans | rules | constants | events
+#   Every entry: name, status, source, referenced_by, added, revised — plus the
+#   section's own fields listed above each section.
 
 version: 1
 last_updated: ""
 
 # ─── ENTITIES ────────────────────────────────────────────────────────────────
-# Named game-world objects: enemies, NPCs, characters, factions, bosses.
-# Register an entity here when it appears in more than one GDD — e.g., an
-# enemy defined in combat.md that also drops items listed in inventory.md.
+# Domain terms: the nouns users and the team use for the product's things
+# (goal, deposit, mandate, workspace, member). Registering a term fixes its
+# meaning and its wording in every language the product ships, so PRDs, UI copy,
+# notifications and help-center articles all say the same thing.
 #
-# Required fields: name, status, source, referenced_by, added
-# Attribute fields: any key stats that could appear in another GDD
-#   (health, damage, drops, faction, etc.)
+# Fields: name, status, source, referenced_by, definition, term_ko (the Korean
+#   term used in the product), avoid (terms not to use for it), added, revised
 
 entities: []
 
-# Example (remove when first real entry is added):
+# Example (remove when the first real entry is added):
 #
 # entities:
-#   - name: goblin
+#   - name: goal
 #     status: active              # active | deprecated
-#     source: design/gdd/combat.md
+#     source: design/prd/goals.md
 #     referenced_by:
-#       - design/gdd/combat.md
-#       - design/gdd/inventory.md
-#     health: 40
-#     damage: 8
-#     drops:
-#       - item: goblin_arm        # must match an entry in items section
-#         qty: 1
-#         drop_rate: 0.8          # 0.0–1.0
-#     added: 2026-03-26
+#       - design/prd/goals.md
+#       - design/prd/payments.md
+#       - design/prd/notifications.md
+#     definition: "A named savings target with an amount and a date that Moa deposits toward automatically."
+#     term_ko: "목표"
+#     avoid:
+#       - savings plan
+#       - piggy bank
+#     added: 2026-10-05
 #     revised: ""
 
 
-# ─── ITEMS ───────────────────────────────────────────────────────────────────
-# Named collectables, equipment, consumables, crafting materials, currency.
-# Register an item when its name or value appears in more than one GDD.
+# ─── PLANS ───────────────────────────────────────────────────────────────────
+# Subscription plans, credit packs and anything else a user buys or is entitled
+# to. The full pricing picture (promotions, taxes, refunds) lives in
+# design/product/pricing-model.md; this section holds the plan facts other PRDs
+# depend on. Prices point at constants so a price has exactly one home.
 #
-# Required fields: name, status, source, referenced_by, added
-# Attribute fields: value_gold, weight, stackable, category, and any stat
-#   modifiers that another system (e.g., economy, crafting) might reference.
+# Fields: name, status, source, referenced_by, display_name,
+#   monthly_price_constant, annual_price_constant, entitlements (list), added, revised
 
-items: []
+plans: []
 
 # Example:
 #
-# items:
-#   - name: goblin_arm
+# plans:
+#   - name: free
 #     status: active
-#     source: design/gdd/combat.md   # drop defined in combat GDD
+#     source: design/prd/subscription.md
 #     referenced_by:
-#       - design/gdd/combat.md
-#       - design/gdd/inventory.md    # inventory GDD lists its weight/stack rules
-#       - design/gdd/economy.md      # economy GDD references its sell price
-#     value_gold: 5
-#     weight: 1
-#     stackable: true
-#     category: crafting_material
-#     added: 2026-03-26
+#       - design/prd/subscription.md
+#       - design/prd/goals.md
+#     display_name: Free
+#     monthly_price_constant: ""
+#     annual_price_constant: ""
+#     entitlements:
+#       - active_goals_up_to_free_active_goal_limit
+#       - weekly_auto_debit
+#     added: 2026-10-05
+#     revised: ""
+#
+#   - name: plus
+#     status: active
+#     source: design/prd/subscription.md
+#     referenced_by:
+#       - design/prd/subscription.md
+#       - design/prd/goals.md          # the upgrade sheet shown at the goal limit
+#       - design/prd/admin-console.md  # support view shows the user's plan
+#     display_name: Plus
+#     monthly_price_constant: plus_monthly_price
+#     annual_price_constant: plus_annual_price
+#     entitlements:
+#       - unlimited_active_goals
+#       - daily_auto_debit
+#       - progress_insights
+#     added: 2026-10-05
 #     revised: ""
 
 
-# ─── FORMULAS ────────────────────────────────────────────────────────────────
-# Named calculations with defined variables and output ranges.
-# Register a formula when its output feeds into another system's input,
-# or when another GDD references it by name.
+# ─── RULES ───────────────────────────────────────────────────────────────────
+# Named business rules and calculations whose result another feature consumes,
+# or that another PRD cites by name — fees, limits, eligibility, proration,
+# rounding. The full rule (variable table, worked example, boundary cases) stays
+# in the owning PRD's "## Business Rules & Calculations"; this entry is the index.
 #
-# Required fields: name, status, source, referenced_by, variables[],
-#   output_range[min, max], added
-# Optional: expression (the actual formula), notes
+# Fields: name, status, source, referenced_by, variables (list), unit, rounding,
+#   output_range [min, max], expression (optional), notes (optional), added, revised
 
-formulas: []
+rules: []
 
 # Example:
 #
-# formulas:
-#   - name: damage_formula
+# rules:
+#   - name: suggested_debit_amount
 #     status: active
-#     source: design/gdd/combat.md
+#     source: design/prd/goals.md
 #     referenced_by:
-#       - design/gdd/combat.md
-#       - design/gdd/progression.md   # progression GDD scales attack variable
+#       - design/prd/goals.md
+#       - design/prd/onboarding.md    # onboarding shows the suggestion on the first goal
+#       - design/prd/payments.md      # payments schedules debits of this amount
 #     variables:
-#       - attack
-#       - defense
-#       - crit_chance
-#       - crit_multiplier
-#     output_range: [0, 999]
-#     expression: "max(0, attack - defense) * (1 + crit_chance * crit_multiplier)"
-#     notes: "Output feeds into health-system damage intake. Min is 0 (armour
-#       can absorb all damage). Max is uncapped in formula but tuning knob
-#       damage_cap in combat.md clamps at 999."
-#     added: 2026-03-26
+#       - target_amount
+#       - saved_amount
+#       - remaining_debits
+#     unit: KRW
+#     rounding: "up to the nearest KRW 10, once, on the result"
+#     output_range: [0, target_amount]
+#     expression: "ceil((target_amount - saved_amount) / remaining_debits / 10) * 10"
+#     notes: "No suggestion when no debit date is left before the target date."
+#     added: 2026-10-05
 #     revised: ""
 
 
 # ─── CONSTANTS ───────────────────────────────────────────────────────────────
-# Named numerical values referenced across multiple systems.
-# Register a constant when it is defined in one GDD but another GDD must
-# agree with it (e.g., gold carry limit defined in economy but checked in
-# inventory, or base inventory slots defined in inventory but displayed in HUD).
+# Named values that one PRD defines and another must agree with: plan limits,
+# prices, quotas, time windows. The value used at run time lives in config or a
+# feature flag (the owning PRD's "## Configuration & Flags" names the key); this
+# entry is the agreed product value.
 #
-# Required fields: name, status, source, referenced_by, value, unit, added
+# Fields: name, status, source, referenced_by, value, unit, config_key (optional),
+#   added, revised
 
 constants: []
 
 # Example:
 #
 # constants:
-#   - name: gold_carry_limit
+#   - name: free_active_goal_limit
 #     status: active
-#     source: design/gdd/economy.md
+#     source: design/prd/subscription.md
 #     referenced_by:
-#       - design/gdd/economy.md
-#       - design/gdd/inventory.md   # inventory enforces the carry limit
-#       - design/gdd/ui.md          # HUD displays current gold vs limit
-#     value: 9999
-#     unit: gold
-#     added: 2026-03-26
+#       - design/prd/subscription.md
+#       - design/prd/goals.md         # goal creation is blocked at the limit
+#     value: 3
+#     unit: goals
+#     config_key: entitlements.free.active_goal_limit
+#     added: 2026-10-05
 #     revised: ""
 #
-#   - name: base_inventory_slots
+#   - name: plus_monthly_price
 #     status: active
-#     source: design/gdd/inventory.md
+#     source: design/prd/subscription.md
 #     referenced_by:
-#       - design/gdd/inventory.md
-#       - design/gdd/progression.md  # progression unlocks additional slots
-#     value: 20
-#     unit: slots
-#     added: 2026-03-26
+#       - design/prd/subscription.md
+#       - design/prd/goals.md
+#     value: 4900
+#     unit: KRW per month, VAT included
+#     added: 2026-10-05
+#     revised: ""
+#
+#   - name: plus_annual_price
+#     status: active
+#     source: design/prd/subscription.md
+#     referenced_by:
+#       - design/prd/subscription.md
+#     value: 49000
+#     unit: KRW per year, VAT included
+#     added: 2026-10-05
+#     revised: ""
+
+
+# ─── EVENTS ──────────────────────────────────────────────────────────────────
+# Named events that more than one PRD relies on: domain events one feature
+# publishes and another consumes (payment_settled), and analytics events that
+# two PRDs cite. The full analytics catalogue is design/product/tracking-plan.md;
+# register an event here when a second PRD depends on its name or payload.
+#
+# Fields: name, status, source, referenced_by, kind (domain | analytics),
+#   trigger, properties (list), added, revised
+
+events: []
+
+# Example:
+#
+# events:
+#   - name: payment_settled
+#     status: active
+#     source: design/prd/payments.md
+#     referenced_by:
+#       - design/prd/payments.md
+#       - design/prd/goals.md          # progress is updated from it
+#       - design/prd/notifications.md  # deposit confirmation message
+#     kind: domain
+#     trigger: "the payment provider confirms a debit has settled"
+#     properties:
+#       - payment_id
+#       - goal_id
+#       - amount_krw
+#       - settled_at
+#     added: 2026-10-05
 #     revised: ""

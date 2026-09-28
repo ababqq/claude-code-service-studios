@@ -3,14 +3,20 @@
 # Last match wins. Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default owner for everything
-*                           @Donchitos
+*                                   @ababqq
 
 # Core configuration — owner review required
-CLAUDE.md                   @Donchitos
-.claude/                    @Donchitos
-settings.json               @Donchitos
+/CLAUDE.md                          @ababqq
+/project.yaml                       @ababqq
+/.claude/                           @ababqq
+/.claude/settings.json              @ababqq
 
-# Skills and agents — high-impact, review carefully
-.claude/skills/             @Donchitos
-.claude/agents/             @Donchitos
-.claude/hooks/              @Donchitos
+# Skills, agents, hooks, scripts and rules — high-impact, review carefully
+/.claude/skills/                    @ababqq
+/.claude/agents/                    @ababqq
+/.claude/hooks/                     @ababqq
+/.claude/scripts/                   @ababqq
+/.claude/rules/                     @ababqq
+
+# Skill and agent QA framework (spaces in the path are escaped)
+/CCSS\ Skill\ Testing\ Framework/   @ababqq

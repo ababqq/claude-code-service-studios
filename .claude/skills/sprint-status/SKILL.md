@@ -1,15 +1,15 @@
 ---
 name: sprint-status
-description: "Fast, concise sprint snapshot — burndown and emerging risks for situational awareness. 'How is the sprint going?'"
+description: "Fast sprint snapshot — burndown and emerging risks."
 argument-hint: "[sprint-number or blank for current]"
 user-invocable: true
 allowed-tools: Read, Glob, Grep, Bash(bash "*/.claude/skills/sprint-status/../../hooks/yaml-helper.sh" resolve_config *)
 model: haiku
 ---
 
-!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys story_granularity`
+!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys story_granularity,code_roots`
 
-
+Resolved above — use as-is. No block → defaults in `.claude/docs/config-resolution.md`.
 
 # Sprint Status
 
@@ -23,7 +23,7 @@ files, and makes at most one concrete recommendation.
 
 **`story_granularity`** — it sets the
 grain of the burn-down read: **feature-sized** chunks at `coarse`, **task-sized**
-at `balanced` (default), **AC-sized** at `fine`.
+at `balanced`, **AC-sized** at `fine`.
 
 ---
 
@@ -37,7 +37,8 @@ at `balanced` (default), **AC-sized** at `fine`.
 - If no argument is given, find the most recently modified file in
   `production/sprints/` and treat it as the current sprint.
 - If `production/sprints/` does not exist or is empty, report: "No sprint
-  files found. Start a sprint with `/sprint-plan new`." Then stop.
+  files found. Start a sprint with `/sprint-plan new`." and
+  `Burndown: NOT ASSESSED — no sprint file found.` Then stop.
 
 Read the sprint file in full. Extract:
 - Sprint number and goal
@@ -66,13 +67,18 @@ found — burndown assessment skipped."
 
 If it exists, read it directly — it is the authoritative source of truth.
 Extract status for each story from the `status` field. No markdown scanning needed.
+Display the yaml values as: `done` → DONE; `in-progress` → IN PROGRESS;
+`review` → IN REVIEW (counts as in progress); `blocked` → BLOCKED;
+`ready-for-dev` and `backlog` → NOT STARTED.
 Use its `sprint`, `goal`, `start`, `end` fields instead of re-parsing the sprint plan.
 
-**If `sprint-status.yaml` does not exist** (legacy sprint or first-time setup),
+**If `sprint-status.yaml` does not exist** (a sprint planned without `/sprint-plan`, or first-time setup),
 fall back to markdown scanning:
 
 1. If the entry references a story file path, check if the file exists.
-   Read the file and scan for status markers: DONE, COMPLETE, IN PROGRESS,
+   Read the file and scan for status markers: the story's `> **Status**:` line
+   (`Complete` → DONE, `In Progress` → IN PROGRESS, `In Review` → IN REVIEW,
+   `Blocked` → BLOCKED, `Ready` → NOT STARTED), else DONE, COMPLETE, IN PROGRESS,
    BLOCKED, NOT STARTED (case-insensitive).
 2. If the entry has no file path (inline task in the sprint plan), scan the
    sprint plan itself for status markers next to that entry.
@@ -82,9 +88,11 @@ fall back to markdown scanning:
 When using the fallback, add a note at the bottom of the output:
 "⚠ No `sprint-status.yaml` found — status inferred from markdown. Run `/sprint-plan update` to generate one."
 
-Optionally (fast check only — do not do a deep scan): grep the code root for a
-directory or file name that matches the story's system slug to check for
-implementation evidence. This is a hint only, not a definitive status.
+Optionally (fast check only — do not do a deep scan): grep the resolved code
+roots (the `code_roots` line above) for a directory or file name that matches the
+story's feature slug to check for implementation evidence. This is a hint only,
+not a definitive status. When the line reads `code_roots: unresolved`, skip the
+hint and print `NOT CHECKED — no code root resolved (set stack.layers.<layer>.root via /setup-stack)`.
 
 ### Stale Story Detection
 
@@ -136,8 +144,10 @@ Assess burndown by comparing completion percentage to time consumed percentage:
 - **At Risk**: completion % is 10-25 points behind time consumed %
 - **Behind**: completion % is more than 25 points behind time consumed %
 
-If dates are unavailable, skip the burndown assessment and report "On Track /
-At Risk / Behind: unknown — sprint dates not found."
+If dates are unavailable, skip the burndown assessment and report
+"Burndown: NOT ASSESSED — sprint dates not found." — never a confident On Track.
+A STALE story still raises it to **At Risk**: a known problem outranks an unknown
+(Behind > At Risk > NOT ASSESSED > On Track).
 
 ---
 
@@ -166,7 +176,7 @@ Keep the output concise. The story status table is mandatory — do not truncate
 
 *(Omit this section entirely if no IN PROGRESS stories are stale or have timestamp concerns.)*
 
-### Burndown: [On Track / At Risk / Behind]
+### Burndown: [On Track / At Risk / Behind / NOT ASSESSED]
 [1-2 sentences. If behind: which Must Haves are at risk. If on track: confirm
 and note any Should Haves the team could pull.]
 

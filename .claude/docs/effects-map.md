@@ -2,81 +2,169 @@
 
 > ## READ ONE SECTION, NEVER THIS WHOLE FILE
 >
-> This document is **~31,000 tokens** — roughly **four times an entire turn's
-> context budget**, which sits near 8,300. It is organised as **36 sections of
-> ~900 tokens each**, one per setting, headed `## <key>`.
->
-> **So opening it costs 36× what you need.** To look up a setting:
+> This document is large: one `## <key>` section per setting, and a skill needs
+> one of them. Opening the whole file costs several times a turn's context budget
+> and buys nothing. To look up a setting:
 >
 > ```
-> Grep pattern="^## modes.review_mode" path=".claude/docs/effects-map.md" -A 40
+> Grep pattern="^## modes.review_mode" path=".claude/docs/effects-map.md" -A 80
 > ```
 >
-> Read the section for your key and stop. The same rule the skills already apply
-> to their own reference files — `/gate-check` loads only the row for the target
-> phase and says "never load the others" — applies here, and this is the largest
-> file in the framework by a factor of seven.
->
-> This banner exists because six skills cite this document and **none of them
-> scoped the citation**. None instructed a full read either, so
-> nothing was actually loading 31k — but "see effects-map.md for full schema" in
-> front of a file this size is an invitation, and the cost of accepting it is
-> silent.
+> Read the section for your key — up to the next `## ` heading; raise `-A` for the
+> long ones (`modes.workflow`, `modes.automation`) — and stop. The same rule the
+> skills apply to their own reference files — `/gate-check` loads only the
+> reference file of the target phase and never the others — applies here. "See `.claude/docs/effects-map.md`"
+> in a skill or doc means "grep the one section", never "read the file".
 
-This document defines what each `project.yaml` setting actually does across
-every skill that reads it. It is the tracked, authoritative reference.
+This document defines what each `project.yaml` setting does across every skill,
+hook and script that reads it. It is the authoritative key catalog: a key with no
+`## ` section (or group section) here is not a Claude Code Service Studios setting,
+and nothing reads it.
 
-**Purpose:** When a skill reads a setting, this document is the authoritative
-source for what each value means for that skill's behavior. Implementers update
-this file when adding a new setting or changing how a skill responds to one.
+**Sibling documents — do not duplicate their content here:**
 
-**Format per setting:**
-- Priority chain — which source wins when multiple are present
-- Per-value intent — what the value means in plain terms
-- Skill behavior table — exactly what changes per skill per value
+| Doc | Answers |
+|---|---|
+| `.claude/docs/effects-map.md` (this file) | What each setting *does*, per value, per reader |
+| `.claude/docs/config-resolution.md` | How a setting *resolves* — the bootstrap line, the chain, failure modes |
+| `.claude/docs/settings-guidance.md` | Which value to *recommend*, and when to suggest a change |
+| `.claude/docs/automation-modes.md` | The shared interaction pattern behind `modes.automation` |
+| `.claude/docs/workflow-modes.md` | The shared tier pattern behind `modes.workflow` |
 
-**Coverage scope:** This document covers the skills most affected by each setting.
-Skills not listed (e.g. `ux-review`, `balance-check`, `test-flakiness`, `test-helpers`,
-`test-setup`, `soak-test`, `perf-profile`, `launch-checklist`, `release-checklist`,
-`skill-test`, `skill-improve`, `vertical-slice`) are not meaningfully affected by
-`project.yaml` settings and do not need entries here. Add a skill only when its
-behavior genuinely branches on a setting value.
+### How a section is laid out
 
-**Local override pattern:** `project.yaml` is committed to git as the shared team
-config. Per-developer overrides live in `project.local.yaml` (gitignored). Priority
-chain across all settings: `project.local.yaml` → `project.yaml` → legacy mirror →
-`modes.rigor` expansion → hardcoded default. The expansion step applies only to the
-six knobs `rigor` fronts (`modes.workflow`, `docs.density`, `qa.level`,
-`modes.story_granularity`, `modes.review_mode`, `team.size`), which for that reason have **no** hardcoded default —
-see the `modes.rigor` section.
-**Secrets do NOT belong in either file — use environment variables.** See the
-"Local Override Pattern" section below for full design including the whitelist of
-which settings can be locally overridden.
+Every setting has its own `## <key>` heading, or shares a **group heading** that
+names its keys (`## project.name and project.version`, `## stack.layers and
+specialists`, …). A setting mentioned only inside a table is invisible to every
+check that derives its scope from these headings — the `/settings` reserved-set
+derivation and the enum-parity check among them — so it can neither be reported
+as dead nor caught when it gains a reader. Add a heading, never just a row.
+
+Each section opens with the same fields:
+
+- **Controls** — what the setting decides.
+- **Values** — the allowed values. For every enum or list-enum key this line
+  names **exactly** the values in `_yaml_helper_enums` / `_yaml_helper_array_enums`
+  of `.claude/hooks/yaml-helper.sh`, in the same order. `/settings` validates a
+  write against those tables with `validate_enum_value`, and resolution drops any
+  value outside them — so this line, the helper table and the reader's branches
+  must change together.
+- **Default** — the terminal default, if one exists. Only three keys have one
+  (`modes.automation`, `modes.rigor`, `performance.enforce`). "Fronted" means the
+  value comes from the `modes.rigor` expansion and there is deliberately no
+  default. "unset ⇒ ask" means a reader that needs the value must ask or report
+  `MANUAL CHECK NEEDED` — never assume the permissive reading
+  (`.claude/rules/skill-authoring.md`, obligation 2).
+- **Status** — `live` (at least one skill, hook or script reads it) or
+  `RESERVED` (stored and validated, read by nothing).
+- **Local override** — whether `project.local.yaml` may set it (§ Local Override Pattern).
+- **Label** — the `resolve_config` label that delivers the resolved value to a
+  skill's bootstrap block. `—` means no label exists: a skill reads the key from
+  `project.yaml` with Read at run time, and `project.local.yaml` is not consulted
+  for it.
+- **Set by / Read by** — the writers and the readers. Where a reader list is long
+  or changes often, the section also gives the grep that derives it.
+
+**RESERVED banner rule.** A RESERVED setting carries the banner
+`> ### RESERVED - NOT IMPLEMENTED` within 14 lines under its heading. `/settings`
+derives its reserved set with `grep -B14` from those banners, so keep the banner
+directly under the heading, and keep the section *above* a RESERVED section
+longer than 14 lines (otherwise the previous heading is captured too).
+
+### Resolution chain (every key)
+
+```
+project.local.yaml (whitelisted keys only)
+  → project.yaml
+  → modes.rigor expansion (the six fronted knobs only)
+  → terminal default (modes.automation, modes.rigor, performance.enforce only)
+  → unset
+```
+
+An enum-invalid value at any hop **falls through** to the next source — it never
+wins — and `resolve_config` names what it rejected on its `notes:` line.
+`resolve_config` always exits 0 and always emits a complete block. A skill's
+bootstrap receives the result through the `--keys` labels; the mechanics are in
+`.claude/docs/config-resolution.md`.
+
+**Secrets never go in either file** — see § Local Override Pattern.
+
+### Key index
+
+`Local` ✓ = on the `project.local.yaml` whitelist. `Fronted` = supplied by `modes.rigor`.
+
+| Key | Type / values | Default | Status | Local | Label | Section |
+|---|---|---|---|---|---|---|
+| `schema_version` | int | `1` | live | — | — | `schema_version` |
+| `framework.version` | semver | template value (see `project.yaml`) | live | — | — | `framework` |
+| `framework.last_upgraded` | ISO date | `2026-09-27` | live | — | — | `framework` |
+| `project.name` | string | unset | live | — | — | `project.name and project.version` |
+| `project.category` | string | unset | live | — | — | `project.category` |
+| `project.version` | semver | unset | live | — | — | `project.name and project.version` |
+| `project.stage` | `Discovery` … `Launch` (7) | unset ⇒ `stage-estimate.sh` | live | — | `project.stage` | `project.stage` |
+| `modes.rigor` | `minimal\|standard\|full` | `minimal` | live | — | `rigor` | `modes.rigor` |
+| `modes.automation` | `collaborative\|guided\|autonomous` | `collaborative` | live | ✓ | `automation` | `modes.automation` |
+| `modes.automation_always_ask` | list of categories | 9-item default list | live | ✓ | `automation_always_ask` | `modes.automation_always_ask` |
+| `modes.review_mode` | `full\|lean\|solo` | — (Fronted) | live | ✓ | `review_mode` | `modes.review_mode` |
+| `modes.workflow` | `minimal\|standard\|full` | — (Fronted) | live | — | `workflow` | `modes.workflow` |
+| `modes.story_granularity` | `coarse\|balanced\|fine` | — (Fronted) | live | — | `story_granularity` | `modes.story_granularity` |
+| `docs.density` | `terse\|balanced\|thorough` | — (Fronted) | live | — | `docs.density` | `docs.density` |
+| `qa.level` | `minimal\|standard\|full` | — (Fronted) | live | — | `qa.level` | `qa.level` |
+| `qa.coverage_minimum` | int 0–100 | unset | RESERVED | — | — | `qa.coverage_minimum` |
+| `team.size` | `individual\|small\|studio` | — (Fronted) | live | ✓ | `team.size` | `team.size` |
+| `testing.framework` | string | unset | live | — | — | `testing.framework` |
+| `testing.patterns` | flow list of globs | unset ⇒ `tests/**` + announce | live | — | — | `testing.patterns` |
+| `testing.strict.{logic,integration,ui,e2e,config}` | `true\|false` | unset (per-skill default) | live | ✓ | `testing.strict` | `testing.strict` |
+| `stack.pinned_on` | ISO date | unset | live | — | `stack` | `stack.pinned_on` |
+| `stack.layers.<layer>.*`, `specialists.<layer>` | strings, paths | unset | live | — | `stack`, `code_roots` | `stack.layers and specialists` |
+| `stack.monorepo` | `true\|false` | unset | live | — | — | `stack.monorepo and stack.shared_roots` |
+| `stack.shared_roots` | flow list of paths | unset | live | — | `code_roots` | `stack.monorepo and stack.shared_roots` |
+| `stack.package_manager` | string | unset | live | — | — | `stack.package_manager and stack.profile` |
+| `stack.profile` | string (informational) | unset | live | — | — | `stack.package_manager and stack.profile` |
+| `platform.surfaces` | list ⊆ `web\|ios\|android\|api` | unset ⇒ ask | live | — | `surfaces` | `platform.surfaces` |
+| `platform.browsers` | flow list (browserslist) | unset | live | — | — | `platform.browsers and platform.min_os` |
+| `platform.min_os.ios`, `platform.min_os.android` | strings | unset | live | — | — | `platform.browsers and platform.min_os` |
+| `release.distribution` | `web\|stores\|web+stores\|enterprise\|internal` | unset ⇒ ask | live | — | `distribution` | `release.distribution` |
+| `privacy.handles_pii` | `true\|false` | unset ⇒ ask | live | — | `compliance` | `privacy.handles_pii` |
+| `compliance.regions` | list ⊆ `kr\|eu\|us` | unset ⇒ ask | live | — | `compliance` | `compliance.regions` |
+| `localization.locales` | flow list of BCP 47 tags | unset ⇒ ask | live | — | — | `localization.locales` |
+| `accessibility.target` | `none\|wcag-a\|wcag-aa\|wcag-aaa` | unset ⇒ ask | live | — | `accessibility` | `accessibility.target` |
+| `performance.api_p95_ms` … `performance.crash_free_pct` (9 budgets) | number | unset | live | — | — | one section each |
+| `performance.enforce` | `warn\|block\|off` | `warn` | live | ✓ | `performance.enforce` | `performance.enforce` |
+| `workflow_overrides.{edge_cases,config_flags,design_language_strict}` | `true\|false` | unset | live | — | — | `workflow_overrides` |
+| `workflow_overrides.feature_overrides.<prd-stem>` | `minimal\|standard\|full` | — | live | — | `feature_overrides` | `workflow_overrides` |
+| `cadence.sprint_length`, `cadence.milestone_length` | strings | unset | RESERVED | — | — | `cadence.sprint_length and cadence.milestone_length` |
+| `commands.<name>` | string or OS map | unset | live | — | — | `commands` |
+| `naming.<field>` | string | unset | live | — | — | `naming` |
+| `features.session_state` | `on\|off` | enabled unless `off` | live | ✓ | — | `features.session_state` |
+| `features.token_budget_warn_at` | float 0–1 | unset | RESERVED | ✓ | — | `features.token_budget_warn_at` |
 
 ---
 
 ## Local Override Pattern — `project.local.yaml`
 
-The `project.local.yaml` file lets each developer override specific settings for
-their own use without affecting the team. The file is gitignored and never
-committed.
+`project.yaml` is committed and shared by the team. `project.local.yaml` lets each
+developer override a small set of **personal-experience** settings for their own
+sessions without affecting anyone else. It is gitignored (`.gitignore`, block
+`# === Claude Code Local ===`) and never committed.
 
 ### How it works
 
-Priority chain (every setting): `project.local.yaml` → `project.yaml` → hardcoded default
+Priority chain for a whitelisted key: `project.local.yaml` → `project.yaml` →
+`modes.rigor` expansion (fronted knobs only) → terminal default → unset.
+For every other key, `project.local.yaml` is **not consulted** — the chain starts
+at `project.yaml`.
 
-If a setting is present in `project.local.yaml`, that value wins. If absent, the
-value from `project.yaml` is used. If absent there too, the hardcoded default
-takes over.
+If a whitelisted setting is present in `project.local.yaml`, that value wins —
+unless it is enum-invalid, in which case it falls through to `project.yaml` and
+the rejection is named on the `notes:` line.
 
 ---
 
 ### Deep merge semantics
 
-When both files set a nested value, only the explicitly-set key is overridden.
-Sibling keys in the same block are preserved.
-
-Example:
+When both files set values in the same block, only the explicitly-set leaf is
+overridden. Sibling keys are read independently from their own files.
 
 `project.yaml`:
 ```yaml
@@ -84,7 +172,7 @@ testing:
   strict:
     logic: true
     integration: true
-    visual: false
+    e2e: true
 ```
 
 `project.local.yaml` (sparse override):
@@ -94,142 +182,136 @@ testing:
     logic: false
 ```
 
-Effective config seen by skills: `logic: false, integration: true, visual: false`.
-Only the explicitly-set `logic` key is overridden; sibling keys come through from
-`project.yaml`.
+Effective values seen by skills: `logic: false`, `integration: true`, `e2e: true`.
+Only `logic` is overridden; the siblings come through from `project.yaml`.
 
 ---
 
 ### Whitelist — which settings can be locally overridden
 
-Only personal-experience settings can be locally overridden. Project-wide facts
-(engine, stage, naming conventions, what's required on disk) are locked to
-`project.yaml` because divergence between developers would break team coordination.
-
 The rule for deciding which side a setting belongs on:
 
 > **If a setting affects what artifacts exist or what they look like on disk,
 > it must be locked to `project.yaml`. If a setting only changes your personal
-> experience (which agents spawn for you, whether you get prompts, your local
-> CI bypass), it can be locally overridden.**
+> experience (which agents spawn for you, whether you get prompts, whether a
+> failure blocks your local work), it can be locally overridden.**
 
-**Locally overridable** (personal experience only — no effect on artifacts on disk):
+**Locally overridable** — exactly these keys (`_yaml_helper_locally_overridable`
+in `.claude/hooks/yaml-helper.sh`; `_yaml_helper_local_read_scope` equals it, so
+what `/settings --local` may write is exactly what resolution reads):
 
-| Setting | Why local override makes sense |
-|---------|-------------------------------|
+| Setting | Why a local override makes sense |
+|---|---|
 | `modes.review_mode` | How much AI review you personally want |
-| `modes.automation` | How often the AI prompts you |
+| `modes.automation` | How often the AI stops to ask you |
 | `modes.automation_always_ask` | Your personal safety categories |
-| `team.size` | Which agents spawn for your reviews (review depth differs, artifacts don't) |
-| `testing.strict.*` (each type) | Whether failures block your local work (CI still enforces project.yaml defaults) |
-| `performance.enforce` | Whether budget violations block your local work (CI enforces project defaults) |
-| `features.session_state` | Your session tracking preference |
-| `features.token_budget_warn_at` | Your personal cost threshold |
+| `team.size` | Which agents spawn for your runs (review depth differs, artifacts do not) |
+| `testing.strict.logic`, `.integration`, `.ui`, `.e2e`, `.config` | Whether a failing test blocks *your* local story closure — CI runs against `project.yaml` |
+| `performance.enforce` | Whether a budget breach blocks *your* local work — CI runs against `project.yaml` |
+| `features.session_state` | Your session-tracking preference |
+| `features.token_budget_warn_at` | Your personal cost threshold (RESERVED — nothing reads it) |
 
-**Locked to `project.yaml`** (project-wide — would create artifact divergence if local):
+**Locked to `project.yaml`** (project-wide — a local value would make checkouts diverge):
 
 | Setting | Why it must be project-wide |
-|---------|----------------------------|
-| `schema_version`, `framework.*` | File metadata, not preferences — **exempt from the report below**, since a `project.local.yaml` carrying `schema_version: 1` is correct as written |
-| `project.name`, `version`, `genre`, `kind`, `stage` | Project identity |
-| `engine.*`, `specialists.*` | Whole team must use same engine |
-| `naming.*` | Code conventions must be consistent across team |
-| `platform.*` | Game facts (what platforms it ships on) |
-| `performance.target_framerate`, `frame_budget_ms`, `draw_call_limit`, `memory_ceiling_mb` | Game budgets, shared targets |
-| `accessibility.target` | Game commitment, project-wide |
-| `cadence.*` | Sprint/milestone length affects team coordination |
-| `modes.rigor` | Fronts the four below — locked for the same reason they are |
-| `modes.workflow` and `workflow_overrides` | Affects which sections are required in authored docs |
-| `modes.story_granularity` | Affects how big stories are in repo — team must be consistent |
-| `docs.density` | Affects how deep authored docs are — team must produce consistent docs |
-| `qa.level` | Affects what test evidence stories must include on disk |
-| `qa.coverage_minimum` | Project quality bar |
-| `strict_gate_checks` | Affects whether `project.stage` advances — a project-wide write |
-| `commands.*` | Build/test commands are project facts |
-| `testing.framework` | Whole project uses one framework |
+|---|---|
+| `schema_version`, `framework.*` | File metadata, not preferences — **exempt from the local-scope report below**, since a `project.local.yaml` carrying `schema_version: 1` is correct as written |
+| `project.*` | Product identity, version and phase |
+| `stack.*`, `specialists.*` | The whole team builds on the same stack, roots and routing |
+| `naming.*`, `commands.*` | Code conventions and build/test commands are project facts |
+| `testing.framework`, `testing.patterns` | One set of runners and one test layout per project |
+| `platform.*`, `release.distribution` | What ships where, and how it is distributed |
+| `privacy.handles_pii`, `compliance.regions`, `localization.locales` | Legal and product commitments |
+| `accessibility.target` | A product commitment, not a preference |
+| `performance.*` budgets | Shared SLO and budget targets |
+| `cadence.*` | Sprint and milestone length coordinate the team (RESERVED) |
+| `modes.rigor` | Fronts four on-disk knobs — locked for the same reason they are |
+| `modes.workflow`, `workflow_overrides` | Decide which sections authored documents must contain |
+| `modes.story_granularity` | Decides how big stories in the repo are |
+| `docs.density` | Decides how deep authored documents go |
+| `qa.level` | Decides what test evidence a story must carry on disk |
+| `qa.coverage_minimum` | Project quality bar (RESERVED) |
 
 > **A locked key written into `project.local.yaml` by hand is reported, not
-> swallowed.** `/settings --local` refuses to write one, but the
-> file is meant to be hand-edited and that path had no guard: `modes.rigor: full`
-> there is a real key with a legal value, so enum validation passes it, and then
-> resolution never consults the local file for that path — the setting vanishes
-> and the user sees the default they were trying to override, with no error
-> anywhere. Every check validated the **value**; nothing validated the
-> **location**. `validate_local_scope` in `yaml-helper.sh` now names such keys on
-> `resolve_config`'s `notes:` line. It **warns and never reconciles**: it does not
-> edit the file, does not begin honouring the key, and does not change
-> resolution — a locked setting decides which artifacts exist on disk, so
-> applying one quietly would produce exactly the divergence this table prevents.
-> A clean file stays silent — you are only told when a key is actually in the
-> wrong place.
+> swallowed.** `/settings --local` refuses to write one, but the file is meant to
+> be hand-edited and that path had no guard: `modes.rigor: full` there is a real
+> key with a legal value, so enum validation passes it, and resolution then never
+> consults the local file for that path — the setting vanishes and the user sees
+> the value they were trying to override, with no error anywhere. Every check
+> validated the **value**; nothing validated the **location**.
+> `validate_local_scope` in `yaml-helper.sh` names such keys on `resolve_config`'s
+> `notes:` line. It **warns and never reconciles**: it does not edit the file,
+> does not begin honouring the key, and does not change resolution — a locked
+> setting decides which artifacts exist on disk, so applying one quietly would
+> produce exactly the divergence this table prevents. A clean file stays silent.
 
 ---
 
 ### `/settings --local` flag behavior
 
 ```
-/settings workflow=minimal               → writes to project.yaml (team-wide)
-/settings --local automation=autonomous  → writes to project.local.yaml (just you)
+/settings modes.workflow=minimal                → writes project.yaml (team-wide)
+/settings --local modes.automation=autonomous   → writes project.local.yaml (just you)
 ```
 
-**Behavior rules:**
-
-- Default (no flag): writes to `project.yaml`
-- `--local` flag: writes to `project.local.yaml` (creates it if absent)
-- `--local` on a locked setting → error:
+- Default (no flag): writes `project.yaml`.
+- `--local`: writes `project.local.yaml` (creates it if absent).
+- `--local` on a locked setting → refused:
   > *"`<setting>` cannot be locally overridden — it's a project-wide setting.
   > Use `/settings <setting>=<value>` (no `--local`) to change it for the whole team."*
-- Writing to `project.yaml` when the same setting is currently locally overridden → warning:
+- Writing `project.yaml` while the same setting is locally overridden → warning:
   > *"This setting is currently locally overridden in `project.local.yaml`.
-  > Writing to `project.yaml` will not affect your effective value."*
+  > Writing to `project.yaml` will not change your effective value."*
+
+`/settings` is the only skill that writes `project.local.yaml`.
 
 ---
 
 ### Schema validation on read
 
-When skills or hooks read either file:
-
 | Issue | Behavior |
-|-------|----------|
-| Unknown key (typo or stale setting) | Session-start warning: *"`project.local.yaml` has unknown key `modes.automaton` — typo? Ignored."* Does NOT block (forwards-compat with future settings). |
-| Invalid value not in enum (e.g. `automation: chaotic`) | Hard error: skill exits with explanation of valid values. |
-| Type mismatch (e.g. integer field set to a string) | Hard error: skill exits with type expected. |
+|---|---|
+| Enum-invalid value (e.g. `modes.automation: chaotic`) | Dropped; resolution falls through to the next source and `resolve_config` names the rejected value on `notes:`. `session-start.sh` reports enum and scope errors at session start. `/settings` refuses to write it. Never a hard stop — a skill always receives a complete block. |
+| Invalid element in a list-enum key (e.g. `platform.surfaces: [web, iso]`) | The element is dropped with a note (`platform.surfaces: dropped invalid element 'iso'`); the valid elements survive. |
+| Locked key in `project.local.yaml` | Named on `notes:`, ignored (see above). |
+| `project.local.yaml` without a `project.yaml` | Hard error from `validate_local_yaml_base`, surfaced on `notes:`; defaults are used. |
+| Unknown key (typo, or a key this file does not define) | **Not detected.** Resolution reads only the paths it knows, so a misspelled key is simply never read. Check spelling against this file's headings; `/settings <key>` shows `(not set)` for a key nothing supplies. |
+| Unparseable value of a key without an enum (a budget written as `fast`) | Not validated by `yaml-helper.sh`. A skill that cannot parse a value treats it as unset and says so (obligation 3) — it never measures against a guess. |
 
 ---
 
 ### Creation and error handling
 
 | Scenario | Behavior |
-|----------|----------|
-| `/start` on fresh project | Creates `project.yaml` only. Does NOT create `project.local.yaml`. |
-| `/settings --local <x>=<y>` when local.yaml doesn't exist | Creates `project.local.yaml` containing just that setting. |
+|---|---|
+| Fresh clone of the template | `project.yaml` ships with `schema_version` and `framework` only — no `modes:` block. |
+| `/start` | Adds `project.stage`, `modes.rigor` and `modes.automation` to `project.yaml`. Never creates `project.local.yaml`. |
+| `/setup-stack` | Adds the `stack.*` block and the product facts (surfaces, distribution, regions, locales, naming, commands). |
+| `/settings --local <key>=<value>` with no local file | Creates `project.local.yaml` containing just that setting. |
 | `project.local.yaml` exists but `project.yaml` doesn't | Hard error: *"`project.yaml` missing — run `/start` to create one. Local overrides require a base."* |
-| Both files exist | Read `project.yaml` first, deep-merge `project.local.yaml` on top. Normal operation. |
-| Both files set the same key | `project.local.yaml` wins. No prompting. |
+| Both files set the same whitelisted key | `project.local.yaml` wins. No prompting. |
 
 ---
 
 ### Two-developer clash scenarios — and why the whitelist prevents them
 
-**File-level conflict (`project.yaml`):**
-Standard git merge conflict. Each developer's `project.local.yaml` is gitignored
-and never collides with another developer's. Normal git workflow handles team-wide
-changes.
+**File-level conflict (`project.yaml`):** an ordinary git merge conflict. Each
+developer's `project.local.yaml` is gitignored and never collides with anyone
+else's.
 
-**Logical inconsistency (prevented by whitelist):**
+**Logical inconsistency (prevented by the whitelist).** Example of what the
+whitelist prevents:
 
-Example of what the whitelist prevents:
+> Minji sets `modes.workflow: minimal` locally to skip PRD requirements. She stops
+> writing PRDs because her local tier does not require them. Alex runs
+> `/gate-check architecture` with the team's `standard`; the gate sees MVP
+> features without PRDs and fails.
 
-> Sarah sets `modes.workflow: minimal` locally to skip GDD requirements. She
-> doesn't write GDDs because her local mode doesn't require them. Mike runs
-> `/gate-check` with the team default of `standard`; gate-check sees missing
-> GDDs and fails.
+This cannot happen because `modes.workflow` is locked to `project.yaml`. The same
+holds for `qa.level`, `docs.density`, `naming.*` and every other setting that
+decides what artifacts exist on disk.
 
-This can't happen because `modes.workflow` is locked to `project.yaml`. Same
-for `qa.level`, `docs.density`, `strict_gate_checks`, `naming.*`, and every
-other setting that affects what artifacts exist on disk.
-
-Personal experience settings (`automation`, `review_mode`, `team.size`,
+Personal-experience settings (`automation`, `review_mode`, `team.size`,
 `testing.strict.*`, `performance.enforce`) can diverge freely without affecting
 anyone else.
 
@@ -237,240 +319,99 @@ anyone else.
 
 ### Stricter reviewer reviewing a looser reviewer's work
 
-A common worry: "what if my teammate has stricter review settings than me?
-Will their `/gate-check` or `/design-review` flag things in my work?"
-
-The answer depends on which kind of difference you're talking about:
+A common worry: "my teammate has stricter review settings than me — will their
+`/gate-check` or `/prd-review` flag things in my work?" It depends on which kind
+of difference it is.
 
 **Different review depth, same project requirements (HEALTHY):**
 
 - Teammate A: local `review_mode: full`, `automation: collaborative`, `testing.strict.logic: true`
 - Teammate B: local `review_mode: solo`, `automation: autonomous`, `testing.strict.logic: false`
-- Both bound by the same project.yaml-locked settings (e.g. `workflow: standard`, `qa.level: standard`)
+- Both are bound by the same locked settings (e.g. `workflow: standard`, `qa.level: standard`)
 
-B writes a GDD that meets `workflow: standard` (all 5 required sections present).
-B's `/design-review` runs with `review_mode: solo` — fast advisory check, no
-specialists spawned. B moves on.
+B writes `design/prd/goals.md` meeting `workflow: standard` (the 8 required
+sections present). B's `/prd-review` runs at `solo` — a single-session check, no
+consultants. Later A reviews the same PRD at `full`, which consults the routed
+specialists and finds an idempotency edge case in auto-debit retries that B's
+lighter review missed. A files it as a review comment; B fixes it.
 
-Later A reviews the same GDD with `review_mode: full` — spawns 5–15 specialists,
-finds polish opportunities and edge cases B's lighter review missed. A files
-findings as PR comments or follow-up issues. B addresses the ones that matter.
+**This is normal team collaboration.** The artifacts on disk are the same; only
+review depth differs.
 
-**This is normal team collaboration.** Different reviewers catching different
-things is the value of having multiple reviewers. The artifacts on disk are the
-same; only review depth differs. Nothing about this scenario creates project-state
-divergence.
+**Different requirements (PREVENTED by the whitelist).** If `qa.level` were
+locally overridable:
 
-**Different requirements (PREVENTED by the whitelist):**
+- B sets `qa.level: minimal` locally. B's stories close without test evidence.
+- A pulls. A's `qa.level: standard` requires evidence; A's `/story-done` would have rejected them.
+- A's next `/gate-check hardening` fails on missing evidence across B's "Complete" stories.
 
-If `qa.level` were locally overridable:
-
-- B sets `qa.level: minimal` locally. B's stories don't include test evidence.
-- B's `/story-done` accepts the story without evidence. Story marked Complete on disk.
-- A pulls. A's `qa.level: standard` requires evidence. A's `/story-done` would have rejected it.
-- A's next `/gate-check` fails because evidence is missing across multiple of B's "Complete" stories.
-
-This is the artifact divergence problem. To prevent it, `qa.level` is locked to
-`project.yaml`. The team agrees together on what's required; individuals override
-only their personal experience, never the team's standards.
-
-**The pattern to remember:**
+That is artifact divergence, which is why `qa.level` is locked.
 
 | Difference type | Outcome |
-|----------------|---------|
-| Different review depth (review_mode, team.size) | Stricter reviewer surfaces more findings — healthy. Artifacts unchanged. |
-| Different local strictness on failures (testing.strict.*, performance.enforce) | Stricter dev's local /story-done blocks earlier — they fix it locally. CI uses project.yaml defaults so team-wide quality bar stays. |
-| Different artifact requirements (workflow, qa.level, docs.density, etc.) | **Can't happen — these are locked.** Team agrees once in project.yaml. |
+|---|---|
+| Review depth (`review_mode`, `team.size`) | The stricter reviewer surfaces more findings — healthy. Artifacts unchanged. |
+| Local strictness on failures (`testing.strict.*`, `performance.enforce`) | The stricter developer's local `/story-done` blocks earlier — they fix it locally. CI runs `project.yaml`, so the team bar holds. |
+| Artifact requirements (`workflow`, `qa.level`, `docs.density`, …) | **Cannot happen — these are locked.** The team agrees once in `project.yaml`. |
 
 ---
 
 ### CI behavior
 
-CI environments have no `project.local.yaml` — the file is gitignored and never
-present in a fresh clone. CI therefore always runs against `project.yaml`
-defaults: strict project standards, no developer-specific overrides.
+CI has no `project.local.yaml` — the file is gitignored and absent from a fresh
+clone — so CI always resolves from `project.yaml`, the `modes.rigor` expansion and
+the terminal defaults. That is intentional: developers iterate with relaxed
+personal settings, and CI holds the team bar.
 
-This is intentional and important:
+| Setting | Typical local value | What CI resolves |
+|---|---|---|
+| `modes.review_mode` (overridable) | `solo` for fast solo iteration | whatever `project.yaml` or the rigor expansion gives — e.g. `lean` at `rigor: standard` |
+| `testing.strict.logic` (overridable) | `false` for WIP commits | the `project.yaml` value (unset ⇒ the skill's own default) |
+| `modes.automation` (overridable) | `autonomous` | `project.yaml` value or `collaborative` — mostly a no-op in CI, which asks no questions |
 
-| Setting | Local default for fast iteration | CI default (`project.yaml`) |
-|---------|----------------------------------|------------------------------|
-| `modes.review_mode` (locally overridable) | `solo` for one developer | `lean` (team default — phase gates always run) |
-| `testing.strict.logic` (locally overridable) | `false` for fast WIP commits | `true` (failing tests block CI) |
-| `modes.automation` (locally overridable) | `autonomous` for solo flow | `collaborative` (the team's collab protocol, but CI doesn't ask questions anyway — this is mostly a no-op on CI) |
-
-A developer can iterate locally with relaxed gates, but CI catches issues using
-the strict project defaults. The team's quality bar is enforced at the CI level
-regardless of any individual developer's local config.
+Unset on an unconfigured project: `modes.rigor` defaults to `minimal`, which resolves `review_mode` to `solo`.
 
 ---
 
 ### Secrets — never in either file
 
-`project.yaml` and `project.local.yaml` are for **preferences and configuration**,
-never for **secrets**. API keys, tokens, and credentials belong in:
+`project.yaml` and `project.local.yaml` hold **configuration**, never
+**secrets**. API keys, tokens, signing keys and credentials belong in:
 
-- **Environment variables** (preferred for production/CI)
-- **`.env` file** (gitignored, local dev)
-- **OS keychain** (when integrating with services that support it)
+- **A secret manager** in deployed environments (AWS Secrets Manager / SSM,
+  GCP Secret Manager, Vercel or Fly environment secrets, GitHub Actions secrets)
+- **`.env` files** for local development — gitignored; only `.env.example` is committed
+- **The OS keychain** for developer tokens that support it
 
-When a skill needs an API key (e.g. `/asset-spec` calling Midjourney), it reads
-from the environment, not from `project.yaml`. `project.yaml` only stores **which**
-generator is used (`art.generator: midjourney`), not the API key for it.
-
-CI environments typically have no `project.local.yaml` (gitignored, not in the
-clone) — so CI always runs against `project.yaml` defaults. This is correct
-behavior: strict project defaults for CI, looser developer overrides for local work.
-
----
-
-## modes.review_mode
-
-**Controls:** How many specialist and director agents are spawned during skill execution  
-**Values:** `full` | `lean` | `solo`  
-**Default:** *none* — supplied by `modes.rigor` (`standard` yields `lean`)  
-**Set by:** `/start`, `/adopt`, `/settings`  
-**Read by:** See skill table below
-
-**Priority chain (all skills):** inline argument flag → `modes.review_mode` in `project.yaml` → `production/review-mode.txt` (legacy fallback) → `modes.rigor` expansion (no terminal default; `minimal`→`solo`, `standard`→`lean`, `full`→`full`)
-
-> **design-review follows the standard chain.** `modes.review_mode` controls
-> design-review depth, its inline flag is `--review` for consistency with every
-> other review-mode-aware skill, and the default is `lean` to match them.
-
-> **Hotfix / day-one-patch exception:** These skills are emergency or release-critical
-> pipelines. They are never gated by `review_mode` — all agents always run.
-
-> **Known inertness — `full` and `lean` are identical in all nine `team-*`
-> orchestrators.** Each of them documents a three-way split:
-> `full` spawns every director and lead gate, `lean` skips director gates *unless*
-> they are PHASE-GATE type, `solo` skips gate spawning entirely. But every
-> `team-*` skill names exactly four gates — `CD-PHASE-GATE`, `TD-PHASE-GATE`,
-> `PR-PHASE-GATE`, `AD-PHASE-GATE` — and all four are the type `lean` keeps. So
-> `lean` has nothing to skip and behaves as `full`.
->
-> `solo` genuinely differs, and outside the orchestrators (`/design-review`,
-> `/architecture-review`) all three levels differ as documented.
->
-> **This is recorded, not fixed.** Making `lean` mean something in the
-> orchestrators requires deciding which non-phase-gate reviewers each of the nine
-> should call at `full` — a design decision about review depth, not a wording fix,
-> and one that changes how many agents a run spawns.
-
----
-
-### Value intent
-
-| Value | Intent |
-|-------|--------|
-| `full` | All director and specialist gates active. Best for teams, learning, or anyone who wants thorough AI feedback on every decision. |
-| `lean` | Phase gates only — per-skill director sign-offs skipped. Default. Balances quality with token cost. |
-| `solo` | No gates, no director spawns at all. Fastest. For confident solo iteration. |
-
----
-
-### Core skills (currently review-mode aware)
-
-| Skill | full | lean | solo |
-|-------|------|------|------|
-| **design-review** | 5–15 specialist agents spawned in Phase 3b | No specialist agents — single-session analysis only | Phases 1–4 only, no delegation, no next-steps prompt |
-| **gate-check** | Director panel runs in parallel — **width set by `modes.workflow`**, not by this axis | Director panel runs in parallel — same width rule; phase gates always run | Artifact existence checks only, no directors spawned |
-| **design-system** | All section specialists + CD-GDD-ALIGN sign-off gate | All section specialists, CD-GDD-ALIGN skipped | All section specialists, CD-GDD-ALIGN skipped |
-| **art-bible** | All section specialists + AD-ART-BIBLE sign-off gate | All section specialists, AD-ART-BIBLE skipped | All section specialists, AD-ART-BIBLE skipped |
-| **architecture-decision** | Engine specialist + TD-ADR gate | Both skipped | Both skipped |
-| **create-architecture** | TD self-review + LP-FEASIBILITY agent | Both skipped | Both skipped |
-| **brainstorm** | CD-PILLARS, AD-CONCEPT-VISUAL, TD-FEASIBILITY, PR-SCOPE | All skipped | All skipped |
-| **map-systems** | TD-SYSTEM-BOUNDARY, PR-SCOPE, CD-SYSTEMS | All skipped | All skipped |
-| **story-done** | QL-TEST-COVERAGE + LP-CODE-REVIEW | Both skipped | Both skipped |
-| **sprint-plan** | PR-SPRINT feasibility check | Skipped | Skipped |
-| **create-epics** | PR-EPIC scope check | Skipped | Skipped |
-| **create-stories** | QL-STORY-READY + test case specs | Skipped | Skipped |
-| **prototype** | CD-PLAYTEST director override | Skipped — prototyper verdict is final | Skipped — prototyper verdict is final |
-| **milestone-review** | PR-MILESTONE feasibility check | Skipped — no producer verdict | Skipped — no producer verdict |
-| **playtest-report** | CD-PLAYTEST creative assessment | Skipped | Skipped |
-| **story-readiness** | QL-STORY-READY acceptance criteria check | Skipped | Skipped |
-
----
-
-### Skills to be made review-mode aware (currently ignore the setting)
-
-| Skill | full | lean | solo |
-|-------|------|------|------|
-| **review-all-gdds** | Phase 2 consistency pass + Phase 3 design theory pass (parallel) | Phase 2 consistency pass only, Phase 3 skipped | Phase 2 only, Phase 3 skipped |
-| **architecture-review** | Engine specialist + security-engineer (if online features) | Both skipped | Both skipped |
-| **dev-story** | Core programmer routing always runs + engine-specialist escalation on HIGH risk stories | Core programmer routing always runs, engine-specialist escalation skipped | Core programmer routing always runs, engine-specialist escalation skipped |
-| **code-review** | Language, shader, UI specialists + qa-tester | All optional specialists skipped | All optional specialists skipped |
-| **security-audit** | security-engineer spawned | Skipped | Skipped |
-| **create-control-manifest** | technical-director validation step | Skipped | Skipped |
-| **propagate-design-change** | technical-director validation step | Skipped | Skipped |
-
----
-
-### Team orchestration skills (pipeline behavior — different relationship)
-
-Team skills are execution pipelines, not review gates. `review_mode` controls
-whether *optional* specialists within the pipeline are included — not whether
-the pipeline runs.
-
-| Skill | full | lean | solo |
-|-------|------|------|------|
-| **team-combat** | Full pipeline including technical-artist, sound-designer, qa-tester | Core pipeline only (game-designer, gameplay-programmer, ai-programmer) — optional specialists skipped | Core pipeline only |
-| **team-ui** | Full pipeline including accessibility-specialist, art-director review pass | Core pipeline (ux-designer, ui-programmer, engine UI specialist) — optional reviewers skipped | Core pipeline only |
-| **team-audio** | Full pipeline including accessibility-specialist, engine-specialist | Core pipeline (audio-director, sound-designer, technical-artist) — optional specialists skipped | Core pipeline only |
-| **team-qa** | Full QA cycle including per-story qa-tester spawns + qa-lead sign-off | Core qa-lead plan only, per-story tester spawns skipped | Core qa-lead plan only |
-| **team-release** | Full pipeline including security-engineer, analytics-engineer, localization-lead | Core pipeline (producer, release-manager, devops-engineer, qa-lead) — optional reviewers skipped | Core pipeline only |
-| **team-narrative** | Full pipeline including world-builder, writer, localization-lead | Core pipeline (narrative-director, art-director) — optional contributors skipped | Core pipeline only |
-| **team-polish** | Full pipeline including engine-programmer, sound-designer, qa-tester | Core pipeline (performance-analyst, technical-artist) — optional specialists skipped | Core pipeline only |
-| **team-level** | Full pipeline including narrative-director, world-builder, accessibility-specialist, qa-tester | Core pipeline (level-designer, systems-designer, art-director) — optional reviewers skipped | Core pipeline only |
-| **team-live-ops** | Full pipeline including analytics-engineer, community-manager | Core pipeline (live-ops-designer, narrative-director, economy-designer) — optional contributors skipped | Core pipeline only |
-
----
-
-### Special cases and notes
-
-- **gate-check** is the only skill where `full` and `lean` behave identically —
-  phase gates always run. Only `solo` skips them. This is intentional: phase
-  gates are the minimum quality bar, not optional extras. **How many directors
-  run is a separate axis** — `modes.workflow` sets panel width (`minimal` → PR
-  only, `standard` → TD + PR, `full` → all four), because a fixed four-director
-  Opus panel cost a two-system jam exactly what it cost a thirty-system
-  commercial project. Width never softens a verdict: the strictest verdict from
-  whoever ran still wins, and `/gate-check` names the perspectives it skipped.
-- **design-system** and **art-bible** always spawn section specialists regardless
-  of mode — only the final sign-off gate is controlled by `review_mode`. Specialist
-  delegation is mandatory for the authoring output to be useful, and that has not
-  changed. What sets `art-bible`'s **spawn count** is therefore not `review_mode`
-  but (a) `modes.workflow`, via how many sections get authored at all — `standard`
-  requires sections 1–4, not all 9, and Phase 1 recommends the tier's set — and
-  (b) batching consecutive sections that call the *same* agent with the *same*
-  input into one delegation (2–4, and 5–6). Unbatched, sections 5 and 6 spawn
-  `art-director` twice with the identical `sections 1–4` brief. Every section is
-  still specialist-authored; per-section approval and write-to-file are unchanged.
-- **dev-story** core programmer routing (gameplay-programmer, ui-programmer, etc.)
-  always runs regardless of mode — only the optional engine-specialist escalation
-  for HIGH risk stories is gated.
-- **hotfix** and **day-one-patch** are exempt — all agents always run.
-- When a gate is skipped, skills emit: `"[GATE-ID] skipped — [mode] mode."` before
-  proceeding. This is consistent across all skills.
+`project.yaml` records *which* provider is used (`stack.layers.cloud.provider:
+AWS`, a Toss Payments integration in the tech radar), never the key for it.
+`validate-commit.sh` blocks commits that stage `.env` files, private keys,
+keystores or recognisable secret tokens, and the shared `.claude/settings.json`
+denies reading them.
 
 ---
 
 ## modes.rigor
 
 **Controls:** How much process the project carries overall — the single question
-`/start` asks that sets the six knobs below
-**Values:** `minimal` | `standard` | `full`
-**Default:** `minimal` — see the rationale block above `_yaml_helper_defaults`
-in `.claude/hooks/yaml-helper.sh`. Short version: the heavier tier cost several
-times more to reach working code without producing a better result.
-**Set by:** `/start` (Phase 3d), `/settings`
-**Read by:** nothing directly — it is read *through* the six knobs it supplies
+`/start` asks, which supplies six knobs at once
 
-**Priority chain:** `modes.rigor` in `project.yaml` → hardcoded default `minimal`
-(**locked** — not overridable from `project.local.yaml`, like the four *on-disk*
+**Values:** `minimal` | `standard` | `full`
+
+- **Default:** `minimal` (terminal default in `_yaml_helper_defaults`). Unset on an unconfigured project: `modes.rigor` defaults to `minimal`, which resolves `review_mode` to `solo`.
+- **Status:** live
+- **Local override:** no — it fronts four on-disk knobs
+- **Label:** `rigor` → `rigor: <value> (<source>)`
+- **Set by:** `/start`, `/settings`
+- **Read by:** the `yaml-helper.sh` expansion (every read of a fronted knob goes through it); `statusline.sh` (shows `minimal` when unset); `/launch-checklist` and `/release-checklist` through the `rigor` label (item blocking markers)
+
+**Priority chain:** `modes.rigor` in `project.yaml` → terminal default `minimal`.
+Locked: `project.local.yaml` is never consulted for it, like the four *on-disk*
 knobs it fronts — `modes.workflow`, `docs.density`, `qa.level`,
-`modes.story_granularity` — because those five change what artifacts exist on
-disk. The two personal-experience knobs it also fronts, `modes.review_mode` and
-`team.size`, stay locally overridable.)
+`modes.story_granularity`. The two *personal-experience* knobs it also fronts,
+`modes.review_mode` and `team.size`, stay locally overridable.
+
+Which level to recommend for which product — and when to suggest a change — is
+`.claude/docs/settings-guidance.md`, not this section.
 
 ---
 
@@ -478,258 +419,355 @@ disk. The two personal-experience knobs it also fronts, `modes.review_mode` and
 
 | `modes.rigor` | `modes.workflow` | `docs.density` | `qa.level` | `modes.story_granularity` | `modes.review_mode` | `team.size` |
 |---|---|---|---|---|---|---|
-| `minimal` | `minimal` | `terse` | `minimal` | `coarse` | `solo` | `individual` |
-| `standard` *(default)* | `standard` | `balanced` | `standard` | `balanced` | `lean` | `individual` |
+| `minimal` *(default)* | `minimal` | `terse` | `minimal` | `coarse` | `solo` | `individual` |
+| `standard` | `standard` | `balanced` | `standard` | `balanced` | `lean` | `individual` |
 | `full` | `full` | `thorough` | `full` | `fine` | `full` | `studio` |
 
 ### It fronts, it does not replace
 
-The expansion sits **below every explicit source and above the terminal
-default**:
+The expansion sits **below every explicit source and above the terminal default**:
 
 ```
-project.local.yaml → project.yaml → legacy file → rigor expansion → default
+project.local.yaml → project.yaml → rigor expansion → default
 ```
 
-That ordering is the back-compat guarantee, and it is what makes the migration
-free. Three consequences worth stating plainly:
+Consequences worth stating plainly:
 
-- **An existing `project.yaml` behaves identically.** If it already sets
-  `docs.density: terse`, step 2 answers before the expansion is consulted — so
-  the value and its reported source (`project.yaml`) are unchanged whether or not
-  `rigor` is present. No migration, no `schema_version` bump.
-- **Overrides go both ways.** Unlike the `workflow_overrides` **boolean flags** —
-  which are additive and stricter-only — an explicit knob may be *looser* than
-  the rigor level implies.
-  (`workflow_overrides.system_overrides` is also two-directional — it replaces a tier; only the flags are stricter-only.)
-  Inheriting the stricter-only rule would make "comprehensive but compact"
-  inexpressible, which is the one off-diagonal the docs have always cited.
-- **`modes.workflow` keeps `workflow_overrides.system_overrides`.** Per-system
-  tiers still beat the rigor-derived project tier. `workflow` was fronted rather
-  than folded away precisely because it drives ~5 distinct behaviors and owns the
-  only per-system override mechanism.
+- **An explicit value always answers first.** If `project.yaml` sets
+  `docs.density: terse`, that value — and its reported source `project.yaml` —
+  wins whatever `rigor` says.
+- **Overrides go both ways.** Unlike the `workflow_overrides` boolean flags — which
+  are additive and stricter-only — an explicit knob may be *looser* than the rigor
+  level implies. `rigor: full` + `docs.density: terse` ("comprehensive but
+  compact") is the off-diagonal the knobs exist to express.
+- **Per-feature tiers still win.** `workflow_overrides.feature_overrides.<prd-stem>`
+  beats the rigor-derived project tier for that feature. `modes.workflow` is fronted
+  rather than folded away because it drives several distinct behaviors and owns the
+  only per-feature override mechanism.
 
-The six fronted knobs therefore have **no entry in `_yaml_helper_defaults`**. A
-terminal default there would answer before the expansion and make `rigor` a no-op
-for anyone who had not also set the sub-knob.
+The six fronted knobs therefore have **no entry in `_yaml_helper_defaults`**, and
+**no template, skill or onboarding step ever seeds them into `project.yaml`**. A
+terminal default — or a seeded value — would answer before the expansion and make
+`rigor` a no-op for anyone who had not also set the sub-knob. A user who wants to
+pin one does so deliberately with `/settings`.
 
 ### Provenance
 
-Derived values report their source as `rigor:<level>`, so the vocabulary is
-`{project.local.yaml, project.yaml, <legacy path>, rigor:<level>, default,
-unset}`. `/settings` renders this as `(derived from rigor: standard)` and
-force-appends the five to its view-all list — none of them is a leaf of either
+Derived values report their source as `rigor:<level>`, so the source vocabulary of
+`resolve_setting` is `{project.local.yaml, project.yaml, rigor:<level>, default,
+unset}`. `/settings` renders it as `(derived from rigor: standard)` and always
+appends the rigor family to its view-all list — none of the six is a leaf of either
 YAML file, so enumerating file leaves alone would hide exactly the settings the
 user just chose.
 
 ---
 
-## modes.workflow
+## modes.review_mode
 
-**Controls:** How much design documentation is required before code can begin —
-the tradeoff between token/time cost of documentation and speed of reaching
-working code  
-**Values:** `full` | `standard` | `minimal`  
-**Default:** *none* — supplied by `modes.rigor` (`standard` yields `standard`)  
-**Set by:** `/start`, `/settings`  
-**Read by:** See skill tables below
+**Controls:** How many director and specialist agents a skill spawns — in
+particular, which director gates run
 
-**Priority chain:** `modes.workflow` in `project.yaml` → `modes.rigor` expansion → *(no hardcoded default)*
+**Values:** `full` | `lean` | `solo`
 
-> **Why the middle level is `standard`, not `indie`.** A developer-type label
-> would conflate "type of developer" with "level of process". `standard`
-> describes the *amount of process*, not the user, and pairs cleanly with
-> `minimal` and `full`.
+- **Default:** none — fronted by `modes.rigor` (`minimal`→`solo`, `standard`→`lean`, `full`→`full`).
+- **Status:** live
+- **Local override:** yes — a personal-experience knob
+- **Label:** `review_mode` → `review_mode: <value> (<source>)`
+- **Set by:** `/settings` only. No other skill writes it — not `/start`, `/adopt` or `/sprint-plan`.
+- **Read by:** every gate-using skill (see the tables below). Derive the current list with `grep -lE 'resolve_config --keys ([a-z_.]+,)*review_mode' .claude/skills/*/SKILL.md`.
 
-> **Permissive, not restrictive:** `workflow` controls what is REQUIRED —
-> not what is ALLOWED. Any skill can be run at any workflow level. The
-> setting changes what gate-check enforces and what completeness checks
-> validate, not what the user can invoke.
+Unset on an unconfigured project: `modes.rigor` defaults to `minimal`, which resolves `review_mode` to `solo`.
 
-> **`minimal` floor:** Even in minimal mode, engine choice and a filled
-> **`design/game-brief.md`** are required before code starts — the brief's
-> build-order field is the plan, so there is no separate `sprint-plan` step.
-> Both take minutes and prevent real problems downstream. Everything else can
-> be skipped.
+**Priority chain (all skills):** inline `--review full|lean|solo` flag →
+`project.local.yaml` → `project.yaml` → `modes.rigor` expansion. No terminal
+default.
 
-> **Escape hatches via `workflow_overrides`:** Users who want *almost* the
-> standard set with one extra requirement (e.g. always force Edge Cases) use
-> `workflow_overrides` rather than escalating to `full`. See next section.
+**Review-mode exemption:**
+
+> `/hotfix`, `/rollout-plan` and `/incident` are release-critical: every agent and gate they name runs at every `review_mode`. They do not resolve `review_mode`.
+
+**Panel width is not this setting.** How many directors sit on `/gate-check`'s
+phase-gate panel is decided by `modes.workflow`; the only copy of that table is
+`.claude/skills/gate-check/SKILL.md` Section 4b. Read it there. `review_mode`
+decides only *whether* the panel runs (`solo` skips it).
 
 ---
 
 ### Value intent
 
-| Value | Token/time cost | Required before code | Best for |
-|-------|----------------|---------------------|----------|
-| `full` | High | All 8 GDD sections per system, full architecture, all ADRs, art bible, UX specs per screen | Projects where design correctness matters more than speed — teams, commercial titles, learning the full pipeline |
-| `standard` | Balanced | 5 GDD sections per system, one architecture doc, critical ADRs, game concept, systems index | Projects that have outgrown a brief — several interacting systems, or a design someone else has to implement |
-| `minimal` | Low | One-page `design/game-brief.md` + engine choice (build order in the brief = the plan; no separate sprint plan) | **Default.** Get to code fast — small scope, jam projects, or the design already in your head. Raise it when the project grows |
+| Value | Intent |
+|---|---|
+| `full` | Every director gate and every optional reviewer runs. For teams, regulated products, or anyone who wants thorough AI review on every decision. |
+| `lean` | Phase gates only: `lean` → **skip every gate whose ID does not end in `-PHASE-GATE`**. Note: `[GATE-ID] skipped — Lean mode` |
+| `solo` | Skip all gates, note `[GATE-ID] skipped — Solo mode`. Fastest; for confident solo iteration. |
 
-**standard required GDD sections:** Overview, Detailed Rules, Edge Cases, Dependencies,
-Acceptance Criteria.
-**standard conditional:** Formulas — required when the system **defines numeric
-rules**: rates, curves, thresholds, costs, damage, drop weights, or any value a
-balance pass would tune. Optional only when the system defines no such value.
+The suffix rule is derived, not enumerated: a new gate is covered the moment it
+exists, and no skill carries a hand-written list of the gates `lean` keeps.
 
-> **The test is what the system defines, not what it is called.** The `Category`
-> column in `systems-index.md` is a *hint* — `Gameplay`, `Economy` and
-> `Progression` systems almost always qualify — but it is not the test, and a
-> `Core`, `UI` or `Persistence` system that defines a numeric rule qualifies too.
->
-> Do not restate it as "required when system category is combat, economy,
-> progression, or AI". Those four tokens are not the vocabulary `/map-systems`
-> writes: `templates/systems-index.md` defines the categories as `Core ·
-> Gameplay · Progression · Economy · Persistence · UI · Audio · Narrative ·
-> Meta`, and lists **combat and AI as example systems under `Gameplay`**. A
-> combat system categorised exactly as the template instructs therefore matched
-> none of the four, and Formulas was silently dropped for the system most likely
-> to need it. `coding-standards.md` and `rules/design-docs.md` already stated the
-> "has math" test; the skills are reconciled to them rather than the other way
-> round.
+---
 
-> **Edge Cases is required at `standard`.** Skipping it consistently produces
-> "wait, what happens if X is null?" debt during implementation. These 5
-> required sections are the minimum that produces implementable code.
+### Gate-spawning skills
 
-> **Art bible is conditional in `standard`.** It is required only if visual
-> asset stories exist in the project. Code-focused projects can skip it
-> entirely at `standard` level.
+At `full` every gate below spawns. At `lean` only IDs ending in `-PHASE-GATE`
+spawn — in practice only `/gate-check`'s panel. At `solo` none spawns. A skipped
+gate always leaves its note (`[GATE-ID] skipped — Lean mode` / `— Solo mode`) in
+the artifact, which is the evidence the mode was applied.
+
+| Skill | Gates it spawns |
+|---|---|
+| `/gate-check` | the `*-PHASE-GATE` panel, at the width `/gate-check` Section 4b resolves |
+| `/brainstorm` | PD-PRINCIPLES, TD-FEASIBILITY, DM-SCOPE, DD-BRAND-DIRECTION (optional: `full` with a UI surface) |
+| `/map-features` | TD-DOMAIN-BOUNDARY, PD-FEATURE-MAP, DM-SCOPE |
+| `/write-prd` | PD-PRD-ALIGN |
+| `/prototype`, `/usability-report` | PD-USER-VALIDATION |
+| `/walking-skeleton` | PD-USER-VALIDATION (only when a usability session runs on the skeleton) |
+| `/setup-stack` | TD-STACK-RISK (`upgrade` mode) |
+| `/create-architecture` | TD-ARCHITECTURE, TL-FEASIBILITY |
+| `/architecture-decision` | TD-ADR; TD-STACK-RISK (Knowledge Risk HIGH or MEDIUM); SE-SECURITY-REVIEW (ADR Domain `Auth`, `Security` or `Data`) |
+| `/api-design`, `/data-model` | SE-SECURITY-REVIEW |
+| `/create-control-manifest` | TD-MANIFEST |
+| `/propagate-prd-change` | TD-CHANGE-IMPACT |
+| `/create-epics` | DM-EPIC |
+| `/create-stories`, `/story-readiness` | QL-STORY-READY |
+| `/sprint-plan` | DM-SPRINT |
+| `/milestone-review` | DM-MILESTONE |
+| `/design-language` | DD-BRAND-DIRECTION (when the brief has no `## Brand Direction Anchor`), DD-DESIGN-LANGUAGE |
+| `/ux-review`, `/team-ui` | DD-UI-CONSISTENCY |
+| `/team-content` | DD-CONTENT-VOICE |
+| `/story-done` | TL-CODE-REVIEW, QL-TEST-COVERAGE |
+| `/team-qa` | QL-TEST-COVERAGE |
+
+Gate files, verdict tokens and the Context each spawn passes are in
+`.claude/docs/director-gates.md`.
+
+---
+
+### Skills that resolve `review_mode` without spawning a gate
+
+`/prd-review`, `/team-feature`, `/team-growth`, `/team-hardening`, `/team-release`
+and `/ui-inventory` use it to scale optional consultants and reviewers; each
+SKILL.md states what each mode adds. Team skills are execution pipelines, not review gates: `review_mode`
+decides which *optional* reviewers join, never whether the pipeline runs, and
+team-size scoping never removes a director gate.
+
+---
+
+### Special cases and notes
+
+- **`/gate-check`** is the one skill where `full` and `lean` behave the same —
+  its panel consists of `-PHASE-GATE` gates, which `lean` keeps. Only `solo`
+  skips the panel (artifact checks still run). Width never softens a verdict: the
+  strictest verdict from whoever ran wins, and `/gate-check` names the
+  perspectives that did not run.
+- **Gate-outcome items.** A gate reference item "<GATE-ID> outcome recorded" is
+  satisfied by the recorded verdict line **or**, when the resolved `review_mode`
+  skips that gate, by the skip note in the same artifact. `/gate-check` then
+  prints `NOT CHECKED — <GATE-ID> skipped (<mode> mode)` and does not score the
+  item — review mode is an explicit user choice.
+- **`/story-done` code review.** When the mode skips TL-CODE-REVIEW, `/story-done`
+  runs the `/code-review` checklist itself over the story's changed files and
+  records `Code review: inline checklist (TL-CODE-REVIEW skipped — <Mode> mode)`.
+- **Exempt skills** (`/hotfix`, `/rollout-plan`, `/incident`) never resolve the
+  setting; SR-PRODUCTION-READINESS in `/rollout-plan` runs at every mode.
+- **`/dev-story`** routing to the primary engineer always runs regardless of
+  mode; `/dev-story` does not resolve `review_mode`.
+
+---
+
+## modes.workflow
+
+**Controls:** How much product and technical documentation is required before
+code — the trade-off between the time and token cost of documentation and the
+speed of reaching working, deployed code
+
+**Values:** `minimal` | `standard` | `full`
+
+- **Default:** none — fronted by `modes.rigor` (`minimal`→`minimal`, `standard`→`standard`, `full`→`full`).
+- **Status:** live
+- **Local override:** no — it decides which artifacts exist
+- **Label:** `workflow` → `workflow: <value> (<source>)`; with the optional positional `<feature>` argument, `resolve_config` also prints `workflow[<feature>]: …` (see `workflow_overrides`)
+- **Set by:** `/settings`
+- **Read by:** tiered skills and `/gate-check` (tables below); `/help` and `/project-stage-detect` render catalog steps whose `required_tiers` omit the resolved tier as OPTIONAL
+
+**Priority chain:** `modes.workflow` in `project.yaml` → `modes.rigor` expansion →
+*(no terminal default)*. For one feature,
+`workflow_overrides.feature_overrides.<prd-stem>` wins over both.
+
+> **Permissive, not restrictive.** `workflow` controls what is REQUIRED — not
+> what is ALLOWED. Any skill can run at any tier. The setting changes what
+> `/gate-check` enforces and what completeness checks validate, never what the
+> user may invoke.
+
+> **`minimal` floor.** Even at `minimal`, a filled one-pager
+> (`design/product/one-pager.md`) and a pinned stack (`stack.pinned_on`) are
+> required before code, and the one-pager's `## Build Order` section is the plan —
+> there is no separate sprint plan. Both take minutes and prevent real problems
+> downstream; everything else can be skipped.
+
+> **Escape hatches via `workflow_overrides`.** A team that wants *almost* the
+> `standard` set with one extra requirement (always write Configuration & Flags,
+> say) sets a `workflow_overrides` flag instead of escalating to `full`.
+
+---
+
+### Value intent
+
+| Value | Cost | Required before code | Best for |
+|---|---|---|---|
+| `full` | High | Product brief; feature map; all 11 PRD sections per MVP feature; architecture doc and SLO doc; Foundation ADRs; API contract and data model (*Backend*); threat model (*PII*); traceability; design language (all 9 sections, *UI*); UX specs, app shell and interaction patterns (*UI*); control manifest; walking skeleton on staging | Regulated products, B2B with SLAs, larger teams, or learning the full pipeline |
+| `standard` | Balanced | Product brief; feature map; 8 PRD sections per MVP feature (+ conditional Business Rules & Calculations); architecture doc; critical ADRs; API contract and data model (*Backend*); design language sections 1–5 (*UI*); key UX specs (*UI*); walking skeleton on staging | Seed-stage product teams with several interacting features, or a design someone else implements |
+| `minimal` | Low | `design/product/one-pager.md` + stack pinned; the one-pager's `## Build Order` is the plan | Hackathons, prototypes, small scope; resolved on an unconfigured project. Raise it when the project grows |
+
+**`standard` required PRD sections:** Overview, Goals & Non-Goals, Functional
+Requirements, Edge Cases, Dependencies, Non-Functional Requirements, Success
+Metrics & Instrumentation, Acceptance Criteria. Advisory at `standard`: User Value,
+Configuration & Flags. The contract (exact headings, order, template) is
+`.claude/docs/templates/prd.md`.
+
+**`standard` conditional:** Business Rules & Calculations is required when the
+feature **defines any numeric or policy rule** — prices, fees, limits, quotas,
+rate limits, eligibility thresholds, time windows, rounding.
+
+> **The test is what the feature defines, not what it is called.** The feature
+> map's `Category` column is free text and at most a hint — a `Payments` or
+> `Billing` feature almost always qualifies, but an `Account` feature with a
+> "3 failed sign-ins lock the account for 15 minutes" rule qualifies too. Never
+> restate the condition as a list of categories: a feature categorised exactly as
+> the template suggests would then silently skip the section it most needs.
+
+> **Edge Cases is required at `standard`.** Skipping it reliably produces "what
+> happens when the auto-debit call times out?" debt during implementation —
+> network loss, partial failure, concurrency and retries are where service
+> features break.
+
+> **The design language is conditional at `standard`.** Sections 1–5 are required
+> only when a UI surface exists (*UI* = `platform.surfaces` ∩ {web, ios, android}
+> ≠ ∅); `workflow_overrides.design_language_strict: true` forces all 9. An
+> API-only product skips it.
 
 ---
 
 ### Authoring skills
 
 | Skill | full | standard | minimal |
-|-------|------|----------|---------|
-| **design-system** | All 8 sections required | 5 required sections + conditional Formulas; Player Fantasy, Tuning Knobs skipped | Not required — game brief replaces GDDs. Can still be run voluntarily. |
-| **art-bible** | All 9 sections required | Required only if visual asset stories exist; sections 1–4 minimum when required | Not required. Can still be run voluntarily. |
-| **create-architecture** | Full architecture — all layers, module ownership, data flow, API boundaries, full ADR audit | Simplified — system layer map + critical ADR list only | Not required. Can still be run voluntarily. |
-| **ux-design** | UX spec required per screen | Core screens only (main menu, HUD, primary game loop) | Not required. Can still be run voluntarily. |
-| **map-systems** | Required before design-system | Required before design-system | Not required |
-| **architecture-decision** | All ADRs on required ADR list must be completed | Critical ADRs only — Foundation layer systems | Not required |
+|---|---|---|---|
+| **`/brainstorm`** | Product brief (`design/product/product-brief.md`) | Product brief | One-pager (`design/product/one-pager.md`) |
+| **`/write-prd`** | All 11 sections required | 8 required + conditional Business Rules & Calculations; User Value and Configuration & Flags advisory | Not required — the one-pager replaces PRDs; can still be run |
+| **`/map-features`** | Required before PRDs | Required before PRDs | Not required |
+| **`/design-language`** | All 9 sections | Sections 1–5 when a UI surface exists | Not required |
+| **`/create-architecture`** | Full architecture doc + `docs/ops/slo.md` with an SLO per critical user journey | Architecture doc + the SLO doc's `## Critical User Journeys` | Not required |
+| **`/architecture-decision`** | ≥3 Foundation-layer ADRs covering identity & auth, primary data store, API style, deployment topology & environments, observability | The Foundation-layer ADRs the architecture doc marks critical | Not required |
+| **`/api-design`, `/data-model`** | Required when *Backend* | Required when *Backend* | Not required |
+| **`/ux-design`** | UX spec per key screen + app shell + interaction patterns (*UI*) | Same key screens (sign-up/sign-in, onboarding, core flow, settings/account) | Not required |
 
 ---
 
 ### Review and validation skills
 
 | Skill | full | standard | minimal |
-|-------|------|----------|---------|
-| **design-review** | All 8 sections validated — any missing section blocks approval | 5 required sections validated; missing optional sections warned but do not block | Not applicable — no GDDs to review |
-| **review-all-gdds** | Validates all 8 sections across all GDDs | Validates 5 required sections across all GDDs; optional sections surfaced as advisory only | Not applicable |
-| **architecture-review** | Full traceability matrix — all GDDs, all ADRs | Reduced scope — architecture doc + critical ADRs only | Not applicable |
-| **consistency-check** | Full entity registry cross-check against all GDD sections | Entity registry check against required sections only | Not meaningful — no GDDs to check |
-| **content-audit** | Full content count audit against all GDD specs | Limited audit — only specs in required sections counted | Cannot run — no systems index exists |
+|---|---|---|---|
+| **`/prd-review`** | All 11 sections validated — any missing section blocks approval | 8 required sections validated; advisory sections warned, not blocking | The one-pager only |
+| **`/review-all-prds`** | Required; all 11 sections across all PRDs | Recommended; required sections, advisory sections surfaced only | Not applicable |
+| **`/architecture-review`** | Full traceability matrix — every MVP PRD, every ADR | Architecture doc + critical ADRs; traceability recommended | Not applicable |
+| **`/consistency-check`** | Glossary registry cross-check against all PRD sections | Registry check against required sections | Not meaningful — no PRDs |
+| **`/feature-audit`** | Planned vs implemented for every MVP, Beta and GA feature in the feature map (`Later` listed, not scored) | MVP features only | The one-pager's `## Build Order` items and `## Core User Journey` steps |
 
 ---
 
-### Phase gate enforcement (gate-check)
+### Phase gate enforcement (`/gate-check`)
 
-`gate-check` is where workflow has the most visible impact — the artifact
-checklists differ per phase per mode.
+`/gate-check` is where the tier has the most visible impact. The authoritative
+per-tier checklists are the `## Workflow tier reductions` sections of the gate
+reference files (`.claude/skills/gate-check/references/gate-<target>.md`); this
+table only summarizes them. Items marked with a condition (*UI*, *Backend*, *PII*,
+*Stores*, *Regions*, *Multi-locale*) are `N/A` when the condition is known false.
 
-| Gate | full | standard | minimal |
-|------|------|----------|---------|
-| Concept → Systems Design | game-concept.md, pillars, Visual Identity Anchor | game-concept.md only | `design/game-brief.md` only (content check, not section check) |
-| Systems Design → Technical Setup | systems-index, all MVP GDDs reviewed (8 sections), cross-GDD review | systems-index, 5-section GDDs reviewed, cross-GDD review optional | Not applicable — no gates between brief and code |
-| Technical Setup → Pre-Production | engine, art bible sections 1–4+, 3+ ADRs, architecture, UX specs started | engine, art bible only if visual assets, critical ADRs, architecture | engine configured (required floor) |
-| Pre-Production → Production | prototype, sprint plan, complete art bible, epics, 3+ playtests | prototype, sprint plan, epics, 1+ playtest | prototype (advisory); the brief's Build order is the plan — no separate sprint-plan floor |
-<!-- gate-check reconciliation: the Vertical Slice / prototype keeps
-     its long-standing "recommended, not blocking → CONCERNS if absent; FAIL if
-     built-and-broken" status at ALL tiers — the tier table never upgrades it to
-     a hard blocker. The genuinely-required floor item at this gate is the
-     sprint plan at `standard`/`full`; at `minimal` (Option A) there is
-     no separate sprint-plan step — the brief's Build order is the plan, so the
-     brief existing satisfies the floor. "prototype" above means "checked,
-     advisory," not "blocks." -->
+| Gate (target) | full | standard | minimal |
+|---|---|---|---|
+| `definition` (Discovery → Definition) | Product brief with its seven checked sections; principles stated as decision tests; brief reviewed | Product brief; brief reviewed | One-pager only |
+| `architecture` (Definition → Architecture) | Feature map; every MVP PRD (11 sections) reviewed; cross-PRD review | Feature map; MVP PRDs (8 + conditional) reviewed; cross-PRD review recommended | Not applicable — PASS with the note that the one-pager is the design record |
+| `validation` (Architecture → Validation) | Stack pinned; architecture; Foundation ADRs; API contract and data model (*Backend*); threat model (*PII*); traceability; architecture review; accessibility requirements (*UI*); test framework + CI; SLO doc; tech radar | Same with critical ADRs only; traceability and tech radar recommended; SLO journeys section | Stack pinned (the floor) |
+| `build` (Validation → Build) | Sprint plan; epics + stories; Foundation/Core ADRs Accepted; control manifest; design language 9 sections, UX specs, app shell, patterns and reviews (*UI*); walking skeleton; contract reconciled with UX (*Backend* + *UI*) | Same with control manifest and reconciliation recommended; design language sections 1–5 | One-pager `## Build Order` has at least one item |
+| `hardening` (Build → Hardening) | MVP implemented; tests for Logic, Integration and E2E stories; contract tests (*Backend*); E2E per critical journey; smoke check; no unresolved S1; S2 owners; migrations expanded on staging | Same with Logic/Integration tests and contract tests recommended | Smoke check + no unresolved S1 |
+| `launch` (Hardening → Launch) | Release checklist GO; rollout plan READY TO ROLL OUT; launch checklist GO; full security audit; smoke on the release candidate; QA sign-off; hardening report; load test; ≥3 usability/beta sessions; runbooks; ToS & Privacy Policy; store records (*Stores*); region items (*Regions*); localization QA (*Multi-locale*); release notes (built from the `/changelog <version>` section); no unresolved S1/S2 | Same with load test recommended and ≥1 usability/beta session | Release checklist GO; quick security audit; smoke on the release candidate; no unresolved S1/S2 |
 
-| Production → Polish | core mechanics, tests, smoke check, QA sign-off | core mechanics, smoke check | smoke check |
-| Polish → Release | all features, content complete, QA, smoke, no critical bugs | all features, smoke, no critical bugs | smoke, no critical bugs |
+> **Walking skeleton.** Built and any applicable validation item failing ⇒
+> **FAIL at every tier**. Tier reductions relax what must *exist*, never what must
+> *work*.
 
-**Director panel width** (`/gate-check` Section 4b) is workflow's second effect
-here. Directors are Opus-tier, so a fixed four-director panel charged a
-two-system jam exactly what it charged a thirty-system commercial project:
-
-| `workflow` | Panel | Directors |
-|---|---|---|
-| `full` | 4 | `creative-director`, `technical-director`, `producer`, `art-director` |
-| `standard` | 2 | `technical-director`, `producer` |
-| `minimal` | 1 | `producer` |
-
-`review_mode` remains the axis that decides *whether* the panel runs at all
-(`solo` skips it entirely); workflow decides only how wide it is. Narrowing
-never softens a verdict — the strictest verdict from whoever ran still wins, and
-`/gate-check` names the perspectives that did not run.
+**Director panel width** is the tier's second effect at the gate — how many
+directors sit on the phase-gate panel. The width table lives only in
+`.claude/skills/gate-check/SKILL.md` Section 4b; read it there, do not copy it.
+`review_mode` remains the axis that decides *whether* the panel runs at all.
 
 ---
 
 ### Planning and implementation skills
 
 | Skill | full | standard | minimal |
-|-------|------|----------|---------|
-| **create-epics** | Requires all GDDs approved (8 sections) | Requires 5-section GDDs approved | **Skipped** (Option A) — no separate epic doc. `/create-stories` reads `design/game-brief.md` directly and synthesizes the implicit epic container itself. |
-| **create-stories** | Requires all ADRs on required list present | Requires critical ADRs present | No ADR requirement |
-| **dev-story** | Requires TR registry + governing ADR + control manifest — blocks without them | TR registry optional; critical ADR required where present | No TR registry, no ADR required — implements against `design/game-brief.md` |
-| **story-readiness** | Full TR registry + ADR + control manifest validation | TR registry optional; critical ADR check only | Acceptance criteria check only |
-| **story-done** | Full GDD traceability + ADR consistency check | 5-section GDD traceability check | Acceptance criteria check only |
-| **qa-plan** | Full test plan derived from all 8 GDD sections | Test plan from 5 required sections | Test plan from acceptance criteria only |
-| **regression-suite** | Critical paths mapped from all sections including Edge Cases | Critical paths from required sections (including Edge Cases) | Smoke test coverage only |
+|---|---|---|---|
+| **`/create-epics`** | Requires approved 11-section PRDs | Requires approved 8-section PRDs | **Skipped** — no separate epic doc; `/create-stories` synthesizes the epic from the one-pager |
+| **`/create-stories`** | Requires every Foundation ADR present | Requires critical ADRs present | No ADR requirement |
+| **`/dev-story`** | Requires the TR registry entry, the governing ADR and the control manifest — blocks without them | TR registry optional; critical ADR required where present | Implements against the one-pager — no TR registry, no ADR required |
+| **`/story-readiness`** | TR registry + ADR + control manifest validated | TR registry optional; critical ADR check only | Acceptance criteria check only |
+| **`/story-done`** | Full PRD traceability + ADR consistency | Required-section PRD traceability | Acceptance criteria check only (the migration floor still applies) |
+| **`/qa-plan`** | Plan derived from all 11 PRD sections | Plan from the required sections | Plan from acceptance criteria only |
+| **`/regression-suite`** | Critical paths from all sections, including Edge Cases | Critical paths from required sections (including Edge Cases) | Smoke coverage only |
+| **`/walking-skeleton`** | Required; validation items 1–5 bind | Required; validation items 1–5 bind | Optional; if built, items 1–4 bind and item 5 is N/A |
 
 ---
 
 ### Support skills
 
 | Skill | full | standard | minimal |
-|-------|------|----------|---------|
-| **project-stage-detect** | Checks for all doc types; missing art bible or UX specs flagged as gaps | Adjusts expectations — art bible only flagged if visual-asset stories exist; non-core UX specs not flagged | `design/game-brief.md` + engine present = normal state; no gaps flagged for absent GDDs |
-| **adopt** | Full format compliance audit across all doc types | Audit scope reduced to required docs only | `design/game-brief.md` format check only |
-| **reverse-document** | Generates full 8-section GDD from code | Generates 5-section GDD from code | Generates `design/game-brief.md` from code |
-| **propagate-design-change** | Full cascading impact analysis across all ADRs | Checks critical ADRs for references only | Not applicable |
-| **help** | Full artifact detection — surfaces all missing docs as next steps | Adjusts "what's missing" to required docs only — optional docs not surfaced as gaps | `design/game-brief.md` + engine present = next step is code |
+|---|---|---|---|
+| **`/project-stage-detect`** | Every document type expected; missing design language or UX specs flagged | Design language flagged only with a UI surface; non-key UX specs not flagged | One-pager + stack pinned is the normal state; absent PRDs are not gaps |
+| **`/help`** | Surfaces every missing required step | Surfaces steps required at `standard` only | One-pager + stack pinned ⇒ the next step is code |
+| **`/adopt`** | Full conformance audit across all contracts | Audit scope reduced to the documents required at `standard` | One-pager format check only |
+| **`/reverse-document`** | Generates an 11-section PRD from code | Generates the 8 required sections | Not the right tool — update the one-pager |
+| **`/propagate-prd-change`** | Full impact analysis across every ADR, contract operation, entity and tracking event | Checks critical ADRs and the API contract | Not applicable |
 
 ---
 
 ### Workflow change mid-project
 
-When `workflow` changes via `/settings`, the skill emits an informational note:
-
-> "Workflow changed from [old] to [new]. Run `/content-audit` to see what's now
-> required or extra. No automatic migration — existing files stay in place."
-
-No documents are auto-deleted, auto-generated, or blocked. The setting only affects
-*new* enforcement going forward.
+Changing `modes.workflow` (or `modes.rigor`) migrates nothing: no document is
+deleted, generated or blocked, and the new tier applies to enforcement from then
+on. Run `/help` or `/project-stage-detect` to see what the new tier requires.
 
 ---
 
 ## workflow_overrides
 
-**Controls:** Opt-in granular requirements that override the chosen workflow level
-**Location:** **top level of `project.yaml`** — a sibling of `modes:`, *not* a child of it
-**Values:** object with sub-flags (see below)
-**Default:** all false / empty
-**Set by:** `/settings`
-**Read by:** `/design-system`, `/design-review`, `/art-bible`, `/gate-check`, `/review-all-gdds`, `/qa-plan`
+**Controls:** Opt-in, granular requirements layered on the resolved workflow tier
 
-> **Why the location is called out.** `resolve_config` reads
-> `workflow_overrides.system_overrides.*` from the document root
-> (`yaml-helper.sh`), and all 14 consuming skill files grep the same top-level
-> path. Nested under `modes:` it is still valid YAML, so nothing errors — the
-> setting is simply never read. If you copied a `workflow_overrides` block from
-> anywhere, check its indentation: it belongs at the document root, never under
-> `modes:`.
+**Location:** the **top level of `project.yaml`** — a sibling of `modes:`, *not* a
+child of it
 
-**Priority chain:** the three `workflow_overrides` **boolean flags**
-(`edge_cases`, `tuning_knobs`, `art_bible_strict`) are *additive* on top of the
-chosen `workflow` level — they make things stricter, never looser. None of them
-has a value that opts out of a requirement the workflow level imposes.
+**Values:** `edge_cases`, `config_flags`, `design_language_strict` → `true` | `false`; `feature_overrides.<prd-stem>` → `minimal` | `standard` | `full`
 
-> **`workflow_overrides.system_overrides` is not a flag and is not additive — it replaces a tier in both directions.**
-> This rule does not extend to it. On a
-> `full` project, `system_overrides.inventory: minimal` really does drop that
-> system's required sections to zero. Intended — see
-> `.claude/docs/workflow-modes.md § workflow_overrides`. Stating the additive
-> rule over the whole key is wrong: the guarantee never held for
-> `system_overrides`, so do not rely on it as a safety net.
+- **Default:** every flag unset (nothing forced); no per-feature override
+- **Status:** live
+- **Local override:** no
+- **Label:** `feature_overrides` → `feature_overrides: <stem>=<tier> … | none` (the map only; the three flags have no label and are read from `project.yaml`)
+- **Set by:** `/settings`
+- **Read by:** the three flags — PRD-tier skills (`/write-prd`, `/prd-review`, `/reverse-document` for `config_flags`), `/adopt` (`edge_cases`, `config_flags` in its PRD audit), `/gate-check` (all three), and `/design-language` for `design_language_strict`; the map — every per-feature skill and `/gate-check` (orphan check). Derive the map's readers with `grep -lE 'resolve_config --keys ([a-z_.]+,)*feature_overrides' .claude/skills/*/SKILL.md`.
+
+> **Why the location is called out.** Resolution reads
+> `workflow_overrides.feature_overrides.*` from the document root, and every
+> consuming skill reads the same top-level path. Nested under `modes:` the block
+> is still valid YAML, so nothing errors — it is simply never read. If you copy a
+> `workflow_overrides` block from anywhere, check its indentation.
+
+**Priority chain:** the three **boolean flags** are *additive* on top of the
+resolved tier — they make things stricter, never looser. None of them has a value
+that opts out of a requirement the tier imposes.
+
+> **`feature_overrides` is not a flag and is not additive — it replaces the tier,
+> in both directions.** On a `full` project, `feature_overrides.admin-console:
+> minimal` really does drop that feature's required PRD sections to none. Do not
+> rely on the additive rule as a safety net for the map; see
+> `.claude/docs/workflow-modes.md`.
 
 ---
 
@@ -737,310 +775,349 @@ has a value that opts out of a requirement the workflow level imposes.
 
 ```yaml
 workflow_overrides:
-  edge_cases: false          # force Edge Cases section required (no-op at standard since already required; relevant at minimal)
-  tuning_knobs: false        # force Tuning Knobs section required (relevant at standard, no-op at full)
-  art_bible_strict: false    # force all 9 art bible sections required regardless of asset stories
-  system_overrides: {}       # per-system tier overrides — see below
+  edge_cases: false              # force Edge Cases in PRDs written at minimal (already required at standard/full)
+  config_flags: false            # force Configuration & Flags at standard (already required at full)
+  design_language_strict: false  # force all 9 design-language sections at standard
+  feature_overrides:             # per-feature tier — see below
+    payments: full
 ```
 
-### Per-system overrides
+### Per-feature overrides
 
 ```yaml
 workflow_overrides:
-  system_overrides:
-    combat: full              # combat-system GDD requires full (8 sections) regardless of project workflow
-    boss-encounters: full
-    inventory: minimal        # inventory needs no GDD — the game brief covers it (minimal = no required sections)
+  feature_overrides:
+    payments: full          # design/prd/payments.md must carry all 11 sections on a standard project
+    goals: standard
+    admin-console: minimal  # internal back-office; the one-pager covers it
 ```
 
-`system_overrides` is a map of `system_name: workflow_level`. The named system uses the override; all other systems use the project-level `workflow`.
+`feature_overrides` is a map of `<prd-stem>: <tier>`. The stem is the PRD file
+name without `.md` (`design/prd/<stem>.md`) — the same slug as the feature-map
+row, the `TR-<slug>-NNN` prefix and a story's `**PRD**:` field. Every other feature
+uses the project tier.
+
+A key whose PRD does not exist is an **orphan**: `/gate-check` reports it as
+CONCERNS from the `architecture` gate onward. `/write-prd` treats a key naming a
+PRD it is about to write as healthy.
+
+An invalid `feature_overrides.<prd-stem>` tier is dropped (the feature follows
+`modes.workflow`) and named on `resolve_config`'s `notes:` line.
 
 ---
 
 ### Affected skills
 
-| Skill | How workflow_overrides changes behavior |
-|-------|----------------------------------------|
-| **design-system** | Reads `system_overrides[system_name]` first; falls back to project `workflow`. Applies override-specific section requirements. |
-| **design-review** | Same lookup — validates against the override tier, not the project default, for the named system. |
-| **art-bible** | If `art_bible_strict: true`, requires all 9 sections regardless of `workflow` level. |
-| **gate-check** | Considers `system_overrides` when validating that all required GDDs are complete. A system at `system_overrides.combat: full` blocks the gate until all 8 sections exist for combat. |
-| **review-all-gdds** | Validates each GDD against its effective tier (project workflow + any system override). |
+| Skill | How `workflow_overrides` changes behavior |
+|---|---|
+| **`/write-prd`** | Reads `feature_overrides[<feature>]` first, then the project tier; applies `edge_cases` / `config_flags` on top |
+| **`/prd-review`** | Validates against the effective tier of the PRD under review, not the project default |
+| **`/review-all-prds`** | Validates each PRD against its effective tier |
+| **`/design-language`** | `design_language_strict: true` ⇒ all 9 sections regardless of tier |
+| **`/gate-check`** | Checks each MVP PRD against its effective tier; `design_language_strict` raises the gate-build design-language item to all 9 sections; flags orphan `feature_overrides` keys |
+| **`/create-epics`, `/create-stories`, `/story-done`, `/dev-story`, `/qa-plan`, `/regression-suite`, `/story-readiness`, `/propagate-prd-change`, `/reverse-document`** | Resolve the feature's effective tier through the `feature_overrides` label |
 
 ---
 
 ## modes.automation
 
 **Controls:** Whether skills ask for decisions and approval before acting, or
-recommend and proceed — the tradeoff between user control and speed  
-**Values:** `collaborative` | `guided` | `autonomous`  
-**Default:** `collaborative`  
-**Set by:** `/start`, `/settings`  
-**Read by:** All ~40 skills that use `AskUserQuestion` or write files
+recommend and proceed — the trade-off between user control and speed
 
-**Priority chain:** `modes.automation` in `project.yaml` → hardcoded default
+**Values:** `collaborative` | `guided` | `autonomous`
 
-> **Unlike review_mode and workflow, this setting is not a per-skill table.**
-> It defines universal interaction rules that apply across all skills. A
-> per-skill breakdown would repeat the same answer 40 times.
+- **Default:** `collaborative` (terminal default)
+- **Status:** live
+- **Local override:** yes
+- **Label:** `automation` → `automation: <value> (<source>)`
+- **Set by:** `/start`, `/settings`
+- **Read by:** every automation-aware skill — each one whose bootstrap requests `automation` carries the automation prelude verbatim. Derive the list with the grep below (the `(,|`)` tail keeps `automation_always_ask` out).
 
-> **Overrides COLLABORATIVE-DESIGN-PRINCIPLE.md:** `guided` and `autonomous`
-> modes intentionally relax the Q→O→D→Draft→Approval protocol defined in that
-> document. This is opt-in. `collaborative` preserves the protocol exactly.
+```
+grep -lE 'resolve_config --keys ([a-z_.]+,)*automation(,|`)' .claude/skills/*/SKILL.md
+```
 
-> **Safety net — `automation_always_ask`:** Even in `autonomous` mode, certain
-> categories of decision can be configured to always prompt. See next section.
+**Priority chain:** `project.local.yaml` → `project.yaml` → terminal default
+`collaborative`.
+
+> **Not a per-skill table.** This setting defines universal interaction rules that
+> apply across all skills; the shared pattern each skill applies at every
+> `AskUserQuestion` site and every write is `.claude/docs/automation-modes.md`.
+
+> **Relaxes the collaboration protocol, opt-in.** `guided` and `autonomous`
+> intentionally relax the Question → Options → Decision → Draft → Approval
+> protocol of `docs/COLLABORATIVE-DESIGN-PRINCIPLE.md`. `collaborative` preserves
+> it exactly.
+
+> **Safety net — `modes.automation_always_ask`.** Even at `autonomous`, the
+> configured categories always prompt. See the next section.
 
 ---
 
 ### Value intent
 
 | Value | Speed | Control | What changes |
-|-------|-------|---------|--------------|
-| `collaborative` | Slowest | Full — every decision is the user's | Current behavior. Q→O→D→Draft→Approval strictly followed. |
-| `guided` | Balanced | High — major decisions are the user's, minor ones proceed automatically | AI states recommendation and proceeds for minor decisions. AskUserQuestion reserved for major/irreversible decisions. |
-| `autonomous` | Fastest | Low — AI decides, logs, and proceeds | No AskUserQuestion (except categories in `automation_always_ask`). No draft review. No write approval. All decisions logged to decision log. |
+|---|---|---|---|
+| `collaborative` | Slowest | Full — every decision is the user's | Q → O → D → Draft → Approval strictly followed |
+| `guided` | Balanced | High — major decisions are the user's, minor ones proceed | The AI states a recommendation and proceeds on minor decisions; `AskUserQuestion` is reserved for major or irreversible ones |
+| `autonomous` | Fastest | Low — the AI decides, logs and proceeds | No `AskUserQuestion` except the always-ask categories; no draft review; no write approval; every decision logged |
 
 ---
 
 ### Universal rules per mode
 
-#### collaborative (current behavior — no change)
+#### collaborative
 
-- `AskUserQuestion` called for every multi-option decision
-- 2–4 options presented with pros/cons for every design choice
-- Full draft shown and approved before every file write
-- "May I write this to [filepath]?" asked before every write
-- "May I create [filepath] with skeleton?" asked before skeleton creation
+- `AskUserQuestion` for every multi-option decision
+- 2–4 options with pros and cons for every design choice
+- The full draft shown and approved before every write
+- "May I write this to [filepath]?" before every write
 - Section-by-section approval in multi-section authoring skills
-- Multi-file changes require explicit approval of the full changeset
+- Multi-file changes need explicit approval of the full changeset
 
 #### guided
 
-- `AskUserQuestion` called for **major decisions only** (see classification below)
-- Minor decisions: AI states recommendation inline and proceeds — e.g.
-  *"Going with a static utility pattern here — it fits the existing architecture.
-  Continuing unless you want to change direction."*
-- Draft shown briefly before writing — proceeds after a short summary, does not
-  wait for explicit "yes"
-- "May I write?" asked for **new files only** — updates to existing files proceed
-  directly
-- Still presents options for major decisions but caps at 2 choices with a clear
-  recommendation
-- Multi-section authoring: writes each approved section immediately, no per-section
-  confirmation prompt
+- `AskUserQuestion` for **major decisions only** (classification below)
+- Minor decisions: the AI states its recommendation inline and proceeds — e.g.
+  *"Putting the formatter in the shared package — it matches the existing
+  `packages/` layout. Continuing unless you want to change direction."*
+- The draft is summarized briefly before writing; the skill proceeds without
+  waiting for an explicit "yes"
+- "May I write?" for **new files only** — updates to existing files proceed
+- Major decisions still get options, capped at 2 with a clear recommendation
+- Multi-section authoring writes each section as soon as it is drafted
 
 #### autonomous
 
-- No `AskUserQuestion` calls **except** for categories listed in `automation_always_ask`
-- No draft review
-- No "May I write?" prompts — writes directly
-- Picks the recommended option for every decision without presenting alternatives
-- All decisions logged immediately to `production/session-logs/decision-log.md`
-  with: timestamp, skill, decision point, option chosen, reasoning
-- User reviews decision log post-session to audit choices made
+- No `AskUserQuestion` **except** for categories in `modes.automation_always_ask`
+- No draft review and no "May I write?" prompts
+- The recommended option is taken for every decision
+- Every decision is logged immediately with `log_decision` to
+  `production/session-logs/decision-log.md` (timestamp, skill, decision point,
+  options, choice, reason, category) — decisions only, never evidence
+- The user audits the decision log after the session
 
 ---
 
 ### Major vs minor decision classification (guided mode)
 
-**Major — always use AskUserQuestion in guided mode:**
+**Major — always `AskUserQuestion` in guided mode:**
 
 | Decision type | Example |
-|---------------|---------|
-| Choosing a system name or document path | "What should we call this system?" |
-| Mutually exclusive design directions | "Real-time or turn-based?" |
-| Any choice that gates downstream work | Engine choice, architecture approach |
-| Scope changes | "Cut this feature or slip the deadline?" |
-| Any decision that can't be changed without significant rework | Core loop mechanic |
+|---|---|
+| Naming a feature or choosing a document path | "What do we call this feature — `goals` or `savings-goals`?" |
+| Mutually exclusive directions | "SSR or SPA for the marketing site?", "REST or GraphQL?" |
+| A choice that gates downstream work | Stack choice, architecture approach, API style |
+| Pricing and packaging | "Free / Plus plans, or a single paid tier with a trial?" |
+| Scope changes | "Cut the referral feature or slip the beta?" |
+| Anything that cannot change without significant rework | The data model's ownership of the savings goal entity |
 
-**Minor — AI recommends and proceeds in guided mode:**
+**Minor — the AI recommends and proceeds in guided mode:**
 
 | Decision type | Example |
-|---------------|---------|
+|---|---|
 | Which section to work on next | "Moving to Edge Cases next" |
-| Optional section inclusion | "Adding a Visual Notes section — fits the system" |
-| Formatting and structure choices | Heading levels, table vs prose |
-| Adding detail to an already-decided direction | Sub-options within an approved approach |
-| Next-step routing after a phase completes | "Running design-review now" |
+| Optional section inclusion | "Adding an Open Questions section" |
+| Formatting and structure | Heading levels, table vs prose |
+| Detail inside an approved direction | Sub-options within an approved approach |
+| Next-step routing after a phase completes | "Running /prd-review now" |
 
 ---
 
 ### Affected skills by category
 
 **Authoring skills — highest impact.** Each pauses 10–15 times per document in
-`collaborative`. Drops to 2–3 in `guided`, zero in `autonomous`.
+`collaborative`; 2–3 in `guided`; none in `autonomous`. Examples: `/brainstorm`,
+`/write-prd`, `/map-features`, `/design-language`, `/ux-design`,
+`/create-architecture`, `/architecture-decision`, `/api-design`, `/data-model`,
+`/create-epics`, `/create-stories`, `/sprint-plan`.
 
-`brainstorm`, `design-system`, `art-bible`, `create-architecture`, `ux-design`,
-`map-systems`, `architecture-decision`, `create-epics`, `create-stories`,
-`sprint-plan`, `prototype`
+**Review skills — medium impact.** They pause after presenting findings. In
+`guided` the routing proceeds automatically; in `autonomous` the recommended path
+is taken and logged. Examples: `/prd-review`, `/review-all-prds`,
+`/architecture-review`, `/ux-review`, `/story-readiness`, `/story-done`,
+`/milestone-review`, `/usability-report`.
 
-**Review skills — medium impact.** Pause after presenting findings to ask what
-to do next. In `guided` routing decisions proceed automatically. In `autonomous`
-the recommended path is taken and logged.
+**Team orchestration skills — medium impact.** They pause between phases. In
+`guided` the pipeline advances unless BLOCKED; in `autonomous` it runs end to end
+(always-ask categories still stop it). `/team-feature`, `/team-ui`,
+`/team-content`, `/team-growth`, `/team-hardening`, `/team-qa`, `/team-release`.
 
-`design-review`, `architecture-review`, `gate-check`, `review-all-gdds`,
-`story-readiness`, `story-done`, `milestone-review`, `playtest-report`
+**Implementation skills — lower impact.** They pause for architectural questions
+before writing code. Examples: `/dev-story`, `/walking-skeleton`, `/code-review`.
 
-**Team orchestration skills — medium impact.** Pause between phases for
-check-in. In `guided` the pipeline advances automatically unless BLOCKED. In
-`autonomous` the full pipeline runs end to end.
-
-`team-combat`, `team-ui`, `team-audio`, `team-qa`, `team-release`,
-`team-narrative`, `team-polish`, `team-level`, `team-live-ops`
-
-**Implementation skills — lower impact.** Pause for architectural questions
-before writing code. In `guided` only genuinely ambiguous decisions stop. In
-`autonomous` the conventional approach is picked and logged.
-
-`dev-story`, `code-review`
-
-**Setup and utility skills — lowest impact.** Pause for initial configuration
-or routing questions. In `guided` defaults are applied automatically. In
-`autonomous` recommended defaults are taken without prompting.
-
-`start`, `adopt`, `setup-engine`, `retrospective`, `localize`, `propagate-design-change`,
-`asset-spec`, `smoke-check`, `qa-plan`, `story-readiness`
+**Setup and utility skills — lowest impact.** They pause for configuration or
+routing questions; `guided` applies defaults, `autonomous` takes the recommended
+default without prompting. Examples: `/adopt`, `/test-setup`, `/localize`,
+`/retrospective`, `/smoke-check`, `/qa-plan`.
 
 ---
 
 ### Exemptions — skills that ignore the automation setting
 
-These skills always behave as `collaborative` regardless of the setting.
-The reasons are noted.
+These skills always behave as `collaborative`, never resolve `automation` and
+never carry the automation prelude:
 
 | Skill | Why always collaborative |
-|-------|--------------------------|
-| **hotfix** | Emergency decisions — user must approve scope and risk before any action |
-| **gate-check** | Results must be reviewed — a gate verdict without user acknowledgement defeats the purpose |
-| **day-one-patch** | Release-critical — every action needs explicit sign-off |
-| **setup-engine** | One-time irreversible choice that affects the entire project |
+|---|---|
+| **`/gate-check`** | Stage transitions |
+| **`/hotfix`** | Production emergency |
+| **`/incident`** | Production emergency |
+| **`/rollout-plan`** | Production exposure |
+| **`/setup-stack`** | Stack pins and live sources |
+| **`/start`** | Runs before configuration |
+| **`/settings`** | Changes the automation settings themselves |
 
 ---
 
-### Decision log format (autonomous mode)
+### Decision log
 
-Written to `production/session-logs/decision-log.md` — append-only.
-
-```markdown
-## [timestamp] — [skill-name]
-
-**Decision point:** [what was being decided]
-**Options considered:** [list of options that would have been presented]
-**Chosen:** [what was picked]
-**Reason:** [one-line rationale]
-**Category:** [scope_changes | file_deletions | schema_changes | etc., or "minor"]
-```
-
-If the file does not exist, it is created. It is never truncated — each session
-appends to the existing log.
+Written with `log_decision` (six arguments: skill, decision point, options,
+chosen, reason, category) to `production/session-logs/decision-log.md` —
+append-only, created if absent, never truncated. The entry format is in
+`.claude/docs/automation-modes.md`. `production/session-logs/` is gitignored, so
+the decision log is an audit trail for the developer, **never** evidence for a
+story, gate or release.
 
 ---
 
 ## modes.automation_always_ask
 
-**Controls:** Decision categories that ALWAYS trigger AskUserQuestion regardless of automation mode
-**Values:** list of category names
-**Default:** `[scope_changes, file_deletions, schema_changes]`
-**Set by:** `/start`, `/settings`
-**Read by:** All skills that respect `modes.automation`
+**Controls:** Decision categories that ALWAYS trigger `AskUserQuestion`, whatever
+the automation mode
 
-> **Makes `autonomous` safe.** Without this, `autonomous` is "AI does literally
-> everything, no questions asked." With it, AI does most things but stops on
-> destructive or irreversible decisions you specifically named.
+**Values:** list of category names from the table below (flow `[a, b]` or block list)
+
+- **Default:** the 9-item default list (`_yaml_helper_always_ask_default`): `scope_changes`, `file_deletions`, `schema_changes`, `production_deploys`, `db_migrations`, `infra_changes`, `secrets_access`, `pii_data_access`, `billing_changes`
+- **Status:** live
+- **Local override:** yes — your personal safety categories
+- **Label:** `automation_always_ask` → the configured list with `(configured)`, or the default list with `(default)`
+- **Set by:** `/settings`
+- **Read by:** autonomous-capable skills — every skill that names one of the categories requests this label (always-collaborative skills excepted, since they ask anyway). Membership is checked with `is_always_ask_category`.
+
+> **Makes `autonomous` safe.** Without it, `autonomous` is "the AI does everything,
+> no questions asked". With it, the AI does most things but stops on the
+> destructive, irreversible or production-facing decisions you named.
+
+> **A configured list replaces the default — it is not merged.** Setting
+> `[scope_changes, file_deletions]` drops the other seven defaults, including
+> `production_deploys` and `db_migrations`. List every category you want to keep.
 
 ---
 
 ### Recognized categories
 
-| Category | Examples of decisions in this category |
-|----------|----------------------------------------|
-| `scope_changes` | Cutting a feature, slipping a deadline, splitting/merging an epic, removing acceptance criteria |
-| `file_deletions` | Removing a story, deleting a GDD, removing a system, removing a test file |
-| `schema_changes` | Changes to project.yaml, story template, control manifest, ADR template, GDD template |
-| `architecture_decisions` | New ADR creation, ADR replacement, system boundary changes |
-| `version_bumps` | Engine version change, framework version bump, dependency major version change |
-| `external_calls` | Invoking external APIs (asset gen, AI services) when in autonomous mode |
+| Category | Covers |
+|---|---|
+| `scope_changes` | adding/removing features or stories from an approved plan |
+| `file_deletions` | deleting any tracked file |
+| `schema_changes` | API/contract or config-file schema changes (OpenAPI, GraphQL, protobuf, AsyncAPI, JSON Schema, registry schemas) |
+| `architecture_decisions` | accepting, superseding or deprecating an ADR |
+| `version_bumps` | changing `project.version`, a pinned stack version, or a dependency major version |
+| `external_calls` | calling third-party services or APIs from a skill |
+| `production_deploys` | any deploy or rollout stage beyond preview/staging; a flag change in production |
+| `db_migrations` | any database schema change or data migration/backfill (writing or running it) |
+| `infra_changes` | IaC plan/apply, CI/CD workflow changes, DNS, CDN, scaling, staging environment changes |
+| `secrets_access` | reading, creating or rotating secrets/keys |
+| `pii_data_access` | querying or exporting personal data; log samples containing PII |
+| `billing_changes` | prices, plans, entitlements, payment configuration, pricing experiments |
 
-The list is a YAML list of these strings. Skills check whether the current decision falls into one of the configured categories and prompt regardless of `automation` value.
+The three categories outside the default list (`architecture_decisions`,
+`version_bumps`, `external_calls`) are opt-in.
 
 ---
 
 ### Affected skills
 
 | Skill | Categories typically triggered |
-|-------|--------------------------------|
-| **scope-check** | `scope_changes` |
-| **propagate-design-change** | `schema_changes`, `architecture_decisions` |
-| **architecture-decision** | `architecture_decisions` |
-| **setup-engine** | `version_bumps`, `schema_changes` |
-| **story-done** | `file_deletions` (when removing/replacing test files) |
-| **asset-spec** | `external_calls` (when calling external generators) |
+|---|---|
+| **`/api-design`** | `schema_changes` (contract changes) |
+| **`/data-model`** | `db_migrations` (schema changes and migration files) |
+| **`/architecture-decision`** | `architecture_decisions` |
+| **`/test-setup`** | `infra_changes` (the CI workflow) |
+| **`/walking-skeleton`** | `infra_changes` (pipeline and staging) — `production_deploys` never applies to staging |
+| **`/load-test`** | `infra_changes` (when the run scales staging), `external_calls` (third-party traffic in the request path — stubbed, or sandbox use approved) |
+| **`/security-audit`** | `secrets_access`, `pii_data_access` (reading secrets or PII samples) |
+| **`/team-growth`** | `billing_changes` (pricing experiments) |
+| **`/team-release`** | `production_deploys` (every deploy stage — and it never runs deploy commands itself) |
+| **`/dev-story`, `/team-feature`** | `scope_changes`, `file_deletions`, `db_migrations`, `schema_changes` as the story requires |
 
 ---
 
 ## modes.story_granularity
 
-**Controls:** How big each story is and how many stories per epic/sprint
-**Values:** `coarse` | `balanced` | `fine`
-**Default:** *none* — supplied by `modes.rigor` (`standard` yields `balanced`)
-**Set by:** `/start`, `/settings`
-**Read by:** `/create-epics`, `/create-stories`, `/dev-story`, `/sprint-plan`, `/story-done`, `/sprint-status`
+**Controls:** How big each story is, and how many stories an epic and a sprint hold
 
-**Priority chain:** `modes.story_granularity` in `project.yaml` → `modes.rigor` expansion → *(no hardcoded default)*
+**Values:** `coarse` | `balanced` | `fine`
+
+- **Default:** none — fronted by `modes.rigor` (`minimal`→`coarse`, `standard`→`balanced`, `full`→`fine`)
+- **Status:** live
+- **Local override:** no — story size must be consistent across the team
+- **Label:** `story_granularity` → `story_granularity: <value> (<source>)`
+- **Set by:** `/settings`
+- **Read by:** `/create-epics`, `/create-stories`, `/dev-story`, `/sprint-plan`, `/sprint-status`, `/story-done`
+
+**Priority chain:** `modes.story_granularity` in `project.yaml` → `modes.rigor`
+expansion → *(no terminal default)*
 
 ---
 
 ### Value intent
 
 | Value | Story shape | Stories per sprint | Best for |
-|-------|-------------|-------------------|----------|
-| `coarse` | 1 story = 1 feature. 3–5 days work each. 5–10 ACs per story. | 2–4 | Solo devs, prototyping, "I know what I'm building" |
-| `balanced` | 1 story = 1 task. 1–2 days work each. 2–4 ACs per story. Current default behavior. | 6–10 | Most projects |
-| `fine` | 1 story = 1 AC. Hours of work each. Easy code review. Frequent /story-done. | 15–25 | Teams, learning, anything needing fine handoffs |
+|---|---|---|---|
+| `coarse` | 1 story = 1 feature slice. 3–5 days each. 5–10 acceptance criteria. | 2–4 | Solo builders, prototypes, "I know what I'm building" |
+| `balanced` | 1 story = 1 task. 1–2 days each. 2–4 acceptance criteria. | 6–10 | Most product teams |
+| `fine` | 1 story = 1 acceptance criterion. Hours each. Small PRs, easy review. | 15–25 | Larger teams, fine hand-offs, trunk-based teams merging several times a day |
 
 ---
 
 ### Affected skills
 
 | Skill | coarse | balanced | fine |
-|-------|--------|----------|------|
-| **create-epics** | Generates 3–5 child stories per epic | Generates 5–10 child stories per epic | Generates 10–20 child stories per epic |
-| **create-stories** | Each story carries 5–10 ACs covering an entire feature | Each story carries 2–4 ACs covering one task | Each story carries 1 AC; story name = AC restatement |
-| **dev-story** | Routing prompt expects multi-day implementation cycle. Subagent given longer working context. | Standard 1–2 day expectation. | Each story implementable in hours; subagent given tighter context. |
-| **sprint-plan** | Allocates 2–4 stories per sprint based on velocity. | Allocates 6–10 stories per sprint. | Allocates 15–25 stories per sprint. |
-| **story-done** | Fires every 3–5 days on average. | Fires every 1–2 days on average. | Fires multiple times per day. |
-| **sprint-status** | Burn-down reads in feature-sized chunks. | Burn-down reads in task-sized chunks. | Burn-down reads in AC-sized chunks. |
+|---|---|---|---|
+| **`/create-epics`** | 3–5 child stories per epic | 5–10 per epic | 10–20 per epic |
+| **`/create-stories`** | Each story carries 5–10 ACs covering a whole feature slice | 2–4 ACs covering one task | 1 AC; the story name restates it |
+| **`/dev-story`** | Multi-day implementation cycle; longer working context for the engineer | 1–2 day expectation | Implementable in hours; tight context |
+| **`/sprint-plan`** | 2–4 stories per sprint from velocity | 6–10 | 15–25 |
+| **`/story-done`** | Fires every 3–5 days | Every 1–2 days | Several times a day |
+| **`/sprint-status`** | Burn-down in feature-sized chunks | Task-sized chunks | AC-sized chunks |
 
 ---
 
 ## docs.density
 
-**Controls:** How deep each section in authored docs goes — independent of which sections are required
+**Controls:** How deep each section of an authored document goes — independent of
+which sections are required
+
 **Values:** `terse` | `balanced` | `thorough`
-**Default:** *none* — supplied by `modes.rigor` (`standard` yields `balanced`)
-**Set by:** `/start`, `/settings`
-**Read by:** `/design-system`, `/art-bible`, `/create-architecture`, `/ux-design`, `/map-systems`, `/brainstorm`
 
-**Priority chain:** `docs.density` in `project.yaml` → `modes.rigor` expansion → *(no hardcoded default)*
+- **Default:** none — fronted by `modes.rigor` (`minimal`→`terse`, `standard`→`balanced`, `full`→`thorough`)
+- **Status:** live
+- **Local override:** no — the team produces documents of one depth
+- **Label:** `docs.density` → `docs.density: <value> (<source>)`
+- **Set by:** `/settings`
+- **Read by:** authoring skills — `/brainstorm`, `/write-prd`, `/map-features`, `/design-language`, `/ux-design`, `/create-architecture`, `/architecture-decision`, `/create-epics`, `/create-stories`
 
-> **Distinct from `workflow`, but no longer independent by default.** `workflow`
-> controls which sections exist; `density` controls how deep each section goes.
-> `modes.rigor` now sets both together, so the diagonal (`rigor: full` → 8
-> sections *and* thorough prose) is what you get without asking. The off-diagonal
-> is still reachable and is the reason `rigor` overrides both ways: `rigor: full`
-> + an explicit `docs.density: terse` gives "all sections but each is compact" —
-> the "comprehensive but tight" mode, which neither knob expresses alone.
+**Priority chain:** `docs.density` in `project.yaml` → `modes.rigor` expansion →
+*(no terminal default)*
+
+> **Distinct from `workflow`, but set together by default.** `workflow` decides
+> which sections exist; `density` decides how deep each goes. `modes.rigor` sets
+> both, so the diagonal (`rigor: full` → 11 sections *and* thorough prose) is what
+> you get without asking. The off-diagonal stays reachable because rigor overrides
+> both ways: `rigor: full` + an explicit `docs.density: terse` gives every section,
+> each one compact.
 
 ---
 
 ### Value intent
 
 | Value | Per-section output style |
-|-------|--------------------------|
-| `terse` | Bullet points. 2–5 lines per section. Skip rationale and narrative framing. Skip preambles like "In this game..." Just facts needed to implement. |
-| `balanced` | Paragraphs with light rationale. Examples where helpful. Current default behavior. |
-| `thorough` | Full prose. Rationale for every decision. Examples, alternatives considered, design history. |
+|---|---|
+| `terse` | Bullet points, 2–5 lines per section. No rationale, no preamble — just the facts needed to implement. |
+| `balanced` | Paragraphs with light rationale; examples where they help. |
+| `thorough` | Full prose: rationale for every decision, examples, alternatives considered, decision history. |
 
 ---
 
@@ -1048,448 +1125,1104 @@ The list is a YAML list of these strings. Skills check whether the current decis
 
 |  | docs.density: terse | balanced | thorough |
 |---|---|---|---|
-| **workflow: minimal** | Game brief in bullets | Game brief in prose | Game brief + rationale |
-| **workflow: standard** | 5 sections, bullets | 5 sections, paragraphs *(default)* | 5 sections + examples |
-| **workflow: full** | 8 sections, bullets *(comprehensive but compact)* | 8 sections, paragraphs *(current full)* | 8 sections + rationale + examples |
+| **workflow: minimal** | One-pager in bullets | One-pager in prose | One-pager + rationale |
+| **workflow: standard** | 8 PRD sections, bullets | 8 sections, paragraphs | 8 sections + examples |
+| **workflow: full** | 11 sections, bullets *(comprehensive but compact)* | 11 sections, paragraphs | 11 sections + rationale + examples |
 
 ---
 
 ### Affected skills
 
 | Skill | terse | balanced | thorough |
-|-------|-------|----------|----------|
-| **design-system** | Each GDD section is 2–5 bullets. Skip Player Fantasy preambles. | Paragraphs with key decisions explained. | Full prose, decision history, alternatives considered. |
-| **art-bible** | Each art bible section is a bulleted list of constraints + references. | Paragraphs explaining each visual choice. | Full prose including style explorations, references, rationale per choice. |
-| **create-architecture** | Layer diagrams + decision bullets. No essays. | Diagrams + paragraph explanations of layer choices. | Full prose with rationale, trade-offs, alternatives considered per layer. |
-| **ux-design** | Wireframe descriptions + interaction bullets. | Wireframes + paragraph descriptions of flows. | Full prose including user research summaries, alternative flow considerations. |
-| **map-systems** | One-line system descriptions. | Brief paragraph per system + dependency notes. | Full system-by-system rationale + relationship analysis. |
-| **brainstorm** | Pillar bullets + concept bullets. | Pillars + concept with brief rationale. | Pillars + concept + extensive rationale + alternatives. |
+|---|---|---|---|
+| **`/write-prd`** | Each PRD section is 2–5 bullets | Paragraphs with the key decisions explained | Full prose, alternatives considered, decision history |
+| **`/design-language`** | Each section is a bulleted list of tokens, constraints and references | Paragraphs explaining each choice | Full prose including explorations and rationale per token family |
+| **`/create-architecture`** | Diagrams + decision bullets | Diagrams + paragraph explanations | Full prose with trade-offs and alternatives per layer |
+| **`/ux-design`** | Wireframe descriptions + interaction bullets | Wireframes + flow descriptions | Full prose including research summaries and alternative flows |
+| **`/map-features`** | One-line feature descriptions | A short paragraph per feature + dependency notes | Feature-by-feature rationale + relationship analysis |
+| **`/brainstorm`** | Principle and brief bullets | Principles + brief with short rationale | Principles + brief with extensive rationale and alternatives |
+| **`/architecture-decision`** | Context and decision as bullets | Paragraphs | Full prose with alternatives weighed in depth |
 
 ---
 
 ## testing.framework
 
-**Controls:** Which test framework the project uses — drives test-runner commands and per-engine assumptions in CI
-**Values:** engine-specific (see table)
-**Default:** auto-populated by `/setup-engine` based on engine choice
-**Set by:** `/setup-engine`, `/settings`
-**Read by:** `/test-helpers` — the only skill that references it. `/qa-plan`, `/dev-story`, `/regression-suite`, `/test-setup` and `/smoke-check` do **not** name the key, despite being plausible readers.
-  *(Derived by grep. A helper-based read such as `session_state_enabled()` would not show up, so treat this list as the verified floor, not a ceiling.)*
+**Controls:** Which test runners the project uses, per layer — the name skills put
+in briefs and use to pick runner idioms
 
-**Priority chain:** `testing.framework` in `project.yaml` → engine default
+**Values:** string (e.g. `vitest+playwright`, `jest+maestro`, `pytest`, `junit5+testcontainers`)
 
-> **Migrated from `technical-preferences.md`.**
+- **Default:** unset
+- **Status:** live
+- **Local override:** no — one set of runners per project
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/test-setup`
+- **Read by:** `/smoke-check`, `/test-helpers`, `/regression-suite`, `/test-setup` (shows the existing value before proposing runners)
+
+**Priority chain:** `testing.framework` in `project.yaml` → unset. Unset is never
+guessed: a reader that needs it asks, or reports `NOT CHECKED — testing.framework
+unset (run /test-setup)`.
 
 ---
 
-### Engine defaults
+### Runners `/test-setup` proposes per layer
 
-| Engine | Default test framework | Alternatives |
-|--------|------------------------|--------------|
-| Godot | `gdunit4` | `godot-test`, `WAT` |
-| Unity | `unity-test-framework` | `nunit`, custom |
-| Unreal | `unreal-automation` | Google Test, custom |
+| Layer / stack | Unit & integration | UI / E2E |
+|---|---|---|
+| Web (React/Next.js, Vue/Nuxt) | Vitest (or Jest) + Testing Library | Playwright |
+| React Native / Expo | Jest | Maestro (or Detox) |
+| Flutter | `flutter_test` | `integration_test` (or Maestro) |
+| iOS native | XCTest | XCUITest |
+| Android native | JUnit | Espresso |
+| Node backend | Vitest / Jest + Supertest | — |
+| Spring | JUnit 5 + Testcontainers | — |
+| Python | pytest + httpx | — |
+| API contract | Schemathesis against the OpenAPI contract (or Pact when consumer-driven) | — |
+
+The user confirms each choice; `/test-setup` then records the string here with
+`testing.patterns` and the `commands.test` / `commands.e2e` / `commands.lint` /
+`commands.typecheck` entries.
 
 ---
 
 ### Affected skills
 
 | Skill | How `testing.framework` is used |
-|-------|--------------------------------|
-| **qa-plan** | Test plan tailored to framework's idioms (assertion style, fixture pattern, parameterized tests) |
-| **dev-story** | Test framework name passed to programmer subagent in implementation brief |
-| **regression-suite** | Test file naming and discovery patterns match framework conventions |
-| **test-setup** | Scaffolds the right test runner config (e.g. `gdunit4_runner.gd` for Godot vs Unity Test Framework Asset) |
-| **smoke-check** | Invokes framework-appropriate test runner |
+|---|---|
+| **`/test-helpers`** | Generates factories, fixtures and mocks in the framework's idiom |
+| **`/regression-suite`** | Test file naming and discovery patterns match the framework's conventions |
+| **`/smoke-check`** | Names the runner in the report; the command it runs comes from `commands.*` |
+
+---
+
+## testing.patterns
+
+**Controls:** Where tests live — the globs skills use to find test files, so
+co-located tests (`apps/web/src/goals/goal-card.test.tsx`) count as evidence
+
+**Values:** flow list of globs (e.g. `[apps/*/src/**/*.test.ts, tests/**]`)
+
+- **Default:** unset ⇒ the `tests/**` convention, announced in the output
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/test-setup`
+- **Read by:** `/story-done`, `/test-evidence-review`, `/regression-suite`, `/qa-plan`, `/create-stories`, `/create-epics`, `/dev-story`, `/smoke-check`, `/test-helpers`, `/test-setup`, `/team-feature`, `/team-qa`, `/project-stage-detect`, `/gate-check` (smoke-report spot-read; Build → Hardening test items), `/architecture-review` (`rtm` mode), `/hotfix` (the regression test), `/feature-audit` (contract-test location), `/adopt` (tests & CI audit), `/bug-report` (verify mode)
+
+**Priority chain:** `testing.patterns` in `project.yaml` → the `tests/**`
+convention. A reader using the convention says so
+(`testing.patterns unset — using the tests/** convention`), because in a JS/TS
+monorepo with co-located tests "no test file under `tests/`" is not the same as
+"no test" — a silent fallback would report tested stories as untested.
+
+Write it in flow style. Globs follow the stack's naming convention: `*.test.ts`,
+`*.spec.ts`, `test_*.py`, `*Test.kt`, `*_test.dart`.
 
 ---
 
 ## testing.strict
 
-**Controls:** Whether failing or missing test evidence blocks a story from
-closing, or produces a warning and lets work continue — per test type
-**Values:** map of `{logic, integration, visual, ui, config}` → `true | false`
-**Default:** `{logic: true, integration: true, visual: true, ui: true, config: false}`
-**Set by:** `/start`, `/settings`
-**Read by:** `story-done`, `story-readiness`, `gate-check`, `smoke-check`, `dev-story`
+**Controls:** Whether failing or missing test evidence blocks a story from closing,
+or produces a warning and lets work continue — per story type
 
-> **Per-type, not a single bool.** A global `testing.strict: true|false` forces
-> all-or-nothing: either all test failures block or none do. Per-type matches how
-> most teams actually work — strict logic and visual gates, an advisory smoke check.
+**Values:** map of `{logic, integration, ui, e2e, config}` → `true` | `false`
 
-> **Composes with `qa.level`:** `qa.level` controls whether evidence is REQUIRED.
-> `testing.strict` controls whether failures BLOCK when evidence exists. If
-> `qa.level: minimal`, the strict map is effectively ignored (no evidence required
-> means nothing to be strict about).
+- **Default:** unset — each skill applies its own per-type default (table below); `/smoke-check` treats an unset `config` as BLOCKING
+- **Status:** live
+- **Local override:** yes — each of the five keys
+- **Label:** `testing.strict` → `testing.strict: logic=<v> integration=<v> ui=<v> e2e=<v> config=<v> (unset = each skill applies its own default)`
+- **Set by:** `/settings`
+- **Read by:** `/story-done`, `/dev-story`, `/story-readiness`, `/smoke-check`, `/gate-check`, `/create-stories` (QL-STORY-READY context), `/team-qa` (QL-TEST-COVERAGE context)
+
+> **Per type, not a single boolean.** A global switch forces all-or-nothing. Per
+> type matches how product teams actually work: strict unit, contract and E2E
+> gates, an advisory config check.
+
+> **Composes with `qa.level`.** `qa.level` decides whether evidence is REQUIRED;
+> `testing.strict` decides whether a failure BLOCKS once evidence is required. At
+> `qa.level: minimal` the map has little to act on.
+
+> **Reported, never defaulted, by `resolve_config`.** The label prints `unset` for
+> a type nobody configured, because the unset default legitimately differs between
+> skills: `/smoke-check` is a build-health gate, so an unset
+> `testing.strict.config` is BLOCKING there, while `/story-done` treats Config
+> stories as ADVISORY. Emitting one default would silently pick a winner. Only an
+> explicit `testing.strict.config: false` makes a failing smoke check advisory in
+> `/smoke-check`.
 
 ---
 
 ### Value intent per type
 
-| Type | `true` | `false` |
-|------|--------|---------|
-| `logic` (formulas, AI, state machines) | Unit test failures BLOCK — story cannot close | Failures WARN — story can close with warning |
-| `integration` (multi-system) | Integration test failures BLOCK | Failures WARN |
-| `visual` (animation, VFX, feel) | Missing/failing screenshot evidence BLOCKS (default) | Advisory only — story can close |
-| `ui` (menus, HUD, screens) | Missing screenshot of the screen BLOCKS (default) | Advisory only — story can close |
-| `config` (balance tuning) | Failing smoke check BLOCKS | Advisory only — story can close (default) |
+| Type | Covers | `true` | `false` | Default when unset |
+|---|---|---|---|---|
+| `logic` | Domain rules, calculations, validators, state machines | A failing unit test BLOCKS — the story cannot close | Failures WARN — the story can close | BLOCKING |
+| `integration` | API handler + DB, queue consumers, third-party adapters, contract tests against `docs/api/` | A failing integration or contract test BLOCKS | WARN | BLOCKING |
+| `ui` | Screens, components, visual states (including visual regression) | Missing component tests or screenshots of each state touched BLOCK | Advisory | BLOCKING |
+| `e2e` | A critical user journey across UI → API → DB | A failing or missing E2E run (with trace/screenshot) BLOCKS | Advisory | BLOCKING |
+| `config` | Feature flags, env config, pricing and limit tables | A failing smoke check BLOCKS | Advisory | ADVISORY (`/smoke-check`: BLOCKING) |
+
+**Migration floor — independent of this map.** A story whose `**Migration**` is not
+`None` (any type) requires `production/qa/evidence/<story-slug>/migration-dry-run.log`
+— Expand applied and rolled back on a disposable database — at every `qa.level`
+and regardless of `testing.strict.config`. Absent ⇒ BLOCKING.
 
 ---
 
 ### Affected skills
 
-| Skill | strict.[type]: true | strict.[type]: false |
-|-------|---------------------|----------------------|
-| **story-done** | Story of that type cannot close on test/evidence failure | Story can close; warning logged in story file |
-| **story-readiness** | Validates test requirements exist before implementation — blocks if absent | Validates but does not block — surfaces as warnings |
-| **gate-check** | CI failures of that type block phase transition | CI failures of that type surfaced as concerns, not blockers |
-| **smoke-check** | Failing smoke (config strict) blocks QA handoff | Failing smoke flagged but handoff proceeds |
-| **dev-story** | References test requirements — flags story as unverifiable if absent | References test requirements — advisory only |
-
-> **Unset-key resolution.** Each skill reads `testing.strict.<type>`; if absent
-> it reads `testing.strict` as a plain boolean (legacy form); if still absent it
-> falls back to a hardcoded default. For `story-done`, `story-readiness`,
-> `gate-check`, and `dev-story` the hardcoded default is the per-type default map
-> above (logic/integration/visual/ui strict, config advisory). **`smoke-check` is
-> the exception**: it is a build-health gate, so an unset `testing.strict.config`
-> defaults to *strict* (a FAIL blocks QA hand-off) — preserving its v1.0 behavior.
-> Only an explicit `testing.strict.config: false` makes a failing smoke advisory.
+| Skill | `strict.<type>: true` | `strict.<type>: false` |
+|---|---|---|
+| **`/story-done`** | A story of that type cannot close on failing or missing evidence | The story closes; a warning is recorded in the story file |
+| **`/story-readiness`** | The story's test requirement must be defined before implementation — blocks if absent | Validated, surfaced as a warning |
+| **`/gate-check`** | Failures of that type block the phase transition | Surfaced as CONCERNS |
+| **`/smoke-check`** | A failing smoke check (`config`) blocks QA hand-off | Flagged; the hand-off proceeds |
+| **`/dev-story`** | The routing brief states the test requirement; a story without one is flagged unverifiable | The requirement is advisory |
 
 ---
 
 ## qa.level
 
-**Controls:** What test evidence is required to mark stories Done
+**Controls:** What test evidence a story must carry on disk to be marked Complete
+
 **Values:** `minimal` | `standard` | `full`
-**Default:** *none* — supplied by `modes.rigor` (`standard` yields `standard`)
-**Set by:** `/start`, `/settings`
-**Read by:** `/story-done`, `/story-readiness`, `/dev-story`, `/smoke-check`, `/gate-check`, `/qa-plan`, `/regression-suite`
 
-**Priority chain:** `qa.level` in `project.yaml` → `modes.rigor` expansion → *(no hardcoded default)*
+- **Default:** none — fronted by `modes.rigor` (`minimal`→`minimal`, `standard`→`standard`, `full`→`full`)
+- **Status:** live
+- **Local override:** no — evidence on disk is a team contract
+- **Label:** `qa.level` → `qa.level: <value> (<source>)`
+- **Set by:** `/settings`
+- **Read by:** `/story-done`, `/gate-check`, `/smoke-check`, `/dev-story`, `/story-readiness`, `/qa-plan`, `/regression-suite`, `/team-qa`
 
-> **Different axis from `testing.strict`.** `qa.level` = what evidence is required.
-> `testing.strict` = do failures block. A user wanting "minimal QA" sets
-> `qa.level: minimal` and the strict map becomes effectively a no-op.
+**Priority chain:** `qa.level` in `project.yaml` → `modes.rigor` expansion →
+*(no terminal default)*
+
+> **Different axis from `testing.strict`.** `qa.level` = what evidence is
+> required. `testing.strict` = whether failures block.
+
+> **It relaxes per-story evidence, never the floors.** At every level the smoke
+> report (`production/qa/smoke-*.md`) is required at the `hardening` and `launch`
+> gates, and the migration dry-run is required for every story with a migration.
+> Evidence counts only when retained on disk outside gitignored paths —
+> `production/session-logs/` never holds evidence.
 
 ---
 
 ### Value intent
 
 | Aspect | minimal | standard | full |
-|--------|---------|----------|------|
-| Logic stories | No test required, no gap flagged | Unit test required (strict.logic controls block) | Unit test + coverage minimum |
-| Integration stories | No test required | Integration test or playtest doc required | Same + regression coverage |
-| Visual stories | No evidence required | Screenshot required (strict.visual controls block) | Screenshot + lead sign-off required |
-| UI stories | No evidence required | Screenshot of each screen required (strict.ui controls block) | Screenshot + walkthrough doc + interaction test |
-| Config/Data stories | No evidence required | Smoke check advisory | Smoke check required |
-| /story-done test gate | Acceptance criteria only | Enforced per story type | Enforced for every story type |
-| /gate-check phase enforcement | No test gates | Logic + integration must pass | Full coverage + regression suite |
-| /dev-story routing prompt | No "Test required: ..." line | Per-type test requirement included | Per-type + coverage target included |
-| Regression suite required by | Never | Polish stage | Production stage |
-| Best for | Jam games, throwaway prototypes, fast iteration | Most projects | Commercial, console cert, learning, paranoid teams |
+|---|---|---|---|
+| Logic stories | No test required | Unit test required (`testing.strict.logic` decides blocking) | Same, for every Logic story |
+| Integration stories | No test required | Integration or contract test required | Same + regression coverage |
+| UI stories | No evidence required | Screenshots of each state touched (desktop + mobile viewport, or device) or component tests | Same + visual regression where the stack has it |
+| E2E stories | No test required | E2E test passing against a running environment, with trace/screenshot | Same, for every critical user journey |
+| Config stories | No evidence required | Smoke check (advisory) | Smoke check required |
+| Stories with a migration | Dry-run evidence required (floor) | Same | Same |
+| `/story-done` test gate | Acceptance criteria only (+ the migration floor) | Enforced per story type | Enforced for every story type |
+| `/gate-check` test enforcement | Per-story evidence not scored; the floors still apply (smoke report, migration dry-run) | Per-story evidence scored per type | Per-story evidence scored for every type |
+| `/dev-story` routing brief | No "Test required" line | Per-type test requirement | Per-type requirement + regression note |
+| Regression suite required by | Never | Hardening | Build |
+| Best for | Hackathons, throwaway prototypes | Most product teams | Regulated products (fintech, health), B2B with SLAs, larger teams |
 
 ---
 
 ### Affected skills
 
 | Skill | minimal | standard | full |
-|-------|---------|----------|------|
-| **story-done** | Acceptance criteria check only — no evidence required | Per-type evidence required; strictness from `testing.strict` | All types require evidence; strictness from `testing.strict` |
-| **story-readiness** | No test requirement validated | Test requirement per story type validated | Test requirement + coverage target validated |
-| **dev-story** | Routing prompt has no "Test required" line | Per-type test requirement passed to programmer agent | Coverage target passed to programmer agent |
-| **smoke-check** | Optional | Required before phase transition | Required before every commit |
-| **gate-check** | No test enforcement at phase transitions | Logic + integration tests must pass | Full coverage check + regression suite |
-| **qa-plan** | Skipped entirely or minimal smoke plan | Full plan per story type | Full plan + coverage targets per system |
-| **regression-suite** | Not generated | Generated at Polish stage entry | Generated at Production stage entry |
+|---|---|---|---|
+| **`/story-done`** | Acceptance criteria only; no evidence required (migration floor kept) | Per-type evidence required; strictness from `testing.strict` | Every type requires evidence; strictness from `testing.strict` |
+| **`/story-readiness`** | No test requirement validated | Test requirement per story type validated | Test requirement + regression coverage validated |
+| **`/dev-story`** | Routing brief has no "Test required" line | Per-type test requirement passed to the engineer | Plus the regression expectation |
+| **`/smoke-check`** | Runs; the report is the floor | Required before QA hand-off | Required before QA hand-off and on every release candidate |
+| **`/gate-check`** | Floors only (smoke report, migration dry-run) | Per-story evidence checked per type | Every type |
+| **`/qa-plan`** | A minimal smoke plan | A full plan per story type | Full plan + regression targets per feature |
+| **`/regression-suite`** | Not generated | Generated at Hardening entry | Generated at Build entry |
 
 ---
 
 ## qa.coverage_minimum
-
-**Controls:** Minimum code coverage percentage enforced at `qa.level: full`
-**Values:** integer 0–100, or `null` for unset
-**Default:** `null`
-**Set by:** `/settings`
-**Read by:** `/gate-check` only. `/story-done` does not reference the key, and no CI runner reads it.
-  *(Derived by grep. A helper-based read such as `session_state_enabled()` would not show up, so treat this list as the verified floor, not a ceiling.)*
-
-**Priority chain:** `qa.coverage_minimum` in `project.yaml` → no enforcement if `null`
-
-> **Only meaningful at `qa.level: full`.** Ignored at minimal and standard. A
-> non-null value at standard or minimal level emits a warning at session-start:
-> *"coverage_minimum is set but qa.level is not full — value will not be enforced."*
-
-> **Implementation is engine-specific.** Coverage measurement is different per engine:
-> - Godot: gdunit4 coverage report (markdown export)
-> - Unity: Unity Test Framework coverage (xml export)
-> - Unreal: gcov-style coverage from clang flags
-> CCGS does not unify these — gate-check reads the engine-appropriate report.
-
----
-
-## strict_gate_checks
 
 > ### RESERVED - NOT IMPLEMENTED
 >
 > **No skill or hook reads this setting. Setting it has no effect.** Everything
 > below describes the intended design, not current behaviour.
 >
-> The value is checked for valid spelling when you set it, and then ignored.
+> The value is stored when you set it, and then ignored. No gate compares any
+> coverage report against it.
 
-**Controls:** Whether phase gate failures block stage transition or just warn
+**Controls:** Minimum line-coverage percentage enforced at `qa.level: full`
+
+**Values:** integer 0–100
+
+- **Default:** unset
+- **Status:** RESERVED
+- **Local override:** no
+- **Label:** —
+- **Set by:** —
+- **Read by:** none
+
+**Intended design.** Only meaningful at `qa.level: full`. Coverage reports differ
+per stack — V8/Istanbul `lcov` for JS/TS, `coverage.py` for Python, JaCoCo for
+JVM, Xcode coverage for iOS, `lcov` from `flutter test --coverage` — so a reader
+would have to name the report it parsed and report `NOT ASSESSED` when none
+exists, never a pass.
+
+---
+
+## team.size
+
+**Controls:** Which agents are active by default in team pipelines — a solo builder
+should not get a full studio roster on every change
+
+**Values:** `individual` | `small` | `studio`
+
+- **Default:** none — fronted by `modes.rigor` (`minimal`/`standard`→`individual`, `full`→`studio`)
+- **Status:** live
+- **Local override:** yes — review and pipeline depth differ, artifacts do not
+- **Label:** `team.size` → `team.size: <value> (<source>)`
+- **Set by:** `/settings`
+- **Read by:** all `team-*` skills; `/brainstorm`, `/map-features`, `/create-architecture`, `/architecture-decision`, `/gate-check`; its resolved value is passed as Context to DM-SCOPE and TL-FEASIBILITY
+
+**Priority chain:** `project.local.yaml` → `project.yaml` → `modes.rigor` expansion
+→ *(no terminal default)*
+
+> **`individual` at `minimal` and `standard`, `studio` at `full`.** A smaller team
+> on a big project sets `team.size: small` explicitly, which wins over the
+> rigor-derived value.
+
+> **Different axis from `workflow`.** `workflow` decides *what documents are
+> required*; `team.size` decides *which agents exist to make them*. A solo founder
+> on `workflow: full` still needs the same coverage from a smaller active set.
+
+---
+
+### Active set per team skill
+
+Each team skill announces its active set for the resolved `team.size` in Phase 0,
+so a collapsed pipeline is never mistaken for a full one.
+
+| Skill | individual | small (the documented pipeline) | studio (adds) |
+|---|---|---|---|
+| **`/team-feature`** | backend-engineer (or frontend-engineer when the Surface is web only) runs the pipeline | product-manager → product-designer (UX delta) → tech-lead (API/data delta) → backend-engineer ∥ frontend-engineer ∥ mobile-engineer (per surface) → qa-engineer | Routed stack sub-specialists, security-engineer review, adversarial review pass |
+| **`/team-ui`** | frontend-engineer or mobile-engineer | product-designer → design-engineer → frontend/mobile-engineer → accessibility-specialist | ux-writer, routed stack sub-specialists |
+| **`/team-content`** | ux-writer | ux-writer → localization-lead → customer-success-manager | accessibility-specialist |
+| **`/team-growth`** | growth-manager | growth-manager → analytics-engineer → product-designer ∥ ux-writer → variants handed off as stories | monetization-strategist, customer-success-manager, data-engineer |
+| **`/team-hardening`** | performance-engineer | performance-engineer ∥ sre-engineer ∥ security-engineer (quick audit) ∥ accessibility-specialist → qa-engineer | design-engineer, routed stack leads, adversarial review |
+| **`/team-qa`** | qa-engineer | qa-lead → qa-engineer | accessibility-specialist |
+| **`/team-release`** | release-manager | release-manager → qa-lead → devops-engineer → sre-engineer | security-engineer, customer-success-manager, localization-lead, delivery-manager, analytics-engineer |
+
+---
+
+### Special cases
+
+- **Team-size scoping never removes a director gate.** Team skills spawn only the
+  gates they own, after the review-mode check; `modes.review_mode` — not
+  `team.size` — decides whether those run.
+- **`/gate-check` panel width** is `modes.workflow`'s axis (`/gate-check`
+  Section 4b), not this one.
+- **`individual` disables nothing.** It changes which agents are active by
+  default; any agent can still be invoked by name.
+- When `individual` needs a non-active agent (a security review of an auth
+  change, say), the skill notes it and routes through the nearest active agent or
+  asks — it never silently skips the concern.
+
+---
+
+## project.stage
+
+**Controls:** The current development phase — which gate `/gate-check` targets next
+and what artifacts are expected to exist
+
+**Values:** `Discovery` | `Definition` | `Architecture` | `Validation` | `Build` | `Hardening` | `Launch`
+
+- **Default:** unset ⇒ `bash .claude/scripts/stage-estimate.sh` estimates it from the tree (`SOURCE: estimated`)
+- **Status:** live
+- **Local override:** no — the phase is a project fact
+- **Label:** `project.stage` → `project.stage: <value> (<source>)`
+- **Set by:** `/start` (once: `Discovery`, or the estimator's `STAGE` for an existing codebase); `/gate-check` (on a PASS, after explicit user confirmation, then re-read and verified)
+- **Read by:** `statusline.sh` and `detect-gaps.sh` (through `stage-estimate.sh`), `/help`, `/gate-check`, `/project-stage-detect`, `/release-checklist`, `/launch-checklist`, `/team-qa`, `/onboard`
+
+> **A project attribute, not a mode.** It records where the product is in its
+> lifecycle. Only `/gate-check` advances it — and only on PASS with user
+> confirmation. `project.yaml` is the only place it is stored.
+
+> **Enum-invalid ⇒ estimated.** A value outside the seven (for example a phase
+> name from another framework) is rejected by resolution, named on `notes:`, and
+> the estimator's answer is used instead.
+
+> **The catalog id is the lowercase stage value** (`Build` → `build`), which is
+> also the `/gate-check` target argument.
+
+---
+
+### Stage progression and gate requirements
+
+Each row is the gate that must be passed to advance FROM that stage. The
+requirements are summarized at `standard`; the tier-exact lists are the gate
+reference files.
+
+| From stage | `/gate-check` target | Key artifacts required to pass (standard) |
+|---|---|---|
+| **Discovery** | `definition` | Product brief (one-pager at `minimal`), reviewed by `/prd-review` |
+| **Definition** | `architecture` | Feature map; every MVP PRD with the tier's sections, reviewed (not applicable at `minimal`) |
+| **Architecture** | `validation` | Stack pinned; architecture doc; critical ADRs; API contract and data model (*Backend*); threat model (*PII*); architecture review; accessibility requirements (*UI*); test framework + CI; SLO journeys |
+| **Validation** | `build` | Sprint plan; epics + stories; Foundation/Core ADRs Accepted; design language sections 1–5, UX specs and reviews (*UI*); walking skeleton on staging |
+| **Build** | `hardening` | MVP features implemented; E2E per critical journey; smoke check PASS; no unresolved S1; migrations expanded on staging |
+| **Hardening** | `launch` | Release checklist GO; rollout plan READY TO ROLL OUT; launch checklist GO; full security audit; smoke PASS on the release candidate; QA sign-off; hardening report; runbooks; ToS & Privacy Policy; release notes (`/changelog <version>`, then `/release-notes`); no unresolved S1/S2 |
+| **Launch** | — (terminal) | No further gate. Every later release runs PRD → sprint → story → smoke → release checklist → rollout plan → release record, with its records under `production/releases/<version>/` — records, not gates |
+
+---
+
+### Affected skills
+
+| Skill | How it uses the stage |
+|---|---|
+| **`/gate-check`** | With no argument, targets the `next_phase` of the estimator's `STAGE`; writes the new stage on PASS only after "Gate passed. May I update `project.stage` in `project.yaml` to '<Stage>'?" |
+| **`/start`** | Writes the initial stage once |
+| **`/help`, `/project-stage-detect`** | Report where the project is and what comes next; run `stage-estimate.sh` when the stage is unset |
+| **`statusline.sh`** | Shows `STAGE` from `stage-estimate.sh --quick`; the Epic > Feature > Task breadcrumb appears from `Build` onward |
+| **`detect-gaps.sh`** | Warns when the estimate is two or more phases ahead of the configured stage — "run /gate-check" |
+| **`/release-checklist`, `/launch-checklist`** | Release context — the phase the release ships from |
+| **`/onboard`** | States the current stage in the onboarding document's `## Project Summary` from the resolved `project.stage` line; unset ⇒ says so and suggests `/project-stage-detect` |
+
+---
+
+## project.category
+
+**Controls:** What kind of product this is, in plain words — a signal for
+recommendations, never a branch condition
+
+**Values:** string (e.g. `B2C fintech`, `B2B SaaS`, `marketplace`, `consumer social`, `developer tool`, `health`)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/brainstorm` (asks "May I set `project.name` and `project.category` in `project.yaml`?"), `/settings`
+- **Read by:** `/brainstorm`, `/setup-stack` (profile suggestions), `/onboard` (Project Summary), `/launch-checklist` (a hint only: prompts the question whether business customers are onboarded), `.claude/docs/settings-guidance.md` (archetype seeding)
+
+Free text: no script parses it and no skill branches on its value. Conditions that
+change behavior come from structured keys — `platform.surfaces`,
+`compliance.regions`, `privacy.handles_pii`, `release.distribution` — never from the
+category string.
+
+---
+
+## project.name and project.version
+
+**Controls:** The product's name, and the version of the release being prepared
+
+**Values:** `project.name` → string; `project.version` → semver string (e.g. `1.2.0`)
+
+| Key | Default | Status | Local override | Label | Set by | Read by |
+|---|---|---|---|---|---|---|
+| `project.name` | unset | live | no | — | `/brainstorm`, `/settings` | `/onboard`, `/release-notes`, `/launch-checklist` |
+| `project.version` | unset | live | no | — | `/team-release` (asks first), `/settings` | `/changelog`, `/release-notes`, `/release-checklist`, `/rollout-plan`, `/team-release`, `/launch-checklist`, `/gate-check` (launch gate `<version>`), `/hotfix` (the record's `**Release**` line) |
+
+`<version>` in release paths (`production/releases/<version>/…`) is
+`project.version` or the version argument passed to the skill — semver, e.g.
+`1.2.0`. Mobile build numbers and version codes go *inside* the release files,
+never in the directory name.
+
+Changing `project.version` is a `version_bumps` decision (see
+`modes.automation_always_ask`).
+
+---
+
+## stack.pinned_on
+
+**Controls:** The date the stack was last pinned and verified against live sources —
+the completion marker of stack setup
+
+**Values:** ISO date (e.g. `2026-09-27`)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** `stack` — an unset value adds ` pinned_on=unset` to the stack line
+- **Set by:** `/setup-stack` (and `/setup-stack refresh`, which rewrites it)
+- **Read by:** the catalog `stack-setup` steps (discovery — recommended; definition — standard/full; architecture — every tier; pattern `pinned_on:`), `stage-estimate.sh`, `session-start.sh`, `/gate-check`
+
+`/setup-stack` writes it **last**, and only when every *configured* component has a
+Pinned Components row in `docs/stack-reference/VERSION.md` that is sourced,
+`n/a (managed service)`, or `NOT DETERMINED — accepted by user YYYY-MM-DD`.
+Unconfigured layers do not block it — data and cloud may wait for their
+Foundation ADRs.
+
+| Reader | Effect |
+|---|---|
+| **`/gate-check`** | "Stack pinned" is recommended at `definition`, required at `architecture`, and the `validation` floor at every tier; accepted `NOT DETERMINED` gaps ⇒ CONCERNS, named |
+| **`session-start.sh`** | Warns "run /setup-stack refresh" when it is set but `docs/stack-reference/VERSION.md` still reads `NOT DETERMINED` in its `**Stack Pinned**` row |
+| **Catalog / `/help`** | The `stack-setup` steps are PRESENT once the pattern matches |
+
+---
+
+## stack.layers and specialists
+
+**Controls:** The product's technology stack per layer — framework, version,
+language, runtime and code root(s) — and the stack specialist each layer routes to
+
+**Values:** component strings, versions and paths per the key table below (no enum); `specialists.<layer>` takes an agent name
+
+- **Default:** unset (every key). An unset layer means "not decided yet", never "not used".
+- **Status:** live
+- **Local override:** no — the whole team builds on the same stack
+- **Label:** `stack` (components, versions, roots and routing); `code_roots` (roots)
+- **Set by:** `/setup-stack` (guided setup, `refresh`, `upgrade`)
+- **Read by:** specialist routing in `yaml-helper.sh`, `resolve_code_roots`, `project-coherence.sh`, `/data-model` (data layer), `validate-push.sh` (`migrations_dir`), and every skill whose bootstrap requests `stack` or `code_roots`
+
+| Key | Type | Label |
+|---|---|---|
+| `stack.layers.web.framework`, `.version`, `.language` | strings (`Next.js`, `"15.3"`, `TypeScript`) | `stack` |
+| `stack.layers.web.root` | path or flow list of paths | `stack`, `code_roots` |
+| `stack.layers.mobile.framework`, `.version`, `.language` | strings (`React Native (Expo)`, `Flutter`, `SwiftUI`, `Jetpack Compose`) | `stack` |
+| `stack.layers.mobile.root` | path or flow list | `stack`, `code_roots` |
+| `stack.layers.backend.framework`, `.version`, `.language`, `.runtime` | strings (`NestJS`, `"11.0"`, `TypeScript`, `Node.js 22`) | `stack` |
+| `stack.layers.backend.root` | path or flow list | `stack`, `code_roots` |
+| `stack.layers.data.database`, `.cache`, `.queue`, `.orm` | component strings with an optional trailing version (`PostgreSQL 16`, `Redis 7`, `Prisma 6`, `none`) | `stack` |
+| `stack.layers.data.migrations_dir` | path | `code_roots` |
+| `stack.layers.cloud.provider`, `.iac` | component strings (`AWS`, `Terraform 1.9`) | `stack` |
+| `stack.layers.cloud.root` | path or flow list | `stack`, `code_roots` |
+| `specialists.web`, `specialists.mobile`, `specialists.backend` | agent name (an override of the derived routing) | `stack` |
+
+**Versions.** Web, mobile and backend carry the version in the separate `version`
+key. Data and cloud components carry it *inside* the component string when one is
+pinned (`database: PostgreSQL 16`); `docs/stack-reference/VERSION.md` rows use the
+component with the trailing version removed. Versions come from live sources with
+a source URL and retrieval date — `/setup-stack` never guesses one, and a managed
+service with no user-visible version is recorded as `n/a (managed service)`.
+
+**Roots.** Each `root` is a scalar path or a flow list `[apps/web, apps/admin]`
+(block lists are not supported for this key). `resolve_code_roots` emits one line
+per root — `<dir>\t<layer>\t<source>` — plus `data` for `migrations_dir`,
+`shared` for `stack.shared_roots`, and `undeclared` for workspace directories no
+layer declares. It never defaults to `src`. The algorithm and its consumers are in
+`.claude/docs/code-root-resolution.md`.
+
+The `stack` label prints every one of the five layers, either as `<layer>=…` or in
+`unset=`:
+
+```
+stack: web=Next.js 15.3 @apps/web,apps/admin; backend=NestJS 11.0 @apps/api,services/worker; data=PostgreSQL 16; unset=mobile,cloud [routing: web-specialist>nextjs-specialist, backend-specialist>node-specialist, data-specialist] (project.yaml)
+```
+
+With nothing configured it prints `stack: unset — run /setup-stack`.
+
+---
+
+### Specialist routing
+
+Routing is derived once, in `yaml-helper.sh` (`_yaml_helper_route_specialist
+<layer>`, internal), and printed in the `stack` line as `<lead>`, `<lead>><sub>`,
+or `<lead>><sub1>+<sub2>` for native mobile. Skills spawn what the line says; none
+carries its own routing table.
+
+| Layer | Configured by | Lead | Sub-specialist chosen when the value matches (case-insensitive ERE; rules in order, first match wins) | Override key |
+|---|---|---|---|---|
+| web | `stack.layers.web.framework` | web-specialist | 1 `next\|react` → nextjs-specialist; 2 `nuxt\|vue` → vue-nuxt-specialist; else none | `specialists.web` |
+| mobile | `stack.layers.mobile.framework` | mobile-specialist | 1 `react native\|expo` → react-native-specialist; 2 `flutter` → flutter-specialist; 3 value matches both (`swift\|ios`) and (`kotlin\|compose\|android`), or matches `^native` → ios-specialist + android-specialist; 4 `swift\|ios` → ios-specialist; 5 `kotlin\|compose\|android` → android-specialist; else none | `specialists.mobile` |
+| backend | `stack.layers.backend.framework` | backend-specialist | 1 `nest\|express\|fastify\|hono\|node` → node-specialist; 2 `spring\|java\|kotlin` → spring-specialist; 3 `fastapi\|django\|flask\|python` → python-specialist; else none | `specialists.backend` |
+| data | `stack.layers.data.database` | data-specialist | — | — |
+| cloud | `stack.layers.cloud.provider` | cloud-specialist | — | — |
+
+- **Unset layer ⇒ no specialist spawned**, and the skill prints
+  `NOT CHECKED — <layer> layer not configured (run /setup-stack)`. A skipped
+  specialist always announces itself.
+- **Override.** `specialists.<layer>` (web, mobile, backend) replaces the derived
+  *sub*-specialist — for example `specialists.backend: python-specialist` for a
+  Litestar service, which the rules do not recognize. The lead is fixed per layer.
+  Accepted values: that lead's own sub-specialists (web: `nextjs-specialist`,
+  `vue-nuxt-specialist`; mobile: `react-native-specialist`, `flutter-specialist`,
+  `ios-specialist`, `android-specialist`, and the native pair
+  `ios-specialist+android-specialist`; backend: `node-specialist`,
+  `spring-specialist`, `python-specialist`), or the layer lead itself
+  (`web-specialist`, `mobile-specialist` or `backend-specialist`), which means
+  lead only, no sub-specialist. Any other value is ignored — the derived routing
+  stands — and named on `resolve_config`'s `notes:` line.
+- **Lead vs sub.** Skills spawn the sub-specialist for routine work and the layer
+  lead when the story's `**Risk**` is HIGH — taken from the Knowledge Risk of the
+  component in `docs/stack-reference/VERSION.md`; no row or `NOT DETERMINED` counts
+  as HIGH. The lead may delegate through its `Agent(...)` grant. Data and cloud
+  leads have no subs.
+
+---
+
+### Affected skills
+
+| Skill | How the stack is used |
+|---|---|
+| **`/dev-story`** | Routes the story by `**Surface**` to the primary engineer, adds the routed sub-specialist (or the lead on HIGH risk) and writes in the resolved root |
+| **`/architecture-decision`, `/create-architecture`, `/architecture-review`** | Consult the routed stack leads; stamp component versions in `## Stack Compatibility`; read `docs/stack-reference/` |
+| **`/code-review`** | Routes the review to the stack specialist of the changed files' layer |
+| **`/test-setup`, `/test-helpers`** | Propose runners and write configs per configured layer and root |
+| **`/data-model`** | Uses the data layer (database, ORM) and writes migration files under `migrations_dir` |
+| **`/walking-skeleton`, `/team-feature`, `/team-ui`, `/team-hardening`** | Spawn routed specialists for the configured layers only |
+| **`/team-feature`, `/team-ui`** | Write each surface's implementation in the root the `code_roots` line gives its layer (`data=` for migration files); no resolved root ⇒ reported as a blocker, never a guessed directory |
+| **`/onboard`, `/project-stage-detect`, `/reverse-document`** | Read the resolved `stack` and `code_roots` lines to pick the roots they scan, and print `NOT CHECKED — no code root resolved (set stack.layers.<layer>.root via /setup-stack)` when none resolves |
+| **`/security-audit`, `/perf-profile`, `/bundle-audit`, `/load-test`** | Choose stack-appropriate tools (k6 / Locust / Gatling; `npm audit` / `pip-audit` / `osv-scanner`) |
+| **`project-coherence.sh`** | Compares each configured component with its VERSION.md row, runtime files and manifest dependencies — observations only (`MATCH` / `MISMATCH` / `UNCHECKED`) |
+
+---
+
+## stack.monorepo and stack.shared_roots
+
+**Controls:** Whether the repository is a workspace monorepo, and which directories
+hold code shared across layers
+
+**Values:** `stack.monorepo` → `true` | `false`; `stack.shared_roots` → flow list of paths
+
+| Key | Default | Status | Local override | Label | Set by | Read by |
+|---|---|---|---|---|---|---|
+| `stack.monorepo` | unset | live | no | — | `/setup-stack` | `resolve_code_roots`, `/test-setup`, `/security-audit` |
+| `stack.shared_roots` | unset | live | no | `code_roots` | `/setup-stack` | `resolve_code_roots` |
+
+- **`stack.monorepo: true`** — a pnpm/yarn/npm workspace, Turborepo or Nx
+  monorepo, or a Gradle multi-project build. `/test-setup` reads it when placing
+  runner configs (per workspace package rather than once at the repository root).
+- **`stack.shared_roots`** — e.g. `[packages]`. `resolve_code_roots` emits each
+  entry as layer `shared`. `/dev-story` adds platform-engineer as a secondary when
+  a story's files sit under a shared root, and uses the first shared root for
+  Foundation-layer shared code.
+- **Undeclared workspaces are always found.** Whatever these keys say, every
+  `apps/*`, `services/*` or `packages/*` directory that contains a manifest and
+  lies outside the declared roots is emitted as `undeclared`; callers include it in
+  their scans and print `WARN: undeclared code roots: <dirs> — declare them with /setup-stack`.
+  Monorepos are supported, never assumed; a single-app repo keeps working.
+
+---
+
+## stack.package_manager and stack.profile
+
+**Controls:** The package manager the repository uses, and the informational name of
+the setup preset it started from
+
+**Values:** `stack.package_manager` → string (`pnpm`, `npm`, `yarn`, `bun`, `gradle`, `maven`, `uv`, `poetry`, `pip`, …); `stack.profile` → string (informational)
+
+| Key | Default | Status | Local override | Label | Set by | Read by |
+|---|---|---|---|---|---|---|
+| `stack.package_manager` | unset | live | no | — | `/setup-stack` | `project-coherence.sh` (the lockfile must match), `/test-setup`, `/test-helpers`, `/security-audit` (picks the dependency-audit tool; frozen-lockfile check) |
+| `stack.profile` | unset | live | no | — | `/setup-stack` | `/setup-stack` only — never branched on |
+
+`stack.profile` names the golden-path preset the user picked from
+`.claude/skills/setup-stack/references/profiles.md` (`ts-fullstack-web`,
+`expo-mobile-ts-api`, `flutter-spring`, `python-api-react`). Presets name components
+only, never versions, and the layers remain individually editable — so no skill may
+infer anything from the profile name. Read the layers.
+
+---
+
+## platform.surfaces
+
+**Controls:** Which surfaces the product ships on — the input to the *UI*, *Backend*
+and *Public API* conditions every gate and checklist uses
+
+**Values:** list ⊆ `web` | `ios` | `android` | `api`
+
+- **Default:** unset ⇒ ask
+- **Status:** live
+- **Local override:** no
+- **Label:** `surfaces` → `platform.surfaces: web, ios, api (project.yaml)` or `platform.surfaces: (unset -- ask which surfaces ship)`
+- **Set by:** `/setup-stack`
+- **Read by:** every skill whose bootstrap requests `surfaces` (derive with `grep -lE 'resolve_config --keys ([a-z_.]+,)*surfaces' .claude/skills/*/SKILL.md`), and `/gate-check` conditions
+
+**`api` means an externally consumed API** — public or partner. The backend your own
+apps call is not the `api` surface; it is covered by the *Backend* condition
+through `stack.layers.backend` and `stack.layers.data`.
+
+**List-enum rules** (`_yaml_helper_array_enums`):
+
+- Parsed as a list (flow `[web, ios]` or block), never as a scalar. Each element is
+  validated; an invalid one is dropped with a note
+  (`platform.surfaces: dropped invalid element 'iso'`) and the rest survives.
+- **`[]` is invalid** here — a product ships at least one surface. It is noted and
+  the key is treated as unset.
+- `/settings` accepts `web,ios` or `[web, ios]`, validates each element, rejects
+  the whole write if any element is invalid, and writes flow style.
+- The story `**Surface**` field is a **superset** (`mobile`, `admin`, `infra`,
+  `analytics` are story surfaces); those are not valid values here.
+
+**Derived conditions:**
+
+- *UI* = `platform.surfaces` ∩ {web, ios, android} ≠ ∅. **Unset ⇒ MANUAL CHECK NEEDED
+  (ask), never "no UI".**
+- *Backend* = `stack.layers.backend.framework` set, or `stack.layers.data.database`
+  set, or `api` ∈ `platform.surfaces`.
+- *Public API* = `api` ∈ `platform.surfaces`.
+
+---
+
+### Affected skills
+
+| Skill | Effect |
+|---|---|
+| **`/gate-check`** | Evaluates *UI*, *Backend* and *Public API* items; an item whose condition is false is `N/A — <condition> not configured` and not scored; DD-PHASE-GATE is omitted (and named) when no UI surface is configured — known, not unset |
+| **`/help`, `/project-stage-detect`** | Render `when=ui` / `when=backend` catalog steps as OPTIONAL only when the condition is **known** false |
+| **`/release-checklist`, `/release-notes`** | Web block when `web` is listed; `## API / Developers` release-note section only with *Public API* |
+| **`/smoke-check`, `/perf-profile`, `/bundle-audit`** | Scope batches and budgets per surface (`/smoke-check --surface web\|ios\|android\|api`; `/perf-profile surface:<web\|ios\|android\|api>`; `/bundle-audit surface:<web\|ios\|android>`) |
+| **`/design-language`, `/ux-design`, `/team-ui`** | Platform adaptation (web / iOS HIG / Material) per UI surface |
+| **`/team-feature`, `/walking-skeleton`** | Implement in parallel per surface |
+| **`/api-design`** | Developer guides under `docs/api/guides/` only with *Public API* |
+
+---
+
+## platform.browsers and platform.min_os
+
+**Controls:** The browsers the web surface supports, and the minimum OS versions the
+mobile apps support
+
+**Values:** `platform.browsers` → flow list of browserslist queries; `platform.min_os.ios`, `platform.min_os.android` → strings
+
+| Key | Default | Status | Local override | Label | Set by | Read by |
+|---|---|---|---|---|---|---|
+| `platform.browsers` | unset | live | no | — | `/setup-stack` | `/test-setup` (Playwright projects), `/smoke-check`, `/bundle-audit` (transpile targets), `/release-checklist` (browser support), `/create-architecture` |
+| `platform.min_os.ios` | unset | live | no | — | `/setup-stack` | `/release-checklist`, `/rollout-plan`, `/hotfix`, `/smoke-check` (iOS/Android surface batches), `/create-architecture` |
+| `platform.min_os.android` | unset | live | no | — | `/setup-stack` | `/release-checklist`, `/rollout-plan`, `/hotfix`, `/smoke-check` (iOS/Android surface batches), `/create-architecture` |
+
+```yaml
+platform:
+  browsers: [last 2 versions, not dead, iOS >= 16]   # browserslist syntax
+  min_os:
+    ios: "16.0"
+    android: "26"          # minSdk API level (Android 8.0)
+```
+
+Korean-market web products usually test Samsung Internet and in-app browsers
+(KakaoTalk, Naver) alongside Chrome and Safari; name them in the list rather than
+relying on `defaults`. `min_os` drives the minimum-supported-version and
+force-update policy in `/rollout-plan` and the store block of `/release-checklist`.
+
+---
+
+## release.distribution
+
+**Controls:** How releases reach users — which release, rollout and store tracks the
+checklists emit
+
+**Values:** `web` | `stores` | `web+stores` | `enterprise` | `internal`
+
+- **Default:** unset ⇒ ask. No default is substituted: an unset value must stay
+  unset so skills take their "ask how this release ships" branch — substituting a
+  value would either make the question unaskable or emit every track.
+- **Status:** live
+- **Local override:** no — a local value is ignored with a "not locally overridable" note
+- **Label:** `distribution` (also accepted: `release.distribution`) → `release.distribution: <value> (project.yaml)` or `release.distribution: (unset -- ask how this release ships)`. The label resolves through `resolve_setting`, so an invalid value is dropped with a note and the unset form is printed.
+- **Set by:** `/setup-stack`
+- **Read by:** `/release-checklist`, `/launch-checklist`, `/release-notes`, `/rollout-plan`, `/team-release`, `/gate-check`, `/hotfix`, `/help`, `/project-stage-detect`, `/create-architecture`
+
+---
+
+### Value intent
+
+| Value | Meaning |
+|---|---|
+| `web` | Web app delivered through CI/CD — deploys, CDN, progressive delivery with flags and canaries |
+| `stores` | Mobile apps through the App Store and Google Play — store review, signing, phased release |
+| `web+stores` | Both tracks |
+| `enterprise` | Private distribution to customer organizations (Apple Business Manager custom apps, Managed Google Play, customer-hosted or single-tenant deployments) |
+| `internal` | Employees or testers only (internal tools, TestFlight internal / Play internal testing) |
+
+*Stores* = `release.distribution` ∈ {`stores`, `web+stores`}.
+
+---
+
+### Affected skills
+
+| Skill | Effect |
+|---|---|
+| **`/release-checklist`** | Store block (build number/version code, signing, privacy nutrition labels / Data safety, review guidelines, TestFlight / internal track, phased release) only with *Stores*; unset ⇒ ask, never every track |
+| **`/launch-checklist`** | `## Go-to-Market` store listing / ASO items only with *Stores* |
+| **`/release-notes`** | `## App Store` (≤ 4000 characters) and `## Google Play` (≤ 500 characters per language) sections only with *Stores* |
+| **`/rollout-plan`** | Mobile phased release, minimum supported version and force-update policy with *Stores*; web flags and canary stages otherwise |
+| **`/hotfix`** | ios/android path: server-side mitigation first, then a patch from the release tag through expedited store review, with `release-manager` spawned to advise on the store path (a person submits) |
+| **`/gate-check`** | Store submission records required at the `launch` gate with *Stores* |
+| **`/team-release`** | Records each executed stage in `production/releases/<version>/release-record.md` |
+
+---
+
+## privacy.handles_pii
+
+**Controls:** Whether the product stores or processes personal data — the *PII*
+condition
+
 **Values:** `true` | `false`
-**Default:** `true`
-**Set by:** `/start`, `/settings`
-**Read by:** `/gate-check`
 
-**Priority chain:** `strict_gate_checks` in `project.yaml` → hardcoded default of `true`
+- **Default:** unset ⇒ ask. **Unset is not `false`** (obligation 2): a product whose
+  PII status nobody has stated is never treated as PII-free.
+- **Status:** live
+- **Local override:** no
+- **Label:** `compliance` → `… handles_pii=true (project.yaml)`; an unset value prints `(unset -- ask)` for this part
+- **Set by:** `/setup-stack`, `/data-model` (asks first)
+- **Read by:** `/gate-check`, `/security-audit`, `/data-model`, `/api-design`, `/brainstorm`, `/architecture-decision`, `/create-architecture`, `/architecture-review`, `/incident`, `/launch-checklist` (*PII* items), `/help` (`when=pii`), `/project-stage-detect` (`when=pii`) (through the `compliance` label)
 
-> **Different from `review_mode: solo`.** `review_mode: solo` skips the gate
-> *entirely* — directors don't even run. `strict_gate_checks: false` runs the
-> gate normally but treats the verdict as advisory.
+Almost every consumer product with accounts handles PII (email, phone number,
+name). Korean products that run 본인인증 (identity verification) also receive name,
+date of birth, phone number and CI/DI values, and payment flows add financial data.
+Answer `false` only for products that genuinely store no personal data.
+
+| Skill | Effect when `true` |
+|---|---|
+| **`/gate-check`** | `docs/security/threat-model.md` required at the `validation` gate (recommended otherwise); every PII field in the data model needs a classification, retention rule and deletion path |
+| **`/security-audit`** | The privacy category runs: PII inventory from the data model, consent, retention, erasure, cross-border transfer |
+| **`/data-model`** | Classifies each field; sets the key (asking first) when it finds PII the configuration did not declare |
+
+---
+
+## compliance.regions
+
+**Controls:** Which regional legal and accessibility checklists apply — the
+*Regions* condition
+
+**Values:** list ⊆ `kr` | `eu` | `us`; `[]` = explicitly none
+
+- **Default:** unset ⇒ ask
+- **Status:** live
+- **Local override:** no
+- **Label:** `compliance` → `compliance: regions=kr,eu handles_pii=true (project.yaml)`; `regions=none` for `[]`; an unset part prints `(unset -- ask)`
+- **Set by:** `/setup-stack`
+- **Read by:** `/security-audit`, `/release-checklist`, `/launch-checklist`, `/business-rules-check`, `/incident`, `/rollout-plan` (message-consent check of its Communication Plan), `/localize`, `/ux-design`, `/team-growth`, `/team-content`, `/gate-check`, `/help`, `/project-stage-detect`, `/brainstorm`, `/architecture-decision`, `/create-architecture`, `/api-design`, `/data-model` (through the `compliance` label)
+
+Each listed region selects `.claude/docs/compliance/<region>.md` — a **topic
+checklist** (what to verify, with the law or standard and where to verify it), not
+legal advice and not a source of deadlines, fines or thresholds. A region that is
+not listed is never loaded.
+
+**List-enum rules:** each element validated; an invalid one is dropped with a note.
+**Set-but-empty is not unset**: `[]` means "we have checked, and no regional
+checklist applies" (`regions=none`), while an absent key means nobody has answered
+yet (ask). `/settings` validates each element, rejects the whole write if any is
+invalid, and writes flow style.
+
+| Region | Topics the checklist covers |
+|---|---|
+| `kr` | PIPA (개인정보 보호법), ISMS-P applicability, 위치정보법, 전자상거래법, 전자금융거래법 (PG, auto-debit, prepaid points), in-app payment rules, 정보통신망법 advertising-message consent (알림톡 is for informational messages only), KWCAG 2.2; integration notes for Kakao/Naver login, Toss Payments, 본인인증 |
+| `eu` | GDPR (lawful basis, DPIA, data-subject requests, transfers), ePrivacy (cookie consent and consent for marketing messages), European Accessibility Act, DSA where applicable |
+| `us` | CCPA/CPRA, COPPA (if minors), CAN-SPAM, TCPA, ADA / Section 508, state breach-notification laws, PCI DSS scope for card data |
+
+| Skill | Effect |
+|---|---|
+| **`/security-audit`** | Runs each listed region's checklist in `full` and `privacy` modes |
+| **`/gate-check`** | `launch` gate: each region's items resolved or explicitly accepted; cookie and marketing-message consent implemented where the region requires it |
+| **`/team-growth`, `/team-content`** | Consent & channel check before any campaign, push, email, SMS or 알림톡 template is approved; unset ⇒ ask |
+| **`/business-rules-check`** | Refund and cancellation rules checked against the `kr` commerce items when `kr` is listed |
+| **`/release-checklist`, `/launch-checklist`** | Regions block per listed region |
+| **`/ux-design`** | Regional accessibility standard layered on `accessibility.target` (KWCAG 2.2, EAA, ADA/508) |
+| **`/incident`** | Loads the listed regions' checklists for breach-notification topics when personal data is involved |
+
+---
+
+## localization.locales
+
+**Controls:** Which locales the product ships in — the *Multi-locale* condition and
+the language of customer-facing copy
+
+**Values:** flow list of BCP 47 tags (e.g. `[ko-KR, en-US]`)
+
+- **Default:** unset ⇒ ask
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/setup-stack`, `/localize`
+- **Read by:** `/localize`, `/release-notes`, `/api-design`, `/write-prd`, `/design-language`, `/ux-design`, `/ux-review`, `/launch-checklist` (*Multi-locale* items), `/release-checklist`, `/gate-check` (*Multi-locale*), `/rollout-plan`, `/incident`, `/team-content`, `/team-growth`, `/team-release`, `/help`, `/project-stage-detect`, `/feature-audit` (locale files and key parity), and the DD-CONTENT-VOICE context (the value, or "unset")
+
+*Multi-locale* = `localization.locales` has two or more entries; unset ⇒ ask.
+
+| Skill | Effect |
+|---|---|
+| **`/localize`** | Extraction, ICU MessageFormat checks and localization QA per locale; `qa` mode writes `production/qa/localization-qa-YYYY-MM-DD.md` |
+| **`/gate-check`** | Localization QA report required at the `launch` gate with *Multi-locale* |
+| **`/release-notes`** | One block per locale |
+| **DD-CONTENT-VOICE** (via `/team-content`) | Voice and terminology reviewed per shipped locale |
+
+Customer-facing copy — release notes, store text, microcopy — is written in the
+locales it ships in, whatever the conversation language. Headings, keys and tokens
+in artifacts stay English.
+
+---
+
+## accessibility.target
+
+**Controls:** The accessibility conformance level the product commits to — WCAG 2.2
+level, with regional standards layered on through `compliance.regions`
+
+**Values:** `none` | `wcag-a` | `wcag-aa` | `wcag-aaa`
+
+- **Default:** unset ⇒ ask. **Unset is not `none`**: `none` is a recorded decision,
+  unset is an unanswered question.
+- **Status:** live
+- **Local override:** no — a product commitment
+- **Label:** `accessibility` → `accessibility.target: <value> (project.yaml)` or `accessibility.target: (unset -- ask; unset is not none)`. Resolved through `resolve_setting`: an invalid value is dropped with a note and the unset form printed.
+- **Set by:** `/ux-design accessibility` (which writes `design/accessibility-requirements.md` with `> **Target**: <value>` as the first header line)
+- **Read by:** `/ux-review`, `/design-language`, `/ux-design`, `/write-prd`, `/qa-plan`, `/team-ui`, `/team-hardening`, `/launch-checklist`, `/gate-check`
+
+---
+
+### Value intent
+
+| Value | Meaning |
+|---|---|
+| `none` | No conformance target — a deliberate decision, e.g. an internal prototype. Still recorded. |
+| `wcag-a` | WCAG 2.2 Level A |
+| `wcag-aa` | WCAG 2.2 Level AA — the level most regional accessibility laws and procurement rules reference; check `.claude/docs/compliance/<region>.md` for the standard that applies |
+| `wcag-aaa` | WCAG 2.2 Level AAA — rarely achievable product-wide; usually a target for specific flows |
+
+Regional standards come from `compliance.regions`: KWCAG 2.2 (한국형 웹 콘텐츠
+접근성 지침) and the mobile app accessibility guideline for `kr`; the European
+Accessibility Act for `eu`; ADA / Section 508 for `us`.
+
+---
+
+### Affected skills
+
+| Skill | Effect |
+|---|---|
+| **`/ux-design accessibility`** | Writes the requirements document: POUR-organized requirement matrix per surface for the chosen level |
+| **`/design-language`** | Color contrast and focus styles checked against the target; DD-DESIGN-LANGUAGE receives the resolved line |
+| **`/ux-review`, `/team-ui`** | Specs and implementations reviewed against the target |
+| **`/team-hardening`** | Accessibility audit (axe, VoiceOver / TalkBack / NVDA passes) against the target |
+| **`/launch-checklist`** | Accessibility audit item |
+| **`/qa-plan`** | The accessibility row of `## Non-Functional Checks` targets the resolved value; unset ⇒ `NOT DETERMINED — accessibility.target unset` |
+| **`/gate-check`** | `validation`: accessibility requirements with the target committed (*UI*); `hardening` / `launch`: compliance verified against the target |
+
+---
+
+## performance.api_p95_ms
+
+**Controls:** The API latency budget — server-side p95 response time, in milliseconds
+
+**Values:** number (milliseconds, p95)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no — a shared SLO target
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/load-test`, `/gate-check`, `/rollout-plan`, `/architecture-review`, `/milestone-review`, `/dev-story`, `/smoke-check` (Batch 4 spot check), `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+> **Unset is not zero and not a default.** A budget nobody set is not a budget
+> that was met. Every performance reader reports `NOT ASSESSED` for a metric with
+> no committed target rather than measuring against a placeholder, and
+> `/load-test` asks for its thresholds. The same applies to every
+> `performance.*` budget below; `performance.enforce` decides what a breach does.
+
+Typical service targets are 200–500 ms at p95 for read endpoints; payment and
+third-party-bound operations are usually budgeted separately in `docs/ops/slo.md`.
+`/load-test` uses it as a k6/Locust/Gatling threshold; `/rollout-plan` uses it as a
+guardrail with a halt threshold.
+
+---
+
+## performance.error_rate_pct
+
+**Controls:** The API error budget — the percentage of requests that may fail
+(server errors)
+
+**Values:** number (percent, e.g. `0.5`)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/load-test`, `/gate-check`, `/rollout-plan`, `/milestone-review`, `/smoke-check` (Batch 4 spot check), `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+Used as a `/load-test` threshold and as a `/rollout-plan` guardrail metric whose
+breach halts a rollout stage. Unset ⇒ `NOT ASSESSED` (see
+`## performance.api_p95_ms`).
+
+---
+
+## performance.availability_pct
+
+**Controls:** The availability SLO target — the percentage of time (or of
+successful requests) the service must be available
+
+**Values:** number (percent, e.g. `99.9`)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/create-architecture` (writes `docs/ops/slo.md` `## SLIs & SLOs`), `/perf-profile`, `/gate-check`, `/rollout-plan`, `/milestone-review`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+`99.9` allows about 43 minutes of downtime per 30 days; `99.95` about 22 minutes.
+The error budget policy that goes with it lives in `docs/ops/slo.md`
+`## Error Budget Policy`. Unset ⇒ the SLO doc records the SLI without a target and
+the gate reports CONCERNS, not a pass.
+
+---
+
+## performance.lcp_ms
+
+**Controls:** The Largest Contentful Paint budget for the web surface, at the 75th
+percentile, in milliseconds
+
+**Values:** number (milliseconds, p75)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/gate-check`, `/rollout-plan`, `/dev-story`, `/smoke-check` (Batch 4 spot check), `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+Google's published "good" threshold for LCP is 2500 ms at p75
+(Source: https://web.dev/articles/vitals). Measure field data (RUM, CrUX) where it
+exists; lab runs (Lighthouse) are a proxy and `/perf-profile` labels them as such.
+Only meaningful with a `web` surface.
+
+---
+
+## performance.inp_ms
+
+**Controls:** The Interaction to Next Paint budget for the web surface, at the 75th
+percentile, in milliseconds
+
+**Values:** number (milliseconds, p75)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/gate-check`, `/rollout-plan`, `/smoke-check` (Batch 4 spot check), `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+Google's published "good" threshold for INP is 200 ms at p75
+(Source: https://web.dev/articles/vitals). INP needs real interactions — lab tools
+approximate it with Total Blocking Time — so `/perf-profile` reports lab-only
+results as partial.
+
+---
+
+## performance.cls
+
+**Controls:** The Cumulative Layout Shift budget for the web surface, at the 75th
+percentile
+
+**Values:** number (unitless score, p75, e.g. `0.1`)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/gate-check`, `/rollout-plan`, `/smoke-check` (Batch 4 spot check), `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+Google's published "good" threshold for CLS is 0.1 at p75
+(Source: https://web.dev/articles/vitals). Late-loading banners, web fonts without
+size-adjusted fallbacks and images without dimensions are the usual causes — CJK
+web fonts in particular, which is why `/design-language` covers font subsetting.
+
+---
+
+## performance.bundle_kb
+
+**Controls:** The JavaScript budget per web route — initial JS, gzip, in kilobytes
+
+**Values:** number (kilobytes, gzip, initial JS per route)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/bundle-audit`, `/perf-profile`, `/gate-check`, `/design-language` (font budget), `/dev-story`, `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+`/bundle-audit` measures it per route from the build output (Next.js build stats,
+a Vite/webpack bundle analyzer) and also reports CSS, images and fonts — CJK font
+subsetting included — against it. Mobile app size is reported by `/bundle-audit`
+from the store build, but has no budget key of its own.
+
+---
+
+## performance.cold_start_ms
+
+**Controls:** The mobile cold-start budget — from process start to the first
+interactive frame, in milliseconds
+
+**Values:** number (milliseconds)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/gate-check`, `/dev-story`, `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+Measured on a mid-range device, not the newest flagship — Korean and US user bases
+both include a long tail of older Android devices. Only meaningful with an `ios` or
+`android` surface; `/perf-profile` reports it `N/A — <surface> not configured` on a
+web-only product.
+
+---
+
+## performance.crash_free_pct
+
+**Controls:** The mobile stability budget — the percentage of sessions without a
+crash
+
+**Values:** number (percent of sessions, e.g. `99.5`)
+
+- **Default:** unset
+- **Status:** live
+- **Local override:** no
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/create-architecture`, `/settings`
+- **Read by:** `/perf-profile`, `/rollout-plan`, `/gate-check`, `/milestone-review`, `/smoke-check` (Batch 4 spot check), `/create-architecture`, `/architecture-decision`, `/create-control-manifest` (Performance Budgets table), `/launch-checklist` (performance item; passed to the sre-engineer consult), `/qa-plan` (`## Non-Functional Checks`), `/team-hardening`, `/walking-skeleton`, `/write-prd` (NFR `### Performance`), `/ux-design` (acceptance criteria), `/adopt` (presence audit)
+
+Read from the crash reporter (Firebase Crashlytics, Sentry, App Store Connect /
+Play Console vitals). `/rollout-plan` uses it as a guardrail for phased release —
+a drop below the target halts the next stage — and mobile binaries cannot be rolled
+back, so the kill switch or server flag is the rollback path.
+
+---
+
+## performance.enforce
+
+**Controls:** Whether a breach of a `performance.*` budget warns or blocks
+
+**Values:** `warn` | `block` | `off`
+
+- **Default:** `warn` (terminal default)
+- **Status:** live
+- **Local override:** yes — a stricter local value bites on that developer's machine only; CI runs `project.yaml`
+- **Label:** `performance.enforce` → `performance.enforce: <value> (<source>)`
+- **Set by:** `/settings`
+- **Read by:** `/perf-profile`, `/load-test`, `/bundle-audit`, `/gate-check`, `/team-hardening`, `/rollout-plan`
+
+**Priority chain:** `project.local.yaml` → `project.yaml` → terminal default `warn`,
+resolved by `resolve_config` like every other knob — an invalid value falls through
+to the default with a note, and the line names its source.
+
+> **Read it from the resolved block, never from `project.yaml` directly.** The key
+> is on the local whitelist, so "did this FAIL come from the project or from my own
+> `project.local.yaml`?" is exactly the question the resolved line answers.
+
+> **Mirrors the `testing.strict` pattern** for the nine budgets above: the budget
+> says what the target is; `performance.enforce` says what missing it does.
 
 ---
 
 ### Value intent
 
 | Value | Behavior |
-|-------|----------|
-| `true` | Default. FAIL or BLOCKING-CONCERNS verdict stops the stage transition. `project.stage` is not advanced. User must address findings and re-run gate. |
-| `false` | All gate verdicts are advisory. `/gate-check` still runs and reports findings. `project.stage` advances on user confirmation regardless of verdict. |
+|---|---|
+| `warn` | A breach is a finding: `/perf-profile` and `/bundle-audit` report CONCERNS; `/load-test` reports FAIL and marks it advisory in its `> **Enforcement**:` line; `/gate-check` surfaces it as CONCERNS, not a blocker |
+| `block` | A breach is a failure: the analysis skills report FAIL; `/gate-check` treats it as a blocker at the `hardening` and `launch` gates |
+| `off` | Budgets are informational: no breach is scored, and each reader notes that budgets were not scored instead of staying silent (obligation 3) |
 
 ---
 
 ### Affected skills
 
-| Skill | true | false |
-|-------|------|-------|
-| **gate-check** | FAIL verdict stops execution before writing new stage; CONCERNS verdict prompts user but defaults to "stay at current stage." | All verdicts surfaced as informational; user is asked "advance anyway?" with default Yes. |
-
----
-
-## team.size
-
-**Controls:** Which agents are active by default — solo devs shouldn't get studio-grade gating on every change
-**Values:** `individual` | `small` | `studio`
-**Default:** *none* — supplied by `modes.rigor` (`minimal`/`standard` yield `individual`, `full` yields `studio`)
-**Set by:** `/start` (via `modes.rigor`), `/settings`
-**Read by:** All `team-*` skills, `/gate-check`, all skills that spawn agents via `Agent`
-
-**Priority chain:** `team.size` in `project.local.yaml` → `project.yaml` → the `modes.rigor` expansion (`full` → `studio`, else `individual`) → no terminal default. Locally overridable — it is a personal-experience knob, not an on-disk artifact.
-
-> **`individual` at `minimal`/`standard`, `studio` at `full`.** CCGS's audience is
-> overwhelmingly solo indie developers, so the two lighter rigor tiers resolve
-> `team.size` to `individual` — a `standard` (default) project gets one active agent
-> per role, not 15 (directors and leads included). Only `rigor: full` opts into the
-> full `studio` roster; a smaller team on a big project sets `team.size: small`
-> explicitly, which wins over the rigor-derived value.
-
-> **Different axis from `workflow`.** `workflow` controls *what docs are required.*
-> `team.size` controls *which agents exist to make them.* A solo dev on
-> `workflow: full` still doesn't need all 49 agents — they need the same coverage
-> from a smaller active set.
-
----
-
-### Active agent set per value
-
-| Value | Active set | Notes |
-|-------|-----------|-------|
-| `individual` | Core 8: `producer`, `game-designer`, `gameplay-programmer`, engine-specialist (engine-driven), `technical-artist`, `sound-designer`, `qa-tester`, `writer`. **Default.** | Directors and lead-* run only on explicit invocation (e.g. via `/architecture-decision`). Specialists outside the core 8 routed through their nearest core agent. |
-| `small` | Core 15: directors (CD, TD, PR) + leads (LP, AD, QL, ND) + game-designer + systems-designer + engine-specialist + technical-artist + sound-designer + qa-tester + ux-designer + writer | `team-*` skills run their full pipeline. Optional specialists added per `review_mode`. |
-| `studio` | All 49 agents available. Engine sub-specialists (e.g. `unity-dots-specialist` separate from `unity-specialist`) routed when relevant. Adversarial review patterns active. | Commercial titles, learning the full org chart, large teams with parallel work. |
-
----
-
-### Affected skills
-
-| Skill | individual | small | studio |
-|-------|------|-------|--------|
-| **team-combat** | Single agent (gameplay-programmer) runs the pipeline; ai-programmer escalated only if AI work flagged | Default pipeline as documented | Default + engine sub-specialists + adversarial review pass |
-| **team-narrative** | writer only; narrative-director invoked only on explicit pillar conflict | narrative-director + writer + (per review_mode) localization-lead, world-builder | All narrative agents active + per-system writer reviews |
-| **team-ui** | ui-programmer + ux-designer | + accessibility-specialist + art-director | + engine UI specialist + adversarial review pass |
-| **team-audio** | sound-designer only | + audio-director + technical-artist | + localization-lead + per-system audio reviewers |
-| **team-level** | level-designer + gameplay-programmer | + systems-designer + art-director | + narrative-director + world-builder + accessibility-specialist |
-| **team-qa** | qa-tester only; qa-lead invoked at phase gates only | qa-lead + qa-tester pipeline | qa-lead + per-story qa-tester spawn + sign-off |
-| **team-release** | release-manager only | + producer + devops-engineer + qa-lead | + security-engineer + analytics-engineer + localization-lead |
-| **gate-check** | Panel width is `modes.workflow`'s axis, not this one (gates always run) — `team.size` affects only specialist depth within each director's review | Same as individual for directors; specialists within directors' reviews use small set | Same plus engine sub-specialists |
-| **architecture-decision** | TD + lead-programmer; engine-specialist | TD + LP + engine-specialist + engine sub-specialist if applicable | All of small + adversarial review by alternate engine-specialist |
-
----
-
-### Special cases
-
-- The 3 directors (CD, TD, PR) are present in ALL team sizes — phase gates require them. The setting affects *who else* shows up.
-- `individual` does not disable agents — it just changes which are active by default. Any agent can still be invoked by name.
-- When `team.size: individual` and a non-core agent is needed (e.g. `network-programmer` for a multiplayer story), the skill emits an informational note and routes through the nearest active core agent.
-
----
-
-## platform.multiplayer
-
-**Controls:** Whether the project includes real-time online multiplayer — determines
-which specialists are routed and which architecture sections are required  
-**Values:** `true` | `false`  
-**Default:** `false`  
-**Set by:** `/setup-engine`, `/settings`  
-**Read by:** `dev-story`, `create-architecture`, `security-audit`, `team-release`, `gate-check`
-
-**Priority chain:** `platform.multiplayer` in `project.yaml` → hardcoded default of `false`
-
-> **Distinct from `platform.online`.** `multiplayer` is *real-time multiplayer
-> specifically* (network specialist, netcode review, replication architecture).
-> `platform.online` covers everything else online (cloud saves, leaderboards,
-> telemetry). See next section.
-
-> **This is a project attribute, not a mode.** It describes what the game is,
-> not how the pipeline operates. It lives in `platform` alongside `targets`,
-> `primary_input`, and `gamepad_support` — not in `modes`.
-
----
-
-### Value intent
-
-| Value | Meaning |
-|-------|---------|
-| `true` | Game has real-time online multiplayer. Network specialist included in routing. Architecture requires networking layer. Security audit includes netcode review. |
-| `false` | No real-time multiplayer. Network specialist excluded from routing. Architecture has no networking section. |
-
----
-
-### Affected skills
-
-| Skill | multiplayer: true | multiplayer: false |
-|-------|------------------|-------------------|
-| **dev-story** | `network-programmer` included in routing table for networking stories | `network-programmer` excluded — networking stories flagged as out of scope |
-| **create-architecture** | Networking layer section required in architecture doc | Networking section omitted entirely |
-| **security-audit** | Includes netcode review — authentication, replication, cheat vectors | Netcode review skipped |
-| **team-release** | `network-programmer` included in release sign-off pipeline | `network-programmer` excluded |
-| **gate-check** | Technical Setup gate checks for network architecture ADR | No network architecture requirement |
-
----
-
-## platform.online
-
-**Controls:** Whether the project has any online features (leaderboards, cloud saves, telemetry, IAP)
-**Values:** `true` | `false`
-**Default:** `false`
-**Set by:** `/setup-engine`, `/settings`
-**Read by:** `dev-story`, `create-architecture`, `security-audit`, `team-live-ops`, `gate-check`
-
-**Priority chain:** `platform.online` in `project.yaml` → hardcoded default of `false`
-
-> **Independent of `platform.multiplayer`.** A single-player game with Steam
-> Cloud and leaderboards is `online: true, multiplayer: false`. The two settings
-> have different specialist routing implications.
-
----
-
-### Value intent
-
-| Value | Meaning |
-|-------|---------|
-| `true` | Project includes online services (cloud saves, leaderboards, achievements, telemetry, IAP, anything calling external APIs at runtime). Analytics-engineer included; live-ops considerations active; security-audit includes data-transit review. |
-| `false` | Project is fully offline. No analytics-engineer routing, no live-ops scope, security audit is local-only. |
-
----
-
-### Affected skills
-
-| Skill | online: true | online: false |
-|-------|--------------|---------------|
-| **create-architecture** | Data layer must include online service integration (cloud save sync, leaderboard auth, telemetry buffering) | Data layer is local storage only |
-| **security-audit** | Includes data-transit review — TLS, save data integrity, leaderboard tampering | Local-only review (save file tampering, save data privacy) |
-| **dev-story** | `analytics-engineer` routed for telemetry stories | analytics-engineer not routed |
-| **team-live-ops** | Skill is available (live-ops-designer routes meaningfully) | Skill emits "no online features — live ops scope is empty" |
-| **gate-check** | Technical Setup gate checks for online architecture decisions in critical ADRs | No online ADR requirement |
-
----
-
-## platform.cert_tier
-
-> ### WIRED — this setting is live
->
-> `/launch-checklist` and `/release-checklist` both resolve it and emit
-> console/mobile certification items only for the platforms it names, asking
-> which are in scope when it is unset.
-
-**Controls:** Certification target — scopes what `/launch-checklist` asks for
-**Values:** `none` | `itch` | `steam` | `console`
-**Default:** `none`
-**Set by:** `/setup-engine`, `/settings`
-**Read by:** `/launch-checklist`, `/release-checklist`
-
-**Priority chain:** `platform.cert_tier` in `project.yaml` → hardcoded default of `none`
-
----
-
-### Value intent
-
-| Value | Required compliance | Best for |
-|-------|---------------------|----------|
-| `none` | No certification — internal release, alpha, jam game | Default |
-| `itch` | itch.io upload requirements (build size, page setup, age tags) | Indie web/desktop releases |
-| `steam` | Steamworks integration, store page, achievements, depot build, system requirements, common content rules | Commercial PC releases |
-| `console` | Platform certification (PlayStation/Xbox/Switch) — heavy compliance: TRC/XR/Lotcheck, save data rules, controller mapping rules, age rating boards | Console releases |
-
----
-
-### Affected skills
-
-| Skill | none | itch | steam | console |
-|-------|------|------|-------|---------|
-| **launch-checklist** | Internal launch only — no external requirements | + itch.io page setup, butler upload, build size | + Steamworks integration, store page, achievements depot, common content checks | + Platform-specific TRC, certification submission, console save format compliance |
-| **release-checklist** | Smoke pass + version bump only | + itch.io page live, build uploaded to butler | + Steam store page live, depot pushed, achievements live | + Platform submission accepted, age rating boards cleared |
-| **/pre-cert** (future) | Not applicable | Lightweight readiness check | Steam common content audit | Full TRC compliance audit |
-
----
-
-## accessibility.target
-
-> ### RESERVED - NOT IMPLEMENTED
->
-> **No skill or hook reads this setting. Setting it has no effect.** Everything
-> below describes the intended design, not current behaviour.
->
-> The value is checked for valid spelling when you set it, and then ignored.
-> The accessibility-specialist routing and the Polish-stage audit described
-> below **do not happen at any level** — `/team-ui`, `/team-level`,
-> `/team-polish` and `/gate-check` do not read this setting, and `/start`
-> does not ask for it.
-
-**Controls:** Accessibility commitment level — routes accessibility specialist and gates audit requirements
-**Values:** `none` | `standard` | `aaa`
-**Default:** `none`
-**Set by:** `/start`, `/settings`
-**Read by:** `/team-ui`, `/team-level`, `/team-polish`, `/gate-check`
-
-**Priority chain:** `accessibility.target` in `project.yaml` → hardcoded default of `none`
-
-> **Default is `none`, not `standard`.** Most CCGS users are solo devs and jam-game
-> makers — defaulting to `standard` would auto-spawn the accessibility specialist
-> for projects where it's overhead. `/start` asks the question explicitly so users
-> who care can opt into `standard` or `aaa` consciously.
-
----
-
-### Value intent
-
-| Value | Required features | Specialist routing |
-|-------|-------------------|--------------------|
-| `none` | None enforced | `accessibility-specialist` not spawned |
-| `standard` | Colorblind-safe palette, subtitles for any voice content, key remapping | `accessibility-specialist` runs in team-ui, team-level |
-| `aaa` | Full Game Accessibility Guidelines: motor, vision, hearing, cognitive categories | `accessibility-specialist` runs in all team-* skills; mandatory audit at Polish stage |
-
----
-
-### Affected skills
-
-| Skill | none | standard | aaa |
-|-------|------|----------|-----|
-| **team-ui** | accessibility-specialist not spawned | accessibility-specialist included for HUD/menu reviews | accessibility-specialist included for every screen + accessibility audit pass |
-| **team-level** | accessibility-specialist not spawned | accessibility-specialist reviews level for colorblind safety and signposting | accessibility-specialist reviews for full mobility/audio/cognitive considerations |
-| **team-polish** | No accessibility pass | Final accessibility pass added | Full accessibility audit required before completion |
-| **gate-check** | No accessibility check at any stage | Polish gate checks for the standard required features | Polish gate requires full Game Accessibility Guidelines compliance audit |
+| Skill | Effect |
+|---|---|
+| **`/perf-profile`** | `## Breaches` scored FAIL (`block`) or CONCERNS (`warn`) |
+| **`/bundle-audit`** | Route budgets scored the same way |
+| **`/load-test`** | Threshold breach → verdict FAIL; the `> **Enforcement**:` line marks it blocking (`block`) or advisory (`warn`); `off` → recorded, not scored |
+| **`/gate-check`** | "Performance within budgets" at `hardening`: blocker (`block`), CONCERNS (`warn`), skipped with a note (`off`) |
+| **`/team-hardening`** | `## Performance` section verdict |
+| **`/rollout-plan`** | Whether a guardrail breach during a stage is an automatic halt or a decision for the stage owner |
 
 ---
 
@@ -1503,620 +2236,296 @@ which specialists are routed and which architecture sections are required
 > No reference anywhere outside this file.
 
 **Controls:** Default sprint and milestone durations for planning
-**Values:**
-- `sprint_length`: `1w` | `2w` | `3w` | `4w` | `none`
-- `milestone_length`: `4w` | `6w` | `8w` | `12w`
-**Defaults:** `sprint_length: 2w`, `milestone_length: 8w`
-**Set by:** `/start`, `/settings`
-**Read by:** `/sprint-plan`, `/milestone-review`, `/sprint-status`, future velocity tracking
 
-**Priority chain:** `cadence.*` in `project.yaml` → hardcoded defaults
+**Values:** strings — intended `cadence.sprint_length` ∈ `1w`, `2w`, `3w`, `4w`, `none`; `cadence.milestone_length` ∈ `4w`, `6w`, `8w`, `12w`
 
-> **`none` for `sprint_length`** means continuous-flow / kanban-style — no sprint boundaries.
-> `/sprint-plan` becomes `/work-plan` and is invoked manually as needed. Velocity tracking
-> is per-week rather than per-sprint.
+- **Default:** unset
+- **Status:** RESERVED
+- **Local override:** no
+- **Label:** —
+- **Set by:** —
+- **Read by:** none
 
----
-
-### Affected skills
-
-| Skill | What changes |
-|-------|--------------|
-| **sprint-plan** | Capacity calculated as `sprint_length × team.size velocity baseline`. `none` makes the skill emit a continuous-flow plan instead. |
-| **milestone-review** | Milestone window for retrospective scope = `milestone_length`. |
-| **sprint-status** | Burn-down chart x-axis spans `sprint_length`. |
-| **retrospective** | Sprint retro fires at `sprint_length` cadence (or weekly when sprint_length is `none`). |
-
----
-
-## performance.target_framerate and performance.frame_budget_ms
-
-**Controls:** The frame-rate target and its per-frame millisecond budget
-**Values:** integers (e.g. `60`, `16.67`)
-**Default:** none — unset means no budget was ever committed to
-**Set by:** the user, by hand or via `/settings`
-**Read by:** `/perf-profile`, `/gate-check`
-
-## performance.draw_call_limit and performance.memory_ceiling_mb
-
-**Controls:** Per-frame draw-call ceiling and total memory ceiling
-**Values:** integers
-**Default:** none — unset means no budget was ever committed to
-**Set by:** the user, by hand or via `/settings`
-**Read by:** `/perf-profile`, `/gate-check`
-
-> **Every setting needs its own `## ` heading in this file, not just a table
-> row.** The dead-settings audit derives what it checks from those headings, so
-> a setting mentioned only inside a table is invisible to it — it can neither be
-> reported DEAD if it loses its reader, nor caught if it gains one. A setting
-> outside the audit's field of view is exactly how a documented-but-dead entry,
-> or a working-but-listed-as-dead one, survives unnoticed.
->
-> **Unset is not zero and not a default.** A budget nobody set is not a budget
-> that was met — `/perf-profile` must report `NOT ASSESSED` for a metric with no
-> committed target rather than measuring against a placeholder. That exact
-> failure (">99% headroom against a 16.67ms budget", from zero profiler data)
-> is one of the two instances that motivated `.claude/rules/skill-authoring.md`.
-
-## performance.enforce
-
-**Controls:** Whether performance budget violations warn or block
-**Values:** `warn` | `block` | `off`
-**Default:** `warn`
-**Set by:** `/start`, `/settings`
-**Read by:** `/perf-profile`, `/gate-check`, CI runner
-
-**Priority chain:** `performance.enforce` in `project.local.yaml` → `project.yaml` → hardcoded default of `warn`, resolved by `resolve_config --keys performance.enforce`
-
-> **Read it from the resolved block, never from `project.yaml` directly.** The key is on the `/settings --local` whitelist. `/perf-profile` Phase 0 and `/gate-check` Section 3 are the two readers the table above promises — a key that is enum-validated, accepted and displayed while nothing reads it is exactly the failure this warning guards against.
-
-> **Mirrors the `testing.strict` pattern.** Defines what happens when a budget
-> defined in `performance.target_framerate`, `frame_budget_ms`, `draw_call_limit`,
-> or `memory_ceiling_mb` is exceeded.
-
----
-
-### Value intent
-
-| Value | Behavior |
-|-------|----------|
-| `warn` | Default. Profile runs flag violations as findings. CI logs them but doesn't fail. `/gate-check` surfaces them as concerns, not blockers. |
-| `block` | Profile failures block CI. `/gate-check` treats violations as FAIL verdict (Polish stage onward). |
-| `off` | Performance budgets are informational only — no profile runs gated, no findings surfaced. |
-
----
-
-## project.stage
-
-**Controls:** The current development phase — determines which gate-check
-validates and what artifacts are expected to exist  
-**Values:** `Concept` | `Systems Design` | `Technical Setup` | `Pre-Production` | `Production` | `Polish` | `Release`  
-**Default:** `Concept`  
-**Set by:** `/gate-check` on PASS verdict only — never set manually  
-**Read by:** `gate-check`, `project-stage-detect`, `help`, `sprint-status`, `day-one-patch`
-
-> **Stage count:** This document uses the
-> 7-stage reality implemented by gate-check:
-> `Concept | Systems Design | Technical Setup | Pre-Production | Production | Polish | Release`
-
-> **This is a project attribute, not a mode.** It records where the project is
-> in its lifecycle. Only `/gate-check` writes it — and only on a PASS verdict
-> with user confirmation. Never write it manually mid-session except to correct
-> an incorrect auto-detect.
-
-> **Legacy fallback + dual-write.** Stage is read from `project.stage` in
-> `project.yaml` first, then legacy `production/stage.txt`, then artifact
-> auto-detection. When `/gate-check` advances the stage it dual-writes BOTH
-> `project.yaml` and `production/stage.txt`, so hooks that have not migrated
-> still resolve correctly. `/start` also dual-writes the initial stage. The
-> legacy `.txt` file is retired at `.claude/scripts/migrate-v1-config.sh --finalize`.
-
----
-
-### Stage progression and gate requirements
-
-Each row is the gate that must be passed to advance FROM that stage.
-
-| From stage | Key artifacts required to pass | gate-check writes |
-|------------|-------------------------------|-------------------|
-| **Concept** | `game-concept.md`, design pillars, Visual Identity Anchor | `Systems Design` |
-| **Systems Design** | `systems-index.md`, all MVP GDDs reviewed, cross-GDD consistency check | `Technical Setup` |
-| **Technical Setup** | Engine configured, art bible sections 1–4 (if visual stories exist), 3+ ADRs, architecture doc, control manifest, test framework | `Pre-Production` |
-| **Pre-Production** | Prototype, 3+ playtests, UX specs, epics defined, first sprint plan | `Production` |
-| **Production** | Core mechanics implemented, main path playable, smoke check passes, QA sign-off | `Polish` |
-| **Polish** | All features complete, content complete, localization, no critical bugs | `Release` |
-
-Gates adjust per `modes.workflow` — see `modes.workflow` section for what is
-required at `standard` and `minimal` levels.
-
----
-
-### Affected skills
-
-| Skill | How it uses stage |
-|-------|------------------|
-| **gate-check** | Reads current stage to determine which gate to validate. Writes next stage on PASS. |
-| **project-stage-detect** | Reads `project.stage` first — if set, uses it as authoritative. Falls back to heuristic detection only if absent. |
-| **help** | Uses stage to determine "where are you in the pipeline" and surfaces the correct next steps. |
-| **sprint-status** | Displays current stage in status summary. |
-| **day-one-patch** | Validates that stage is `Release` before proceeding — refuses to run if project is not at release stage. |
-
----
-
-## project.kind
-
-> ### RESERVED - NOT IMPLEMENTED
->
-> **No skill or hook reads this setting. Setting it has no effect.** Everything
-> below describes the intended design, not current behaviour.
->
-> No reference anywhere outside this file.
-
-**Controls:** What type of project this is — routes skill subsets
-**Values:** `game` | `tool` | `engine` | `mod` | `library`
-**Default:** `game`
-**Set by:** `/start`, `/setup-engine`
-**Read by:** Many skills (advisory routing — see below)
-
-**Priority chain:** `project.kind` in `project.yaml` → hardcoded default of `game`
-
----
-
-### Value intent
-
-| Value | Meaning | What's deactivated |
-|-------|---------|-------------------|
-| `game` | Default. Full CCGS framework applies. | Nothing |
-| `tool` | Developer tool, not a game | Skip art bible, narrative, level design, playtesting |
-| `engine` | Custom engine or library underneath games | Skip game-specific concerns entirely (narrative, art, playtest) |
-| `mod` | Mod for an existing game | Skip engine setup; assume parent engine; reduce architecture scope |
-| `library` | Reusable library | Emphasize tests + API design; design docs lighter; no asset pipeline |
-
----
-
-### Affected skills
-
-| Skill | game | tool | engine | mod | library |
-|-------|------|------|--------|-----|---------|
-| **brainstorm** | Full game-concept output | Tool concept output (user, problem, solution) | Engine concept (target use cases, scope) | Mod concept (what changes) | Library concept (API surface, target consumers) |
-| **art-bible** | Required at appropriate workflow level | Skipped | Skipped | Optional (depends on visual scope) | Skipped |
-| **map-systems** | Full game systems decomposition | Tool subsystems | Engine subsystems | Modified-system map | Library module map |
-| **playtest-report** | Required at appropriate stages | Skipped or replaced with user testing | Skipped | Required (compatibility testing) | Skipped or replaced with API usage testing |
-| **setup-engine** | Game engine setup | Skipped or replaced with build tool setup | Self-referential — engine IS the project | Parent engine assumed | Skipped or replaced with library scaffolding |
-
----
-
-## engine.name and specialists
-
-**Controls:** Which engine-specific specialist agents are routed to for code
-implementation, review, and architecture validation  
-**Values:** `Godot` | `Unity` | `Unreal`  
-**Default:** `[UNSET]` — must be configured via `/setup-engine`  
-**Set by:** `/setup-engine`  
-**Read by:** `dev-story`, `code-review`, `architecture-decision`, `create-architecture`, all `team-*` skills
-
-> **Currently stored in `technical-preferences.md`**, not `project.yaml`. After
-> YAML expansion, `engine.name` and the specialist routing table move to
-> `project.yaml specialists` block. Skill behavior is unchanged — only the
-> source file changes.
-
-> **This is a project attribute, not a mode.** Engine choice drives specialist
-> routing the same way `platform.multiplayer` drives network routing — skills
-> respond to a fact about the project, not a process preference.
-
----
-
-### Specialist routing by engine
-
-| Engine | Language/code specialist | Shader specialist | UI specialist | Additional specialists |
-|--------|--------------------------|-------------------|---------------|----------------------|
-| **Godot** | `godot-gdscript-specialist` (GDScript) or `godot-csharp-specialist` (C#) — driven by `engine.language` | `godot-shader-specialist` | `godot-specialist` | `godot-gdextension-specialist` |
-| **Unity** | `unity-specialist` | `unity-shader-specialist` | `unity-ui-specialist` | `unity-addressables-specialist`, `unity-dots-specialist` |
-| **Unreal** | `unreal-specialist` | `unreal-specialist` | `ue-umg-specialist` | `ue-gas-specialist`, `ue-blueprint-specialist`, `ue-replication-specialist` |
-| **[UNSET]** | No specialist spawned — warning emitted | No specialist spawned | No specialist spawned | None |
-
----
-
-### Affected skills
-
-| Skill | How engine.name is used |
-|-------|------------------------|
-| **dev-story** | Routes code stories to language specialist. Spawns engine specialist alongside for HIGH engine-risk stories or engine-specific API usage. |
-| **code-review** | Routes review to language, shader, or UI specialist based on file type being reviewed. |
-| **architecture-decision** | Loads `docs/engine-reference/[engine]/VERSION.md` before authoring. Spawns engine specialist to validate ADR for API correctness and post-cutoff compatibility. |
-| **create-architecture** | Includes engine-specific constraints and patterns in architecture doc based on engine choice. |
-| **team-combat / team-ui / team-audio / team-level / team-polish** | All team skills spawn the appropriate engine specialist for implementation phases. |
+**Intended design.** `/sprint-plan` would size capacity as sprint length × velocity;
+`none` would mean continuous flow (kanban) with weekly velocity; `/milestone-review`
+would scope its window to the milestone length; `/sprint-status` would span the
+burn-down over the sprint length; `/retrospective` would fire at the sprint cadence.
 
 ---
 
 ## commands
 
-> **Live since the run-and-observe step.** This block was RESERVED — written by
-> `/setup-engine`, read by nothing — through most of v1.1. `test`, `smoke` and
-> `build` gained readers as the parse-check and smoke gates landed; `run` gained
-> its reader last, when `/dev-story` Phase 6 step 4 started launching the game to
-> look at it. The per-skill table at the bottom is now current behaviour, not
-> intent. `validate-push.sh` was once named as a reader and never was.
+**Controls:** The exact shell commands to install, run, build, test and check the
+product — so skills execute what the project really uses instead of guessing
 
-**Controls:** Explicit shell commands to build, test, run, and smoke-test the project
-**Values:** strings — shell-executable commands
-**Default:** `[UNSET]` — populated by `/setup-engine` with engine-typical defaults
-**Set by:** `/setup-engine`, `/settings`
-**Written by:** `/setup-engine`, `/settings`. **Read by:** `test` — `/dev-story` (Phase 6 parse check), `/smoke-check`, `project-coherence.sh`; `smoke` — `/dev-story`; `build` — `/smoke-check`, `project-coherence.sh`; `run` — `/dev-story` (Phase 6 step 4, the run-and-observe step). `/launch-checklist` and `/regression-suite` name these commands but cannot execute them — their `allowed-tools` has no `Bash`.
-  *(Derived by grep. A helper-based read would not show up, so treat this list as the verified floor, not a ceiling.)*
+**Values:** each field is a string, or an OS map with keys `default` / `linux` / `macos` / `windows`
 
-**Priority chain:** `commands.*` in `project.yaml` → engine-typical default → no command available
-
-> **Why explicit:** Without this block, CCGS has to guess engine-typical conventions
-> for invoking the project. Better to be explicit per-project — covers cases where
-> projects customize their build (e.g., a Godot project using gdunit4 for tests but
-> a custom export script for builds).
+- **Default:** unset — asked, never guessed
+- **Status:** live
+- **Local override:** no — build and test commands are project facts; OS differences go in the OS map
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/setup-stack`, `/test-setup` (`test`, `e2e`, `lint`, `typecheck`), `/settings`
+- **Read by:** `/dev-story` (`run`, `dev`, `install`, `test`, `typecheck`, `lint`, `migrate`), `/walking-skeleton` (`install`, `run`, `build`, `test`, `typecheck`, `e2e`, `migrate`), `/smoke-check` (`build`, `test`, `e2e`, `smoke`, `run`, `dev`), `/test-setup` (`install`, `dev`, `run`, `test`, `e2e`, `lint`, `typecheck`), `/gate-check` (`test`, `e2e`), `/story-done` (`test`), `/hotfix` (`test`, `smoke`), `/team-feature` and `/team-hardening` (`test`, `e2e`), `/regression-suite` (`test`, `e2e` — named, not run), `/bundle-audit` (`build`), `/api-design` (`api_lint`), `/data-model` (`migrate`), `/load-test` (`load_test`), `/adopt` (`api_lint`; presence audit of `test`, `e2e`, `lint`, `typecheck`), `/bug-report` (`test`, verify mode), `/perf-profile` (`run`, `build`, `test` — passed to performance-engineer), `/security-audit` (`run`, `dev` — how to start a local target for the header check), `project-coherence.sh` (every command that names a package script must exist in the relevant `package.json`)
 
 ---
 
 ### Fields
 
-Each command can be a simple string (used on all OSes) or an OS-aware map:
+| Field | Purpose | Main reader |
+|---|---|---|
+| `install` | Install dependencies from the lockfile | — (onboarding, CI) |
+| `dev` | Start the local development servers | `/dev-story` run-and-observe (fallback for `run`) |
+| `run` | Start the app so a story can be observed | `/dev-story` Phase 6 run-and-observe (`.claude/docs/run-and-observe.md`) |
+| `build` | Production build | `/smoke-check` batch 1, `/bundle-audit` (per-route sizes) |
+| `test` | Unit and integration suites | `/dev-story`, `/smoke-check`, `/gate-check` (test suite passing) |
+| `e2e` | End-to-end suite (the smoke tag selects critical journeys) | `/smoke-check` batch 2 |
+| `lint` | Linters | CI, `/dev-story` |
+| `typecheck` | Type checking (`tsc --noEmit`, mypy, …) | `/dev-story` |
+| `api_lint` | Contract linting (Spectral, Redocly) | `/api-design` |
+| `migrate` | Apply migrations — dry runs only, against a disposable database | `/data-model`, `/dev-story` (migration dry-run) |
+| `smoke` | Minimal "does it boot and answer?" check | `/smoke-check` |
+| `load_test` | Load-test runner (k6, Locust, Gatling) | `/load-test` (runs only when set and confirmed) |
+| `deploy_preview` | Deploy a **preview** environment — never production | — (humans; allowed locally, see `settings-local-template.md`) |
 
-**Simple form** (one command, used on every OS):
+**Simple form** — one command used on every OS (Moa, a pnpm + Turborepo monorepo):
+
 ```yaml
 commands:
-  build: "godot --headless --export-debug '<PRESET>'"   # ask; see the note below
-  test:  "godot --headless --script tests/gdunit4_runner.gd"
-  run:   "godot --path . --windowed --resolution 1280x720"
-  smoke: "godot --headless --quit-after 5"
+  install: pnpm install --frozen-lockfile
+  dev: pnpm turbo run dev
+  run: pnpm --filter web start
+  build: pnpm turbo run build
+  test: pnpm turbo run test
+  e2e: pnpm exec playwright test
+  lint: pnpm turbo run lint
+  typecheck: pnpm turbo run typecheck
+  api_lint: pnpm exec redocly lint docs/api/openapi.yaml
+  migrate: pnpm --filter api exec prisma migrate deploy   # against a disposable DATABASE_URL only
+  smoke: pnpm exec playwright test --grep @smoke
+  load_test: k6 run tests/load/load.js
+  deploy_preview: vercel deploy
 ```
 
-Note that `build` is the one row the simple form suits least: an export preset
-names a *platform*, so a single build string is portable only for a project that
-builds one platform. The other three rows are genuinely OS-independent.
+**OS-aware form** — different commands per OS:
 
-**OS-aware form** (different commands per OS):
 ```yaml
 commands:
-  build:
-    default: "godot --headless --export-debug 'Linux/X11'"
-    windows: "godot.exe --headless --export-debug 'Windows Desktop'"
-    macos:   "godot --headless --export-debug 'macOS'"
   test:
-    default: "godot --headless --script tests/gdunit4_runner.gd"
-  run:
-    default: "godot --path . --windowed --resolution 1280x720"
-  smoke:
-    default: "godot --headless --quit-after 5"
+    default: ./gradlew test
+    windows: gradlew.bat test
 ```
 
-**Resolution rule:** if the value is a string, use it as-is on any OS. If the
-value is a map, skills/hooks read the current OS and pick the matching key
-(`linux`, `windows`, `macos`). Fall back to `default` if no OS-specific key
-matches.
+**Resolution rule:** a string is used as-is on every OS. A map is read for the
+current OS key (`linux`, `macos`, `windows`), falling back to `default`. The
+OS-specific keys live inside the locked file — they are not a local override.
 
-This solves the Windows/Linux/macOS path-and-binary-name differences without
-breaking the whitelist (commands stays locked to project.yaml — the OS-specific
-keys are inside the locked file, not a local override).
+> **`run` and `build` are asked, never guessed.** A wrong guess either fails
+> loudly or — worse — succeeds while building or starting the wrong app in a
+> multi-app workspace. With no command, readers say `NOT CHECKED` or
+> `Run result: NOT VERIFIED — <reason>`.
 
-| Field | Purpose |
-|-------|---------|
-| `build` | Full project build for CI or release. Used by `/launch-checklist`, CI hooks. |
-| `test` | Run the full test suite. Used by `/smoke-check`, `/regression-suite`, CI hooks. |
-| `run` | Launch the **game** windowed at a fixed resolution — not the editor. Used by `/dev-story` Phase 6 step 4 to observe the feature and retain a screenshot; see `.claude/docs/run-and-observe.md` for the per-engine capture flags that are appended to it. |
-| `smoke` | Minimal "does it boot?" check. Named by `/smoke-check` in its prose. Should complete in < 5 seconds. |
-
----
-
-### Engine defaults
-
-When `/setup-engine` runs, it populates `commands` based on engine choice — except
-the **build** row, which it must **ask** for. The build artifact is named by a
-project-defined string (a Godot export preset, a Unity build target), and no
-engine reference in this repo can source it. See `/setup-engine` §"The Godot
-`build` row must not hardcode `'Linux/X11'`".
-
-| Engine | build | test | run | smoke |
-|--------|-------|------|-----|-------|
-| Godot | `godot --headless --export-debug '<PRESET>'` | `godot --headless --script tests/gdunit4_runner.gd` | `godot --path . --windowed --resolution 1280x720` | `godot --headless --quit-after 5` |
-| Unity | `Unity -batchmode -quit -projectPath . -buildTarget <TARGET>` | `Unity -runTests -projectPath . -testPlatform PlayMode` | `Builds/<Target>/<Game>.exe -screen-width 1280 -screen-height 720 -screen-fullscreen 0` | `Unity -batchmode -quit -projectPath . -executeMethod SmokeCheck.Run` |
-| Unreal | engine-specific (varies by version) | engine-specific | engine-specific | engine-specific |
-
-> **`<PRESET>` and `<TARGET>` are placeholders, not values to copy.** A Godot
-> export preset is whatever string the operator typed into `export_presets.cfg`;
-> the shipped defaults are per-platform (`Windows Desktop`, `macOS`, `Web`,
-> `Linux/X11`). Copying a preset name you do not have gives you a build command
-> that fails with `Unknown export preset`; copying one you *do* have, but did not
-> mean, gives you a command that succeeds and builds the wrong platform. The
-> second is the dangerous one. If no presets exist yet — common, since
-> `/setup-engine` usually runs before the project has any — write
-> `[TO BE CONFIGURED]` rather than guessing a name.
-
-Users override per-project as needed via `/settings commands.<field>=<value>` or by editing `project.yaml` directly.
+> **Production deploys are never a command here.** `deploy_preview` targets a
+> preview environment; the shared `.claude/settings.json` denies production deploy,
+> IaC apply and destructive database commands, and agents never run them — a
+> human does, after the rollout plan says so.
 
 ---
 
 ### Affected skills
 
 | Skill | How `commands` is used |
-|-------|------------------------|
-| **smoke-check** | Invokes `commands.smoke` (or `commands.test` for full pass). Critical path for QA hand-off. |
-| **launch-checklist** | Emits a checklist **item** asking whether the build produces a valid artifact. It does **not** run `commands.build` — its `allowed-tools` has no `Bash`. The verification is a human step. |
-| **validate-push.sh** | Does **not** read `commands.*`. It warns on pushes to protected branches (`develop`/`main`/`master`) and runs no build or smoke command — the block path in it is commented out, so it never fails a push. |
-| **dev-story** | Phase 6 step 2 runs `commands.test` or `commands.smoke` as the parse check. Phase 6 step 4 runs `commands.run` — the windowed game launch — to observe the feature and retain a screenshot (`.claude/docs/run-and-observe.md`). |
-| **regression-suite** | Maps coverage by **globbing test filenames**. It does **not** invoke `commands.test` — its `allowed-tools` has no `Bash`, so coverage here means "a test file exists", never "a test passed". |
+|---|---|
+| **`/dev-story`** | Runs `test` / `typecheck` as the build check, then `run` (or `dev`) to observe the story and retain evidence |
+| **`/smoke-check`** | Batch 1 `build` + start + health endpoint; batch 2 critical journeys via `e2e` (smoke tag) or `smoke`; the report names the environment |
+| **`/api-design`** | Runs `api_lint` on the contract |
+| **`/data-model`** | Runs `migrate` as a dry run against a disposable database — never a shared one |
+| **`/load-test`** | Runs `load_test` against staging only (production targets are refused) |
+| **`/bundle-audit`** | Runs `build` (announced first) and measures per-route JS/CSS from the production build; unset ⇒ every route row `NOT ASSESSED — commands.build unset` |
+| **`/gate-check`** | "Test suite passing" runs `test` via Bash when set; otherwise `NOT ASSESSED` |
+| **`/regression-suite`** | Names the commands but cannot execute them — its tools have no Bash; coverage there means "a test file exists", never "a test passed" |
+| **`validate-push.sh`** | Does **not** read `commands.*`; it warns on protected branches and reminds about migrations |
 
 ---
 
 ## naming
 
-**Controls:** Code naming conventions for the project
-**Values:** see field list below
-**Default:** engine-specific (auto-populated by `/setup-engine`)
-**Set by:** `/setup-engine`, `/settings`
-**Read by:** `/adopt`, `/architecture-review`, `/asset-spec`,
-`/create-architecture`, `/create-control-manifest`, `/dev-story`,
-`/vertical-slice` — each reads `naming.*` from `project.yaml` and feeds the
-conventions into a brief, manifest or spec. **NOT by `/code-review` and NOT by
-`validate-commit.sh`**.
-  *(Reader list derived by grep, so treat it as the verified floor rather than
-  a ceiling — a skill reading the value through a helper would not show up.)*
+**Controls:** Naming conventions for code, API, database, environment and analytics
+identifiers
 
-> **These conventions are guidance, not a gate.** They reach your project by
-> being passed into briefs, manifests and specs for whoever writes the code.
-> Nothing checks the result: `/code-review` does not validate files against them
-> and `validate-commit.sh` does not warn on violations — neither contains any
-> naming logic. If you need enforcement, it has to be added.
->
-> **Known rough edge — asset filenames.** `validate-assets.sh` warns unless files
-> under `assets/` are lowercase-with-underscores, and it takes no config input,
-> while `/asset-spec` specifies asset names from `naming.*`. On Unity, Unreal and
-> Godot-C#, where `/setup-engine` sets `naming.files: PascalCase`, that hook will
-> warn on assets named exactly as `/asset-spec` specified them. The two are
-> measuring different things — `naming.files` describes **source** files by its
-> own examples (`PlayerController.cs`), and no key currently governs asset
-> filenames — so treat the hook's naming warning as advisory on those engines.
+**Values:** each field is a string convention (`kebab-case`, `PascalCase`, `camelCase`, `snake_case`, `SCREAMING_SNAKE`, `object_action`, …)
 
-> **Moved from `technical-preferences.md`**, which is being deleted. Naming
-> conventions are project-level facts shared by everyone on the project, so they
-> belong in `project.yaml` alongside the rest of your structured config.
+- **Default:** unset
+- **Status:** live
+- **Local override:** no — conventions are shared
+- **Label:** — (read from `project.yaml`)
+- **Set by:** `/setup-stack`
+- **Read by:** `/dev-story`, `/create-control-manifest`, `/api-design`, `/data-model`, `/write-prd`, `/ux-design`, `/ux-review`, `/prd-review` (`naming.events`), `/architecture-review`, `/adopt`, `/bundle-audit`, `/walking-skeleton`, `/test-helpers`, `/test-setup`
+
+> **Guidance, not a gate.** The conventions reach the code by being passed into
+> briefs, manifests and contracts. No hook validates code against them;
+> `/adopt` audits conformance. If you need enforcement, configure your linters
+> (ESLint naming rules, ktlint, SwiftLint, Ruff) — the CI `lint` command is where it
+> belongs.
 
 ---
 
 ### Fields
 
-| Field | Values | Godot default | Unity default | Unreal default |
-|-------|--------|---------------|---------------|----------------|
-| `classes` | `PascalCase` \| `snake_case` \| `camelCase` | PascalCase | PascalCase | PascalCase |
-| `variables` | `snake_case` \| `camelCase` | snake_case | camelCase | camelCase |
-| `constants` | `SCREAMING_SNAKE` \| `PascalCase` | SCREAMING_SNAKE | SCREAMING_SNAKE | SCREAMING_SNAKE |
-| `signals` (Godot) / `events` (Unity, Unreal) | `past_tense` \| `on_event_name` | past_tense | on_event_name | OnEventName |
-| `files` | `snake_case` \| `PascalCase` \| `kebab-case` | snake_case | PascalCase | PascalCase |
-| `scenes` / `prefabs` | `snake_case` \| `PascalCase` | snake_case | PascalCase | PascalCase |
+| Field | Governs | Typical value (TypeScript web + Node API) |
+|---|---|---|
+| `files` | Source file names | `kebab-case` (`goal-card.tsx`) |
+| `components` | UI component names | `PascalCase` (`GoalCard`) |
+| `classes` | Classes, types | `PascalCase` |
+| `variables` | Variables, functions | `camelCase` |
+| `constants` | Constants | `SCREAMING_SNAKE` |
+| `api_paths` | REST path segments | `kebab-case`, plural resources (`/v1/savings-goals`) |
+| `api_fields` | JSON field names | `camelCase` (or `snake_case` — pick one per API) |
+| `db_tables` | Tables | `snake_case`, plural (`savings_goals`) |
+| `db_columns` | Columns | `snake_case` |
+| `env_vars` | Environment variables | `SCREAMING_SNAKE` (`TOSS_SECRET_KEY`) |
+| `events` | Analytics event names | `object_action` (`goal_created`, `payment_failed`) |
 
-> **`signals` vs `events`:** Godot uses signals natively; Unity uses C# events
-> or UnityEvents; Unreal uses delegates and dynamic multicast. The field stays
-> named `signals` in project.yaml for consistency across engines — interpret as
-> "event-like callbacks" regardless of engine.
+Other ecosystems differ: Kotlin and Swift files follow their type names
+(`PascalCase`), Python uses `snake_case` files and functions, Dart uses
+`snake_case` files and `lowerCamelCase` members.
 
 ---
 
 ### Affected skills
 
 | Skill | How naming is used |
-|-------|--------------------|
-| **dev-story** | Passes the naming conventions to the programmer subagent as part of the implementation context |
-| **create-control-manifest** | Emits the conventions as manifest rows (classes, variables, signals/events, files, constants) |
-| **asset-spec** | Specifies asset naming per the configured convention |
-| **create-architecture** / **architecture-review** | Read as project config alongside `performance.*` |
-| **vertical-slice** / **adopt** | Read as project config; `/adopt` audits conformance at MEDIUM severity |
+|---|---|
+| **`/dev-story`** | Passes the conventions to the engineer in the implementation brief |
+| **`/create-control-manifest`** | Emits them as manifest rules |
+| **`/api-design`** | `api_paths` and `api_fields` in the guidelines and contract |
+| **`/data-model`** | `db_tables` and `db_columns` in the model and migrations |
+| **`/bundle-audit`** | Static-asset naming |
+| **`/adopt`** | Audits existing code against them |
 
-No skill or hook validates code *against* these conventions — see the note above.
+`events` also governs the tracking plan (`design/product/tracking-plan.md`) that
+`/write-prd` appends to.
 
 ---
 
 ## features.session_state
 
-> ⚠️ **`active.yaml` does not exist and nothing writes it — anywhere in this
-> document.** It is deferred design. What ships is
-> `production/session-state/**active.md**`, whose `<!-- CHECKPOINT -->` region
-> `session-start.sh` and `pre-compact.sh` both read, and whose
-> `<!-- STATUS -->` block `statusline.sh` parses. **Read every `active.yaml` and
-> `status:` mention in this file — above and below — as the deferred design, and
-> substitute `active.md` (and its STATUS block).** This scope note is
-> document-wide on purpose: the equivalent warning under *Status line behavior*
-> scoped itself to mentions "below", which left this section's own Controls line
-> and Hook behavior table describing a file that does not exist.
+**Controls:** Whether the session-state pipeline runs — the checkpoint file, session
+archive, compaction log, agent audit log and status-line breadcrumb
 
-**Controls:** Whether the harness runs a full session tracking pipeline (hooks,
-log files, `active.yaml` checkpoint — see the scope note above) or relies on
-skeleton-first output files for recovery  
-**Values:** `off` | `on`  
-**Default:** `on`  
-**Set by:** `/start`, `/settings`  
-**Read by:** All 7 session-lifecycle hooks; `statusline.sh`; any skill that writes
-to `production/session-state/`
+**Values:** `on` | `off`
 
-> **This is the recommended setting for most users.** The session state pipeline
-> was built to solve mid-task context loss during long conversations, but the
-> problem is better solved by long-form skills writing self-describing skeleton
-> files upfront. `session_state: on` is an opt-in for teams or power users who
-> want explicit tracking across many files over many days.
+- **Default:** enabled unless the value is the literal `off` (no terminal-default entry: `session_state_enabled()` returns disabled only on `off`)
+- **Status:** live
+- **Local override:** yes
+- **Label:** — (hooks read it directly)
+- **Set by:** `/settings`
+- **Read by:** the session hooks and `statusline.sh`, through `session_state_enabled()` in `yaml-helper.sh`, which reads the **top-level `features:` block** with awk (`project.local.yaml` first, then `project.yaml`); any skill that writes to `production/session-state/`
 
-> **Priority chain:** `features.session_state` in `project.local.yaml` →
-> `project.yaml` → hardcoded default of **`on`**. Hooks read it via
-> `session_state_enabled()` in `yaml-helper.sh` and exit early when `off`.
-> Skills check it before writing to `production/session-state/`.
+> **What ships:** `production/session-state/active.md` is the session checkpoint.
+> Its `<!-- STATUS -->` … `<!-- /STATUS -->` block carries the `Epic:` /
+> `Feature:` / `Task:` breadcrumb the status line parses, and its
+> `<!-- CHECKPOINT -->` region is what `session-start.sh` and `pre-compact.sh`
+> preview. Read it first after any compaction, crash or `/clear`.
 
-> **The default is `on`, deliberately.** `.claude/docs/context-management.md`
-> tells you to rely on `production/session-state/active.md` as your
-> crash-recovery checkpoint, so defaulting this off would quietly take away
-> recovery, the session archive and the subagent tally. The ~2–5k tokens per
-> session are an explicit opt-out (`/settings features.session_state=off`),
-> never a silent default.
+> **The default is on, deliberately.** `.claude/docs/context-management.md` tells
+> you to rely on `active.md` as your crash-recovery checkpoint, so defaulting this
+> off would quietly take away recovery, the session archive and the agent audit
+> log. The ~2–5k tokens per session are an explicit opt-out
+> (`/settings features.session_state=off`), never a silent default.
 
-> **`session-start.sh` is gated per-block, not at the top.** Its sprint,
-> milestone and git context is not part of the session-state pipeline; only the
-> `active.md` recovery preview is gated. Its check also fails OPEN — that hook
-> sources `yaml-helper.sh` conditionally, and an undefined function is falsey,
-> which would suppress the recovery checkpoint invisibly.
+> **`features:` must be a top-level block.** The hooks read it with awk, not the
+> YAML parser; nested anywhere else it is never seen.
+
+> **`session-start.sh` is gated per block, not at the top.** Its git, sprint,
+> milestone and bug context is not part of the pipeline; only the `active.md`
+> recovery preview is gated. The check fails OPEN — an unavailable helper must
+> never suppress the recovery checkpoint invisibly.
 
 ---
 
 ### Value intent
 
 | Value | Intent |
-|-------|--------|
-| `off` | Recovery via skeleton-first output files. Long-form skills write a complete skeleton (all section headers, empty bodies) before starting. If context clears or compacts, the agent reads the skeleton + relevant docs and resumes. No hooks, no logs, no separate state file. ~2,000–5,000 tokens saved per session. |
-| `on` | Full session tracking. `active.yaml` checkpoint, session-stop archival, compaction log, agent audit log, and STATUS breadcrumb all active. Adds ~2,000–5,000 tokens per session-start and ~1,000–6,000 per compaction event. |
+|---|---|
+| `on` | Full session tracking: `active.md` checkpoint, archive on session stop, compaction log, agent audit log, status-line breadcrumb. Adds ~2,000–5,000 tokens per session start and ~1,000–6,000 per compaction. |
+| `off` | Recovery through skeleton-first output files: long-form skills write the full heading skeleton of their output before discussing sections, so a cleared session resumes from the file itself. No state file, no logs. |
 
 ---
 
 ### Hook behavior
 
-> **Implementation note:** The feature flag check lives inside each hook script,
-> not at the harness level. Every session-state-aware hook reads
-> `features.session_state` from `project.yaml` at its top (via Python fallback
-> chain) and exits silently with no output if the value is `off`. This ensures
-> the harness always fires the hook — the hook decides whether to act.
+The flag is checked inside each hook — the harness always fires the hook, and the
+hook decides whether to act.
 
-| Hook | session_state: off | session_state: on |
-|------|--------------------|-------------------|
-| **session-start.sh** | Runs normally (git/sprint context) — skips active.yaml preview block | Runs fully including active.yaml preview |
-| **detect-gaps.sh** | Runs unchanged — gap detection is independent of session state | Runs unchanged |
-| **pre-compact.sh** | Emits: "Read skeleton files and relevant docs to resume" — no active.yaml dump, no WIP scan, no compaction-log append | Full dump: active.yaml content + git diff + WIP scan + compaction-log append |
-| **post-compact.sh** | No-op — exits silently | Runs: reminds agent to re-read active.yaml |
-| **session-stop.sh** | No-op — exits silently | Archives active.yaml to session-log, appends commits and diffs |
-| **log-agent.sh** | No-op — exits silently | Appends to agent-audit.log |
-| **log-agent-stop.sh** | No-op — exits silently | Appends to agent-audit.log |
+| Hook | `off` | `on` |
+|---|---|---|
+| **`session-start.sh`** | Runs (git, sprint, milestone, bugs, stack check) — skips the `active.md` preview | Runs fully, including the `active.md` preview |
+| **`detect-gaps.sh`** | Runs unchanged — gap detection is independent of session state | Runs unchanged |
+| **`pre-compact.sh`** | Emits "read the skeleton files and relevant docs to resume" — no state dump, no WIP scan, no compaction-log append | Dumps `active.md`, git diff and the WIP scan; appends the compaction log |
+| **`post-compact.sh`** | No-op | Reminds the agent to re-read `active.md` |
+| **`session-stop.sh`** | No-op | Archives `active.md` to the session log when its content hash changed; appends commits |
+| **`log-agent.sh`**, **`log-agent-stop.sh`** | No-op | Append `Agent invoked:` / `Agent completed:` lines to the agent audit log |
 
 ---
 
 ### File existence by mode
 
-| File | session_state: off | session_state: on |
-|------|--------------------|-------------------|
-| `production/session-state/active.yaml` | Not created | Written by skills, read by hooks and status line |
-| `production/session-logs/session-log.md` | Not written | Append-only archive of each session's active.yaml |
-| `production/session-logs/compaction-log.txt` | Not written | Append-only timestamp log of compaction events |
-| `production/session-logs/agent-audit.log` | Not written | Append-only log of agent spawn/complete events |
+| File | `off` | `on` |
+|---|---|---|
+| `production/session-state/active.md` | Not maintained | Written by skills and the agent; read by hooks and the status line |
+| `production/session-logs/session-log.md` | Not written | Append-only archive of each changed `active.md` |
+| `production/session-logs/compaction-log.txt` | Not written | Append-only log of compaction events |
+| `production/session-logs/agent-audit.log` | Not written | `TS \| session \| Agent invoked: <agent_type>` / `Agent completed: <agent_type>` lines |
 
----
-
-### Skeleton-first pattern (session_state: off recovery mechanism)
-
-Long-form skills must write a skeleton file as their first action — before any
-section discussion begins. The skeleton contains all section headers with empty
-bodies and a `<!-- STATUS: incomplete -->` marker per section.
-
-```markdown
-# Combat System — GDD
-
-## Overview
-<!-- STATUS: incomplete -->
-
-## Player Fantasy
-<!-- STATUS: incomplete -->
-
-## Detailed Rules
-<!-- STATUS: incomplete -->
-...
-```
-
-As each section is approved and written, the marker changes to `<!-- STATUS: done -->`.
-On recovery (after /clear or compaction), the agent reads the skeleton, identifies
-which sections are `done` vs `incomplete`, reads relevant ADRs and the systems index,
-and resumes at the first `incomplete` section. No active.yaml needed.
-
-**Skills required to implement skeleton-first:**
-
-| Skill | Output file | Skeleton written when |
-|-------|-------------|----------------------|
-| **design-system** | `design/gdd/[system].md` | Before Phase 1 (section discussion) |
-| **art-bible** | `design/art/art-bible.md` | Before section 1 discussion |
-| **create-architecture** | `docs/architecture/architecture.md` | Before layer discussion |
-| **ux-design** | `design/ux/[screen].md` | Before screen discussion |
-| **create-stories** | `production/epics/[epic-slug]/story-NNN-[slug].md` | Before story authoring loop |
-| **create-epics** | `production/epics/[epic-slug]/EPIC.md` | Before epic authoring loop |
-| **map-systems** | `design/gdd/systems-index.md` | Before system enumeration |
-| **brainstorm** | `design/gdd/game-concept.md` (`standard`/`full`) · `design/game-brief.md` (`minimal`) | Before concept discussion |
-
-> **Note on agents:** `world-builder` and `narrative-director` are agents, not
-> invocable skills — they do not have SKILL.md files. Long-form output from these
-> agents is produced via the skills above (design-system, art-bible, etc.) which
-> are responsible for skeleton-first enforcement.
+Both directories are gitignored (`production/session-state/.gitkeep` excepted):
+nothing in them is ever evidence.
 
 ---
 
 ### Status line behavior
 
-> ⚠️ **The table below describes POST-YAML-EXPANSION behavior, which is NOT
-> IMPLEMENTED.** `active.yaml` does not exist and nothing writes it. What ships
-> today: `statusline.sh` parses the `<!-- STATUS --> ... <!-- /STATUS -->`
-> markdown comment block inside `production/session-state/active.md`. Substitute
-> "the STATUS block in `active.md`" for every `active.yaml` / `status:` mention
-> here. **The same substitution applies document-wide, not just below this
-> point** — see the scope note under `## features.session_state`.
+`statusline.sh` prints `ctx% | model | stage · rigor | Epic > Feature > Task`.
 
-> **Stage detection is always independent of session state.** `statusline.sh`
-> auto-detects stage from `project.yaml` `project.stage` or artifact heuristics regardless
-> of `session_state` value — only the breadcrumb is gated.
-
-| Feature | session_state: off | session_state: on |
-|---------|--------------------|-------------------|
-| Context % display | Always shown | Always shown |
-| Model display | Always shown | Always shown |
-| Stage display | Always shown (from project.yaml or heuristics) | Always shown (same) |
-| Epic/Feature/Task breadcrumb | Not shown — no active.yaml parsed | Parsed from `status:` block in `active.yaml` |
+| Part | `off` | `on` |
+|---|---|---|
+| Context %, model | Always shown | Always shown |
+| Stage | Always shown — `STAGE` from `stage-estimate.sh --quick` | Same |
+| Rigor | Always shown — `minimal` when unset | Same |
+| Epic > Feature > Task | Not shown | Parsed from the STATUS block of `active.md`, shown when the stage is `Build`, `Hardening` or `Launch` |
 
 ---
 
 ### Affected skills
 
-Skills interact with session state in two ways: **inference** (reading active.yaml
-to resolve a missing argument) and **extraction** (appending a SESSION EXTRACT
-block after completing work). Both behaviors are gated by `session_state`.
+When `off`, skills that would infer a missing argument from the checkpoint ask for
+it instead — they never fail silently:
 
-#### Inference — skills that read active.yaml to fill in missing arguments
+| Skill | Infers from `active.md` when `on` | When `off` |
+|---|---|---|
+| **`/dev-story`** | The active story path | Asks for the story path |
+| **`/story-done`** | The in-progress story path | Asks for the story path |
+| **`/team-release`** | The target version | Asks for the version |
+| **`/team-qa`** | The active sprint | Asks for the sprint |
+| **`/help`** | Current task and STATUS block | Answers from sprint and epic files only |
 
-When `session_state: off`, these skills cannot infer from active.yaml and must
-receive the argument explicitly. If called without an argument, they should prompt
-the user rather than fail silently.
-
-| Skill | What it infers from active.yaml | Fallback when `off` |
-|-------|----------------------------------|---------------------|
-| **dev-story** | Active story path (when no arg given) | Prompt user for story path |
-| **story-done** | In-progress story path (when no arg given) | Prompt user for story path |
-| **team-release** | Target version (when no arg given) | Prompt user for version |
-| **team-qa** | Active sprint (when no arg given) | Prompt user for sprint file |
-| **help** | Current task and STATUS block for context-aware suggestions | Responds without session context — surfaces next steps from sprint/epics only |
-
-#### Extraction — skills that append SESSION EXTRACT to active.yaml
-
-These skills append a structured block after completing work when `session_state: on`.
-When `off`, they skip this write entirely.
-
-| Skill | What it writes to active.yaml |
-|-------|-------------------------------|
-| **dev-story** | Story path, files changed, test written, blockers, next steps |
-| **story-done** | Verdict, story path, tech debt count, next recommended story |
-| **architecture-review** | Verdict, TR coverage counts, new TR-IDs, GDD flags, ADR gaps, report path |
-| **prototype** | Prototype scope, current phase, key decisions |
-| **vertical-slice** | Slice concept, current phase, blocked items |
-| **team-qa** | QA phase comment, blocking issues |
-| **map-systems** | Task record: systems enumerated, current phase |
+Long-form authoring skills write their output's heading skeleton before section
+discussion either way (for example, `/write-prd` writes the PRD skeleton with the
+exact headings of `.claude/docs/templates/prd.md`), which is what makes `off` a
+workable recovery mode.
 
 ---
 
 ### Token cost summary
 
-| Scenario | session_state: off | session_state: on |
-|----------|--------------------|-------------------|
-| Per session start | ~500 tokens (git/sprint context only) | ~2,000–5,000 tokens (+ active.yaml preview) |
-| Per compaction event | ~200 tokens (reminder only) | ~1,000–6,000 tokens (active.yaml + git diff + WIP scan) |
-| Per session end | 0 | File I/O only (no conversation tokens) |
-| Recovery after /clear | Read skeleton + 2–3 docs (~1,000–3,000 tokens) | Read active.yaml (~200–500 tokens) |
-| Net for 50 sessions, 2 compactions/session | ~60,000 tokens | ~250,000–550,000 tokens |
+| Scenario | `off` | `on` |
+|---|---|---|
+| Per session start | ~500 tokens (git/sprint context) | ~2,000–5,000 tokens (+ checkpoint preview) |
+| Per compaction | ~200 tokens (reminder) | ~1,000–6,000 tokens (checkpoint + git diff + WIP scan) |
+| Per session end | 0 | File I/O only |
+| Recovery after `/clear` | Read the skeleton + 2–3 docs (~1,000–3,000 tokens) | Read `active.md` (~200–500 tokens) |
 
-> **Note:** The `off` recovery cost (reading skeleton + docs) is paid only when
-> recovery is actually needed. The `on` session-start cost is paid every session
-> whether recovery is needed or not.
+The `off` recovery cost is paid only when recovery is needed; the `on`
+session-start cost is paid every session.
 
 ---
 
@@ -2127,295 +2536,209 @@ When `off`, they skip this write entirely.
 > **No skill or hook reads this setting. Setting it has no effect.** Everything
 > below describes the intended design, not current behaviour.
 >
-> The value is checked for valid spelling when you set it, and then ignored.
-> Nothing warns at any threshold.
+> The value is stored when you set it, and then ignored. Nothing warns at any
+> threshold.
 
-**Controls:** Context usage threshold at which session warnings fire
+**Controls:** The context-usage threshold at which session warnings would fire
+
 **Values:** float between 0.0 and 1.0
-**Default:** `0.7` (warn at 70%)
-**Set by:** `/start`, `/settings`
-**Read by:** `pre-compact.sh`, `session-start.sh`, `statusline.sh`
 
-**Priority chain:** `features.token_budget_warn_at` in `project.yaml` → hardcoded default of `0.7`
+- **Default:** unset
+- **Status:** RESERVED
+- **Local override:** yes — a personal cost threshold
+- **Label:** —
+- **Set by:** —
+- **Read by:** none
 
-> Surfaces a warning when session context usage exceeds the threshold. Helps
-> cost-conscious users hit `/clear` before runaway sessions. Set to `1.0` to
-> disable.
-
----
-
-### Behavior
-
-| Threshold | What fires |
-|-----------|-----------|
-| Below `warn_at` | No warning |
-| At or above `warn_at` | `statusline.sh` shows context usage in yellow; next session-start hook emits a one-line note: *"Last session reached [X]% context — consider /clear if continuing work."* |
-| At 90%+ | Yellow becomes red regardless of `warn_at` value |
+**Intended design.** At or above the threshold, `statusline.sh` would show context
+usage in yellow and the next session start would note "Last session reached [X]%
+context — consider /clear". Red at 90% regardless of the value; `1.0` would disable
+the warning.
 
 ---
 
 ## schema_version
 
-**Controls:** Which version of the project.yaml schema this file conforms to
+**Controls:** Which version of the `project.yaml` schema the file conforms to
+
 **Values:** integer
-**Default:** `1` (for v1.1 of CCGS)
-**Set by:** `/start`, `/adopt`
-**Read by:** All skills and hooks that parse project.yaml (for migration safety)
 
-> Lets future CCGS versions detect and migrate old project.yaml files. The
-> migration logic compares `schema_version` in the file against the current
-> CCGS's expected version. If newer, warn. If older, run migrations.
+- **Default:** `1`
+- **Status:** live
+- **Local override:** no — file metadata, **exempt** from the local-scope report (a `project.local.yaml` carrying `schema_version: 1` is correct as written)
+- **Label:** —
+- **Set by:** the template
+- **Read by:** `yaml-helper.sh`, `session-start.sh`
 
----
-
-### Migration behavior
-
-| project.yaml schema_version | Current CCGS expects | Behavior |
-|----------------------------|---------------------|----------|
-| Matches expected | — | Normal operation |
-| Lower than expected | — | `/adopt` warns and offers migration; skills run with deprecation warnings |
-| Higher than expected | — | All skills warn: "This project.yaml was created by a newer CCGS version. Some settings may be ignored." |
-| Missing | — | Treated as legacy (pre-v1.1); migration prompted on next `/start` or `/adopt` |
+The schema is `1`. A future change to key names or structure bumps it, so a reader
+can tell which schema a file was written for instead of misreading it. Never edit it
+by hand.
 
 ---
 
 ## framework
 
-**Controls:** Tracks which CCGS version created or last touched this project
-**Values:** `framework.version` (semver string) + `framework.last_upgraded` (ISO date)
-**Default:** auto-populated by `/start` and `/adopt`
-**Set by:** `/start`, `/adopt`
-**Read by:** no skill branches on it — it is file metadata, not a behavioural setting. It appears in `/start`, `/gate-check`, `/brainstorm`, `/settings` and `/setup-engine` as part of the `project.yaml` block they **write or display**, and in `yaml-helper.sh`.
-  *(The five skills above were verified to name it; whether each reads it or merely emits it was NOT separated, so this says 'appears in', not 'read by'.)*
+**Controls:** Which Claude Code Service Studios release created or last upgraded this
+project
 
----
+**Values:** `framework.version` → semver string; `framework.last_upgraded` → ISO date
 
-### Fields
+| Key | Default | Status | Local override | Label | Set by | Read by |
+|---|---|---|---|---|---|---|
+| `framework.version` | the template value — see `project.yaml` | live | no (metadata; exempt from the local-scope report) | — | the template; the steps in `UPGRADING.md` | `session-start.sh`, `/adopt`, `/settings` |
+| `framework.last_upgraded` | `2026-09-27` | live | no (metadata) | — | the template | `/settings` |
 
-```yaml
-framework:
-  version: "1.1.0"
-  last_upgraded: "2026-05-14"
-```
-
-| Field | Purpose |
-|-------|---------|
-| `version` | The CCGS version that created the project (or last ran `/upgrade`). Used to determine which migrations apply when CCGS itself is updated. |
-| `last_upgraded` | ISO date of most recent `/adopt` or `/upgrade` run. Helps detect long-stale projects. |
-
----
-
-### Affected skills
-
-| Skill | How it uses framework |
-|-------|----------------------|
-| **adopt** | Reads `framework.version` to determine which migration steps apply. Updates both fields after running. |
-| **session-start hook** | Warns if `last_upgraded` is more than 90 days stale: "Project was last upgraded over 3 months ago — consider running /adopt." |
-
----
-
-## Migration from v1.0 → v1.1
-
-When a v1.0 CCGS project upgrades to v1.1, migration tooling (run via `/adopt`)
-converts legacy files to `project.yaml`. This section specifies the intended
-behavior.
-
-### Detection
-
-A project is detected as needing migration when:
-- `project.yaml` does **NOT** exist at the repo root, AND
-- One or more legacy files exists:
-  - `production/stage.txt`
-  - `production/review-mode.txt`
-  - `.claude/docs/technical-preferences.md`
-
-### Preservation
-
-| Legacy source | Migrates to |
-|---------------|-------------|
-| `production/stage.txt` (single line) | `project.stage` |
-| `production/review-mode.txt` (single line) | `modes.review_mode` |
-| `.claude/docs/technical-preferences.md` → "Engine & Language" section | `engine.name`, `engine.version`, `engine.language`, `engine.rendering`, `engine.physics` |
-| `technical-preferences.md` → "Input & Platform" section | `platform.targets`, `platform.primary_input`, `platform.gamepad_support`, `platform.touch_support` |
-| `technical-preferences.md` → "Naming Conventions" section | `naming.classes`, `naming.variables`, `naming.constants`, `naming.signals`, `naming.files`, `naming.scenes` |
-| `technical-preferences.md` → "Performance Budgets" section | `performance.target_framerate`, `performance.frame_budget_ms`, `performance.draw_call_limit`, `performance.memory_ceiling_mb` |
-| `technical-preferences.md` → "Testing" section | `testing.framework`, `qa.coverage_minimum` (bare number only — prose is reported for manual entry) |
-| `technical-preferences.md` → "Engine Specialists" section | `specialists.code`, `specialists.shader`, `specialists.ui`, `specialists.additional` |
-
-**Value rename — `review_mode: none` → `solo`.** v1.0 used `none` for the "no
-director reviews" tier; v1.1 renamed that tier to `solo` (the enum is
-`full | lean | solo`). Migration **coerces** a legacy `none` to `solo` and reports
-the rename in the migration report's Warnings. This is the one documented value
-rename, so it is mapped-and-flagged rather than preserved raw: writing `none`
-verbatim would produce an enum-invalid `project.yaml` that `resolve_config` rejects
-and falls back to `lean` (reviews *on*) — inverting the user's intent. The
-`--finalize` preservation check applies the same mapping so it does not falsely
-refuse. Every *other* non-v1.1 stage/review value is a fork, not a rename:
-preserved raw and flagged for manual resolution, never coerced (test II.21-23; the
-rename is II.25-27).
-
-Settings absent from the legacy files (new v1.1 settings like `qa.level`,
-`docs.density`, `team.size`, etc.) get hardcoded defaults from the v1.1 schema.
-
-### Cleanup (deferred, non-destructive)
-
-Migration is **non-destructive in v1.1**: legacy files are NOT auto-deleted.
-Migration produces `project.yaml` and leaves the legacy files in place. Hooks
-and skills read `project.yaml` first; they fall back to the legacy file if a
-specific key is missing.
-
-Legacy files are deleted only when the user runs
-`.claude/scripts/migrate-v1-config.sh --finalize` (driven by `/adopt`, which
-detects a v1.0 project automatically at Phase 2g). The cleanup step verifies
-that every legacy file's content has been preserved in `project.yaml` before
-deleting.
-
-### Failure modes
-
-| Problem | Behavior |
-|---------|----------|
-| Legacy file is malformed (can't parse) | Migration emits warning per file, leaves it untouched, continues with the others. `project.yaml` gets the parseable values + defaults for the rest. |
-| Parsed value doesn't match v1.1 enum (e.g. `stage: Alpha` from a fork) | Migration writes the raw value with a `_migration_warning` comment in `project.yaml`. User resolves manually. |
-| Both `project.yaml` AND a legacy file exist (split-brain) | Migration tooling refuses to run. Error: "Both project.yaml and legacy files exist — resolve which is authoritative before migrating." |
-| Custom sections in forked `technical-preferences.md` | Custom content logged to `production/migration-report.md` as "not migrated — please integrate manually." |
-
-### Migration report
-
-Every migration run writes `production/migration-report.md`:
-
-- Source files detected
-- Values preserved (per file → per setting)
-- Defaults applied (for v1.1-new settings)
-- Warnings encountered (malformed, mismatched enums, etc.)
-- Manual review items
-
-User reads the report before running `--finalize`.
+File metadata, not a behavioral setting: `/settings` displays both fields; `/adopt`
+and `session-start.sh` read the version to identify the framework release in use.
+The version literal lives only in `project.yaml` — every other framework file reads
+it from there.
 
 ---
 
 ## Complete example `project.yaml`
 
-A full project.yaml with every setting, showing sensible defaults for a solo
-Godot project. Use this as the reference shape when authoring or migrating.
+A configured `project.yaml` for **Moa** — a B2C subscription savings app for the
+Korean market (web + iOS + Android + API). The stack block is the reference shape
+`/setup-stack` writes. **Version numbers in this example are illustrative
+placeholders** — real values are pinned from live sources by `/setup-stack` and
+recorded in `docs/stack-reference/VERSION.md`.
 
 ```yaml
-schema_version: 1
-
-framework:
-  version: "1.1.0"
-  last_upgraded: "2026-05-15"
-
-project:
-  name: "Forge Knights"
-  genre: "ARPG"
-  version: "0.1.0"
-  stage: Concept             # Concept | Systems Design | Technical Setup | Pre-Production | Production | Polish | Release
-  kind: game                 # game | tool | engine | mod | library
-
-modes:
-  review_mode: lean          # full | lean | solo
-  workflow: standard         # minimal | standard | full
-  automation: collaborative  # collaborative | guided | autonomous
-  automation_always_ask:     # decision categories that always prompt regardless of mode
-    - scope_changes
-    - file_deletions
-    - schema_changes
-  story_granularity: balanced  # coarse | balanced | fine
-
-# TOP-LEVEL, not nested under `modes:` — resolve_config reads
-# `workflow_overrides.system_overrides.*` from the document root
-# (yaml-helper.sh), and every skill greps the same top-level path.
-# Nesting it under `modes:` parses as valid YAML and is silently never read.
-workflow_overrides:
-  edge_cases: false          # force GDD Edge Cases section required
-  tuning_knobs: false        # force GDD Tuning Knobs section required
-  art_bible_strict: false    # force all 9 art bible sections regardless of asset stories
-  system_overrides: {}       # { combat: full, inventory: minimal }
-
-docs:
-  density: balanced          # terse | balanced | thorough
-
-testing:
-  framework: gdunit4         # engine-specific — auto-populated by /setup-engine
-  strict:
-    logic: true              # unit test failures BLOCK story closure
-    integration: true        # integration test failures BLOCK
-    visual: true             # missing screenshot BLOCKS
-    ui: true                 # missing screenshot BLOCKS
-    config: false            # advisory only
-
-qa:
-  level: standard            # minimal | standard | full
-  coverage_minimum: null     # integer 0-100; only enforced at level: full
-
-strict_gate_checks: true     # phase gate failures block stage transition
-
-team:
-  size: individual           # individual | small | studio
-
+stack:
+  pinned_on: 2026-09-27
+  profile: ts-fullstack-web          # informational only
+  monorepo: true
+  package_manager: pnpm
+  shared_roots: [packages]
+  layers:
+    web:
+      framework: Next.js
+      version: "15.3"
+      language: TypeScript
+      root: [apps/web, apps/admin]
+    mobile:
+      framework: React Native (Expo)
+      version: "0.79"
+      language: TypeScript
+      root: apps/mobile
+    backend:
+      framework: NestJS
+      version: "11.0"
+      language: TypeScript
+      runtime: Node.js 22
+      root: [apps/api, services/worker]
+    data:
+      database: PostgreSQL 16
+      cache: Redis 7
+      queue: none
+      orm: Prisma 6
+      migrations_dir: apps/api/prisma/migrations
+    cloud:
+      provider: AWS
+      iac: Terraform 1.9
+      root: infra
 platform:
-  multiplayer: false         # real-time multiplayer
-  online: false              # any online features (leaderboards, cloud, telemetry)
-  targets: [PC]              # [PC, Mobile, Web, Console]
-  primary_input: "Keyboard/Mouse"
-  gamepad_support: "Full"    # Full | Partial | None
-  touch_support: "None"      # Full | Partial | None
-  cert_tier: none            # none | itch | steam | console
-
-engine:
-  name: "Godot"              # Godot | Unity | Unreal — set by /setup-engine
-  version: "4.6"
-  language: "GDScript"       # GDScript | C# | C++ | Blueprint
-  rendering: "Forward+"
-  physics: "Jolt"
-
-specialists:                 # auto-populated by /setup-engine
-  code: "godot-gdscript-specialist"
-  shader: "godot-shader-specialist"
-  ui: "godot-specialist"
-  additional: ["godot-gdextension-specialist"]
-
-naming:
-  classes: PascalCase        # PascalCase | snake_case | camelCase
-  variables: snake_case
-  constants: SCREAMING_SNAKE
-  signals: past_tense        # past_tense | on_event_name (engine-interpreted)
-  files: snake_case
-  scenes: snake_case
-
-accessibility:
-  target: none               # none | standard | aaa
-
-cadence:
-  sprint_length: "2w"        # 1w | 2w | 3w | 4w | none
-  milestone_length: "8w"     # 4w | 6w | 8w | 12w
-
-performance:
-  target_framerate: 60
-  frame_budget_ms: 16.67
-  draw_call_limit: null
-  memory_ceiling_mb: null
-  enforce: warn              # warn | block | off
-
-commands:                    # simple string OR OS-aware map per command
-  build: "godot --headless --export-debug '<PRESET>'"   # your export_presets.cfg name
-  test: "godot --headless --script tests/gdunit4_runner.gd"
-  run: "godot --editor"
-  smoke: "godot --headless --quit-after 5"
-
-features:
-  session_state: on          # off | on
-  token_budget_warn_at: 0.7  # 0.0-1.0; warn at this context % usage
+  surfaces: [web, ios, android, api]
+release:
+  distribution: web+stores
+privacy:
+  handles_pii: true
+compliance:
+  regions: [kr]
+localization:
+  locales: [ko-KR, en-US]
 ```
 
-And a minimal sparse `project.local.yaml` example — a single developer who wants autonomous mode locally:
+The rest of the same file. `schema_version` and `framework` come from the template
+(see `project.yaml`). Performance budgets are illustrative too.
 
 ```yaml
+project:
+  name: Moa
+  category: B2C fintech
+  version: 1.2.0
+  stage: Build
+
+# /start writes exactly these two modes. The six knobs modes.rigor fronts —
+# review_mode, workflow, docs.density, qa.level, story_granularity, team.size —
+# are deliberately absent: a value here pins the knob for the whole team and
+# shadows the rigor expansion. Pin one only on purpose, with /settings.
 modes:
-  automation: autonomous
+  rigor: standard
+  automation: guided
+
+# TOP LEVEL — a sibling of modes:, never nested under it.
+workflow_overrides:
+  config_flags: true           # every PRD states its flags, even at standard
+  feature_overrides:
+    payments: full             # design/prd/payments.md
+    admin-console: minimal     # design/prd/admin-console.md
+
+testing:
+  framework: vitest+playwright
+  patterns: [apps/*/src/**/*.test.ts, tests/**]
+  strict:
+    logic: true
+    integration: true
+    e2e: true
+
+accessibility:
+  target: wcag-aa
+
+performance:
+  api_p95_ms: 300
+  error_rate_pct: 0.5
+  availability_pct: 99.9
+  lcp_ms: 2500
+  inp_ms: 200
+  cls: 0.1
+  bundle_kb: 170
+  cold_start_ms: 2000
+  crash_free_pct: 99.5
+  enforce: warn
+
+naming:
+  files: kebab-case
+  components: PascalCase
+  classes: PascalCase
+  variables: camelCase
+  constants: SCREAMING_SNAKE
+  api_paths: kebab-case
+  api_fields: camelCase
+  db_tables: snake_case
+  db_columns: snake_case
+  env_vars: SCREAMING_SNAKE
+  events: object_action
+
+commands:
+  install: pnpm install --frozen-lockfile
+  run: pnpm --filter web start
+  build: pnpm turbo run build
+  test: pnpm turbo run test
+  e2e: pnpm exec playwright test
+  lint: pnpm turbo run lint
+  typecheck: pnpm turbo run typecheck
+  api_lint: pnpm exec redocly lint docs/api/openapi.yaml
+  migrate: pnpm --filter api exec prisma migrate deploy
+  load_test: k6 run tests/load/load.js
+  deploy_preview: vercel deploy
+
 features:
   session_state: on
 ```
 
-Only the overridden keys are present; everything else cascades from `project.yaml`.
-See "Local Override Pattern" section for full whitelist of what can/cannot be overridden locally.
+And a sparse `project.local.yaml` — one developer who works autonomously, skips
+director reviews and keeps unit-test failures advisory on WIP commits:
+
+```yaml
+# project.local.yaml — per-developer overrides (gitignored)
+modes:
+  automation: autonomous
+  review_mode: solo
+testing:
+  strict:
+    logic: false
+```
+
+Only whitelisted keys belong here; everything else cascades from `project.yaml`.
+See § Local Override Pattern for the whitelist.

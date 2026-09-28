@@ -1,339 +1,394 @@
 ---
 name: start
-description: "First-time onboarding — asks where you are, then guides you to the right workflow."
+description: "First-time onboarding: where are you (A–D), then route to the right workflow."
 argument-hint: "[no arguments]"
 user-invocable: true
-allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion
+allowed-tools: Read, Glob, Grep, Write, Edit, AskUserQuestion, Bash(bash .claude/scripts/stage-estimate.sh*)
 model: sonnet
 ---
 
 # Guided Onboarding
 
-This skill writes `project.yaml` — the `project.stage`, `modes.rigor` and
-`modes.automation` settings — plus one legacy mirror, `production/stage.txt`,
-for backward compatibility with hooks that have not migrated. `modes.rigor` and
-`modes.automation` have no legacy mirror; they are written to `project.yaml`
-only.
+This skill is the entry point for new users. It does not assume a product idea, a
+stack preference or any experience with this framework: it asks where the user is
+starting from, sets the three settings that shape everything after it, and routes
+to the right next skill.
 
-> **`/start` never writes `modes.review_mode`, in either location.** It is a
-> rigor-fronted knob: writing it explicitly pins it and shadows the `modes.rigor`
-> expansion, so the Phase 3d question would stop changing director-review depth
-> (see Phase 3d, and the same rule in `project.yaml`'s header comment). It must
-> **not** write `production/review-mode.txt` either — the legacy step sits
-> **above** the rigor expansion in the resolution chain, deliberately, so a genuine
-> v1.0 project's explicit choice survives migration. On a new project that
-> ordering works against you: a mirror file written here would outrank the
-> expansion permanently. Verified: `rigor: minimal` plus a `review-mode.txt`
-> containing `lean` resolves to `lean`, not the expected `solo`.
+### What it writes — and only this
 
-This skill is the entry point for new users. It does NOT assume you have a game idea, an engine preference, or any prior experience. It asks first, then routes you to the right workflow.
+| Path | Keys | Why here |
+|------|------|----------|
+| `project.yaml` | `project.stage` | Anchors the status line, `/help` and `/gate-check` with no argument |
+| `project.yaml` | `modes.rigor` | One question that sets how much process the project carries |
+| `project.yaml` | `modes.automation` | How often every skill stops to confirm |
+
+No other key and no other file. In particular:
+
+> **`/start` never writes the six knobs `modes.rigor` fronts** — `modes.review_mode`,
+> `modes.workflow`, `docs.density`, `qa.level`, `modes.story_granularity`, `team.size`.
+> Writing one explicitly pins it and shadows the rigor expansion, so the Phase 5
+> question would stop changing it — the same rule stated in the header comment of
+> `project.yaml`. The stack (`stack.*`, surfaces, distribution, regions, locales) is
+> written by `/setup-stack`; `project.name` and `project.category` by `/brainstorm`;
+> everything else by `/settings`.
+
+**Always collaborative.** `/start` runs before any configuration exists, so it
+ignores `modes.automation` (it is listed among the exemptions in
+`.claude/docs/automation-modes.md`): every question is asked and the write is shown
+and approved, whatever mode a returning user has set. It resolves no settings
+through `yaml-helper.sh`; it reads `project.yaml` directly.
 
 ---
 
-**Automation mode**: Resolve `modes.automation` (`project.local.yaml` →
-`project.yaml` → default `collaborative`). **Note**: on a fresh project no
-`modes.automation` is set yet, so `/start` runs collaboratively — it is
-creating the config. Its core onboarding questions (starting point, rigor,
-automation) are project-shaping and always prompt regardless
-of mode. Engine choice is **not** among them — it is deferred to
-`/setup-engine`, which Phase 4 hands off to.
-If `/start` is re-run on an already-configured project, the resolved mode
-applies per `.claude/docs/automation-modes.md`.
-
 ## Phase 1: Detect Project State
 
-Before asking anything, silently gather context so you can tailor your guidance. Do NOT show these results unprompted — they inform your recommendations, not the conversation opener.
+Before asking anything, gather context silently. Do **not** show these results
+unprompted — they tailor the recommendations and catch a mismatched self-assessment;
+they are not the conversation opener.
 
-Check:
-- **Engine configured?** Read `engine.name` from `project.yaml`; if that key is absent or empty (including when `project.yaml` has no `engine:` block), fall back to `.claude/docs/technical-preferences.md` (an Engine field of `[TO BE CONFIGURED]`, or no file, means not set). The engine is configured if either source yields a real engine name.
-- **Game concept exists?** Check for `design/gdd/game-concept.md` (or `design/game-brief.md` at the `minimal` tier).
-- **Source code exists?** Resolve the code root from the `engine.name` read above (`src/` Godot, `Assets/` Unity, `Source/` Unreal; full order in `.claude/docs/code-root-resolution.md`), then Glob it for source files (`*.gd`, `*.cs`, `*.cpp`, `*.h`, `*.rs`, `*.py`, `*.js`, `*.ts`). **If the code root is unresolved, say so rather than concluding there is no code** — a Unity or Unreal project scanned as `src/` returns zero files and reads as greenfield.
-- **Prototypes exist?** Check for subdirectories in `prototypes/`.
-- **Design docs exist?** Count markdown files in `design/gdd/`.
-- **Production artifacts?** Check for files in `production/sprints/` or `production/milestones/`.
+1. **Config** — Read `project.yaml`. Note whether it exists, and the values (or
+   absence) of `project.stage`, `modes.rigor`, `modes.automation`,
+   `stack.pinned_on`, `project.name` and `project.category`. Also note whether any
+   of the six fronted knobs is set explicitly — Phase 7 reports it.
+2. **Product artifacts** — Glob `design/product/product-brief.md`,
+   `design/product/one-pager.md`, `design/product/feature-map.md`,
+   `design/prd/*.md`.
+3. **Architecture artifacts** — Glob `docs/architecture/architecture.md`,
+   `docs/architecture/adr-*.md`, and `docs/api/` contracts (`openapi*.yaml`,
+   `openapi*.json`, `*.graphql`, `*.proto`, `asyncapi*.yaml`).
+4. **Prototypes** — Glob `prototypes/*/`.
+5. **Delivery artifacts** — Glob `production/epics/*/EPIC.md`,
+   `production/sprints/sprint-*.md`, `production/releases/*/`.
+6. **Source code** — Glob for package manifests at the repository root and one
+   level under `apps/`, `services/` and `packages/`: `package.json`,
+   `pyproject.toml`, `build.gradle`, `build.gradle.kts`, `pom.xml`, `go.mod`,
+   `pubspec.yaml`, `Cargo.toml`, `Gemfile`, `composer.json`; plus `ios/`,
+   `android/` and `*.xcodeproj`. **Absence of these patterns is not proof of no
+   code** — if the repository clearly holds source files elsewhere, say what you
+   found rather than calling it greenfield.
 
-Store these findings internally to validate the user's self-assessment and tailor recommendations.
+Store the findings for Phases 3–8.
+
+**Returning user.** If `project.stage`, `modes.rigor` and `modes.automation` are all
+set and a product brief or one-pager exists, skip onboarding — see Edge Cases.
 
 ---
 
 ## Phase 2: Ask Where the User Is
 
-This is the first thing the user sees. Use `AskUserQuestion` with these exact options so the user can click rather than type:
+This is the first thing the user sees. Use `AskUserQuestion` with these options so
+the user can click rather than type:
 
-- **Prompt**: "Welcome to Claude Code Game Studios! Before I suggest anything, I'd like to understand where you're starting from. Where are you at with your game idea right now?"
+- **Prompt**: "Welcome to Claude Code Service Studios! Before I suggest anything, I'd
+  like to understand where you're starting from. Where are you with your product
+  right now?"
 - **Options**:
-  - `A) No idea yet` — I don't have a game concept at all. I want to explore and figure out what to make.
-  - `B) Vague idea` — I have a rough theme, feeling, or genre in mind (e.g., "something with space" or "a cozy farming game") but nothing concrete.
-  - `C) Clear concept` — I know the core idea — genre, basic mechanics, maybe a pitch sentence — but haven't formalized it into documents yet.
-  - `D) Existing work` — I already have design docs, prototypes, code, or significant planning done. I want to organize or continue the work.
+  - `A) No product idea yet` — I want to explore problems worth solving and figure
+    out what to build.
+  - `B) A problem space` — I know the problem or the users I care about (e.g.
+    "people who never manage to save", "small clinics drowning in phone bookings"),
+    but not the product yet.
+  - `C) A clear product concept` — I know who it's for, what it does and roughly how
+    it works, but haven't written it down.
+  - `D) An existing product or codebase` — There is already code, documents,
+    prototypes or a live service, and I want to bring it into this workflow.
 
-Wait for the user's selection. Do not proceed until they respond.
+Wait for the selection. Do not proceed until the user responds.
 
 ---
 
 ## Phase 3: Route Based on Answer
 
-#### If A: No idea yet
+Name the **immediate next step only** in this phase. The full path depends on the
+rigor chosen in Phase 5, so say: "I'll lay out the full path once I know how much
+process you want — two quick questions away."
 
-The user needs creative exploration before anything else.
+#### A) No product idea yet
 
-1. Acknowledge that starting from zero is completely fine
-2. Briefly explain what `/brainstorm` does: it turns "no idea" into a written design your next step can build from. Mention that it has two modes: `/brainstorm open` for fully open exploration, or `/brainstorm [hint]` if they have even a vague theme (e.g., "space", "cozy", "horror").
+1. Say that starting from zero is completely normal — most products start as a
+   problem someone kept noticing.
+2. Explain what `/brainstorm` does, **tier-neutrally**: it turns "no idea yet" into a
+   written bet the next steps can build from — the problem, who has it, what they
+   use today, and what would make a new product worth switching to. `/brainstorm
+   open` explores from scratch; `/brainstorm <a few words>` starts from any hint.
+   Do not describe what document it produces: that depends on the rigor chosen in
+   Phase 5 (a one-pager at `minimal`, a full product brief at `standard`/`full`), and
+   two different accounts of the same skill in one `/start` run confuse the user.
+3. Next step: `/brainstorm open`.
 
-   > **Describe it tier-neutrally here.** Phase 3d has not run, so you do not yet
-   > know how much process this project wants — and `/brainstorm` changes shape
-   > completely on that answer. At `minimal` it runs a short Lean Brief flow and
-   > stops, producing a one-page `design/game-brief.md`; at `standard`/`full` it
-   > runs the full ideation walk (MDA, player psychology, verb-first design) and
-   > produces the concept document. Naming the full walk here, then having Phase 4
-   > describe the same skill as "produce the one-page brief", gives the user two
-   > contradicting accounts of one skill inside a single `/start` run. Phase 4 is
-   > where the tier-specific description belongs.
-3. Recommend running `/brainstorm open` as the next step, but invite them to use a hint if something comes to mind
-4. Name the **immediate next step only** — `/brainstorm open`. Do not list the
-   full pipeline here. Phase 3d has not yet asked how much process the user
-   wants, and that answer changes the path substantially. Say: "I'll lay out the
-   full path once I know how much process you want — two quick questions away."
+#### B) A problem space
 
-#### If B: Vague idea
+1. Ask them to describe the problem space in a few words — plain text, not
+   `AskUserQuestion` (it is an open answer).
+2. Take it as a valid starting point. Do not judge or redirect it.
+3. Next step: `/brainstorm <their words>`.
 
-1. Ask them to share their vague idea — even a few words is enough
-2. Validate the idea as a starting point (don't judge or redirect)
-3. Recommend running `/brainstorm [their hint]` to develop it
-4. Name the **immediate next step only** — `/brainstorm [their hint]`. Do not
-   list the full pipeline here; Phase 3d has not yet asked how much process the
-   user wants, and that answer changes the path. Say: "I'll lay out the full
-   path once I know how much process you want — two quick questions away."
+#### C) A clear product concept
 
-#### If C: Clear concept
+1. Ask for one or two sentences — plain text: who it is for, what it does for them,
+   and where it runs (web, iOS, Android, a public or partner API).
+2. Play it back in one sentence to confirm you understood.
+3. Next steps: `/brainstorm <their concept>` — its fast path turns a clear concept
+   into the written record quickly, confirming rather than re-exploring what the
+   user already knows — then `/setup-stack` to choose and pin the stack.
 
-1. Ask them to describe their concept in one sentence — genre and core mechanic. Use plain text, not AskUserQuestion (it's an open response).
-2. Acknowledge the concept, then use `AskUserQuestion` to offer two paths:
-   - **Prompt**: "How would you like to proceed?"
-   - **Options**:
-     - `Formalize it first` — Run `/brainstorm [concept]` to structure it into a proper game concept document
-     - `Jump straight in` — Go to `/setup-engine` now and write the GDD manually afterward
-3. Name the **immediate next step only** — their pick from step 2. Do not list
-   the full pipeline here; Phase 3d has not yet asked how much process the user
-   wants, and that answer changes the path. Say: "I'll lay out the full path
-   once I know how much process you want — two quick questions away."
+#### D) An existing product or codebase
 
-#### If D: Existing work
-
-1. Share what you found in Phase 1:
-   - "I can see you have [X source files / Y design docs / Z prototypes]..."
-   - "Your engine is [configured as X / not yet configured]..."
-
-2. **Sub-case D1 — Early stage** (engine not configured or only a game concept exists):
-   - Recommend `/setup-engine` first if engine not configured
-   - Then `/project-stage-detect` for a gap inventory
-
-   **Sub-case D2 — GDDs, ADRs, or stories already exist:**
-   - Explain: "Having files isn't the same as the template's skills being able to use them. GDDs might be missing required sections. `/adopt` checks this specifically."
-   - Recommend:
-     1. `/project-stage-detect` — understand what phase and what's missing entirely
-     2. `/adopt` — audit whether existing artifacts are in the right internal format
-
-3. Show the recommended path for D2:
-   - `/project-stage-detect` — phase detection + existence gaps
-   - `/adopt` — format compliance audit + migration plan
-   - `/setup-engine` — if engine not configured
-   - `/design-system retrofit [path]` — fill missing GDD sections
-   - `/architecture-decision retrofit [path]` — add missing ADR sections
-   - `/architecture-review` — bootstrap the TR requirement registry
-   - `/gate-check` — validate readiness for next phase
+1. Run `bash .claude/scripts/stage-estimate.sh`. It prints four lines — `STAGE:`,
+   `SOURCE:` (`project.yaml` when a stage is already recorded, `estimated`
+   otherwise), `ESTIMATE:` and `EVIDENCE:`. It observes the tree; it does not judge
+   it. If it exits non-zero or prints no `STAGE:` line, say so with its error, write
+   no `project.stage`, recommend `/project-stage-detect` once the cause is fixed, and
+   end with `Verdict: **NOT ASSESSED** — the stage could not be estimated (<error>).`
+2. Share what Phase 1 found and what the script estimated, briefly:
+   - "I can see [N PRDs / an architecture doc and N ADRs / an API contract /
+     source code under apps/ and services/ / N prototypes]…"
+   - "The tree looks like the **[ESTIMATE]** stage ([EVIDENCE])."
+   - "The stack is [pinned on YYYY-MM-DD / not set up yet]."
+3. Explain why the next step is an audit: "Having files is not the same as the
+   framework's skills being able to use them. PRDs may miss required sections, ADRs
+   may lack the headings later gates read, and code may live in directories no
+   configuration declares yet. `/adopt` checks exactly that and writes a numbered
+   adoption plan."
+4. Next step: `/adopt`. Mention the others as what the plan will likely include:
+   `/setup-stack` (when the stack is not pinned), `/project-stage-detect` (a full gap
+   inventory by area), and `/reverse-document` for missing PRDs, ADRs or a product
+   brief.
+5. If Phase 1 found nothing at all, see Edge Cases.
 
 ---
 
-## Phase 3c: Write Initial Stage
+## Phase 4: Choose the Initial Stage
 
-After confirming the starting path, write the initial stage to BOTH `project.yaml` (primary) AND `production/stage.txt` (legacy fallback for hooks that haven't migrated yet). Create the `production/` directory if it does not exist.
+Decide the `project.stage` value now; Phase 7 writes it together with the other two
+settings.
 
-In `project.yaml`, ensure a `project:` block exists with `stage: [value]`.
-- **If `project.yaml` already exists**: Read it first (the Edit tool requires the
-  file to have been read in this session), then use the Edit tool to add/update
-  the `project:` block, placing it immediately after the `framework:` block.
-- **If `project.yaml` does not exist** at the repo root: create it with the Write
-  tool using this v1.1 minimal template (replace `[value]` and the date):
-  ```yaml
-  # CCGS project configuration — single source of truth for project settings.
-  # Schema: grep the `## <key>` section of .claude/docs/effects-map.md —
-  # it is ~31k tokens whole, ~900 per section. Do not open it entire.
+- **A, B or C**: `Discovery`.
+- **D**: the value on the script's `STAGE:` line. When `SOURCE: project.yaml`, that
+  stage is already recorded and nothing changes. When the script failed (Phase 3 D
+  step 1), there is no value: Phase 7 writes no `project.stage`.
+- **Already set** (any option): keep the recorded value and show it. `/start` never
+  moves a recorded stage — only `/gate-check` advances it, on a PASS the user
+  confirms. If the recorded stage contradicts the chosen option (option A on a
+  project at `Build`), say so in one sentence and ask whether they meant D.
 
-  schema_version: 1
-
-  framework:
-    version: 1.1.1
-    last_upgraded: <YYYY-MM-DD>
-
-  project:
-    stage: [value]
-  ```
-  **Do not seed `modes.review_mode` here.** It is a rigor-fronted knob —
-  `modes.rigor` supplies its value, so an explicit value here would shadow the
-  rigor expansion and pin the review mode regardless of the rigor the user picks
-  in Phase 3d. `modes.rigor` itself is omitted for a related reason: Phase 3d skips
-  its question when the key is already set, so seeding it would suppress that
-  question. Tests Y.3 and Y.6 lock both in.
-
-Then also write the same single-line stage name to `production/stage.txt` (no trailing newline) so legacy tooling still works.
-
-Stage mapping:
-- **Path A, B, or C (starting from scratch)**: write `Concept`
-- **Path D, existing project, engine not configured or only a game concept exists**: write `Concept`
-- **Path D, existing project with GDDs but no architecture documents**: write `Systems Design`
-- **Path D, existing project with full architecture (ADRs, architecture doc)**: write `Technical Setup`
-
-Do this silently — no "May I write?" needed for these stage anchors.
-
-Say: "I've set `project.stage` to `[stage]` (and updated `production/stage.txt`) — this anchors your status line and stage detection."
+Tell the user what the value anchors: "`project.stage` drives the status line,
+`/help` and `/gate-check` without an argument. `/gate-check` advances it when a phase
+gate passes."
 
 ---
 
-## Phase 3d: Set Rigor
+## Phase 5: Set Rigor
 
-Check whether `modes.rigor` is already set in `project.yaml`. **If it is**, show
-it — "Rigor is set to `[current]`." — and proceed to **Phase 3e**. Do not ask
-again. Either way, **carry the resolved value forward** — Phase 4 branches its
-recommended path on it.
+If `modes.rigor` is already set, show it — "Rigor is set to `[value]`." — and carry
+it forward to Phase 8 without asking again.
 
-**If it is not set**: first pick a recommendation, then ask.
+Otherwise, pick a recommendation first, then ask.
 
-**Seed the recommendation** from what the user described in Phase 2, using the
-archetype presets in `.claude/docs/settings-guidance.md § 2–3`:
-- Map their concept to an archetype (e.g. "open-world RPG with crafting and
-  factions" → systems-heavy → `full`; "a small weekend puzzler" → `minimal`).
-- If the user has **no concept at all** (Path A, or a Path B hint with nothing in
-  §3's signal table), recommend the jam/prototype option (`minimal`) and add:
-  "You can raise this after `/brainstorm` once the concept is clearer —
-  `/settings` changes it anytime."
-- **A Path B hint still counts as a description.** "Still exploring" is about
-  having no signal, not about which path the user picked. If the vague idea trips
-  §3's signals — "some kind of open-world survival sim" hits open-world, sim and
-  survival — seed from the signal, not from the path, and say why in the user's
-  own terms. Recommending `minimal` for a described systems-heavy game is the
-  mismatch Phase 4 would then have to flag, caused here.
-- If nothing in the description points either way, recommend the middle option
-  (`standard`, the documented default).
+**Seed the recommendation** from what the user described, using the archetype
+presets and concept signals in `.claude/docs/settings-guidance.md` § 2–3:
 
-Then use `AskUserQuestion`. Order the options so the **recommended** archetype is
-first and append ` (Recommended)` to its label (per the AskUserQuestion
-convention); the other two follow in any order.
+- Payments, lending, insurance, health or medical data, B2B customers with SLAs,
+  SOC 2 or ISMS-P, on-prem customers → `full`.
+- Hackathon, weekend project, prototype, proof of concept, fake door, side project →
+  `minimal`.
+- Seed or Series A, paying customers, an app store launch, a small team with one
+  clear core journey → `standard`.
+- **A problem-space hint still counts as a description.** "Something for small
+  clinics' insurance claims" trips the health and regulated signals even though the
+  user picked B — seed from the signal, not from the option, and say why in the
+  user's own words.
+- Nothing to map (option A, or a hint with no signal) → `minimal`, and add: "You can
+  raise this after `/brainstorm` once the product is clearer — `/settings` changes it
+  anytime." Unset on an unconfigured project: `modes.rigor` defaults to `minimal`, which resolves `review_mode` to `solo`.
+
+Then use `AskUserQuestion`. Put the **recommended** option first and append
+` (Recommended)` to its label; the other two follow.
 
 - **Prompt**: "What best describes what you're building? This sets how much process
   the project carries — you can change it anytime with `/settings`."
-- **Options** (base labels — the recommended one also gets ` (Recommended)`):
-  - `Jam / prototype / first game` — Short docs, coarse stories, evidence optional. **~4 steps to your first line of code instead of ~18.** Shipping beats recording; design lives in your head. The trade: no GDDs, so design problems surface in code rather than before it.
-  - `Several systems that affect each other` — Balanced docs, normal story size, standard QA evidence. **Expect ~8 design documents and roughly an hour of design work before your first line of code.** Worth paying when systems interact and a design mistake is expensive to unpick once it is in code. **Intending to finish is not the test** — most small games ship faster on the jam path and can move up later with `/settings`.
-  - `Big systems-heavy or team project` — Thorough docs, fine-grained stories, evidence required everywhere. Many interacting systems (open-world, sim, RPG), a firm release date, or shared ownership.
+- **Options** (base labels):
+  - `Hackathon / prototype / side project` — A one-page brief, a pinned stack, then
+    code: **about four steps to running code.** The trade: there are no PRDs, so
+    product and design problems surface in code rather than before it.
+  - `Seed-stage product team` — A product brief, a feature map and a PRD per MVP
+    feature; architecture with the critical ADRs; an API contract and data model when
+    there is a backend; a walking skeleton deployed to staging through CI before the
+    sprint loop; director reviews at phase gates only. **Expect a few days of product
+    and technical design before the first story** — worth it when a wrong decision is
+    expensive to unpick once it is in code.
+  - `Regulated or enterprise (fintech, health, B2B with SLAs)` — Everything in the
+    seed-stage path plus a cross-PRD review, a control manifest, load tests, every
+    director gate, and fine-grained stories with evidence required everywhere. For
+    products where a mistake means a regulator, a breach or an SLA credit.
 
-Value mapping (ignore any ` (Recommended)` suffix on the first option):
-`Jam / prototype / first game` → `minimal`, `Several systems that affect each other` → `standard`,
-`Big systems-heavy or team project` → `full`.
+Value mapping (ignore the ` (Recommended)` suffix): `Hackathon / prototype / side
+project` → `minimal`, `Seed-stage product team` → `standard`, `Regulated or
+enterprise (fintech, health, B2B with SLAs)` → `full`.
 
-Write `modes.rigor` to `project.yaml` immediately after the user selects — no
-separate "May I write?" needed, as the write is a direct consequence of the
-selection. Use the Edit tool to add it under the `modes:` block. There is **no
-legacy mirror file** for this setting, so this is a single write, not a dual-write.
+Then say: "`modes.rigor: [value]` drives six settings — `modes.workflow` (which
+documents are required), `docs.density`, `qa.level`, `modes.story_granularity`,
+`modes.review_mode` (how many director reviews run) and `team.size` (how many agents
+join team skills). Lighter rigor means fewer documents, fewer reviews and fewer
+tokens. `/settings` shows the value each one takes; set one explicitly only to
+override just that one."
 
-Then say: "Set `modes.rigor` to `[choice]`. That drives six settings —
-`modes.workflow`, `docs.density`, `qa.level`, `modes.story_granularity`,
-`modes.review_mode` (director-review depth), and `team.size` (how many agents are
-active on team tasks) — a lighter rigor means fewer reviews, a smaller active
-team, and fewer tokens. Run `/settings` to see the exact value each one takes, or
-set any of them explicitly to override just that one."
-
-**Why this is asked here.** These six knobs each change what skills produce, and
-before `rigor` existed `/start` never asked about any of them — so every project
-silently ran at defaults the user had never seen. Asking once, at onboarding, is
-the only point where the answer is cheap; skipping this question puts the project
-back where it was.
+**Why this is asked here.** Those six knobs change what every skill produces. Asked
+once at onboarding the answer is cheap; skipped, every project silently runs at
+defaults nobody chose.
 
 ---
 
-## Phase 3e: Set Automation Mode
+## Phase 6: Set Automation Mode
 
-Check whether `modes.automation` is already set in `project.yaml`. **If it is**,
-show it — "Automation is set to `[current]`." — and proceed to Phase 4. Do not
-ask again.
+If `modes.automation` is already set, show it — "Automation is set to `[value]`." —
+and continue without asking.
 
-**If it is not set**: Use `AskUserQuestion`:
+Otherwise use `AskUserQuestion`. Recommend by working style
+(`.claude/docs/settings-guidance.md` § 1): `Collaborative` for anyone new to the
+framework or working in a regulated codebase (put it first with ` (Recommended)`);
+recommend `Guided` instead when the user has said they already know this workflow.
 
 - **Prompt**: "Last one: how much should I confirm with you as we work?"
 - **Options**:
-  - `Collaborative` — I ask before each significant step and show drafts before writing. Most control; best while you are learning the workflow and want to see everything.
-  - `Guided (recommended)` — I decide the small stuff and proceed, but still stop for the big calls (scope changes, file deletions, schema changes). Far fewer interruptions than collaborative, without giving up control of the decisions that matter.
-  - `Autonomous` — I proceed and log decisions rather than asking, except for the always-ask categories. Fastest to run, but it makes every call itself and costs more tokens; best for trusted, well-scoped runs.
+  - `Collaborative` — I ask before each significant step and show every draft before
+    writing it. Most control; best while you are learning the workflow.
+  - `Guided` — I decide the small things and keep going, but stop for the big calls:
+    product and scope decisions, stack and API choices, pricing, anything expensive
+    to reverse. Far fewer interruptions without giving up the decisions that matter.
+  - `Autonomous` — I proceed and log each decision instead of asking. Fastest, but I
+    make every call myself and it costs more tokens; best for well-scoped runs you
+    trust.
 
-Value mapping: `Collaborative` → `collaborative`, `Guided (recommended)` →
-`guided`, `Autonomous` → `autonomous`.
+Value mapping: `Collaborative` → `collaborative`, `Guided` → `guided`,
+`Autonomous` → `autonomous`.
 
-Write `modes.automation` to `project.yaml` immediately after the user selects —
-no separate "May I write?" needed, as the write is a direct consequence of the
-selection. Use the Edit tool to add it under the `modes:` block. There is **no
-legacy mirror file** for this setting.
+Then say: "Set `modes.automation` to `[value]`. `.claude/docs/automation-modes.md`
+lists exactly what each mode asks and what it decides alone. `guided` and
+`autonomous` still stop for the always-ask categories — by default `scope_changes`,
+`file_deletions`, `schema_changes`, `production_deploys`, `db_migrations`,
+`infra_changes`, `secrets_access`, `pii_data_access` and `billing_changes`."
 
-Then say: "Set `modes.automation` to `[choice]`. See
-`.claude/docs/automation-modes.md` for exactly what each mode asks vs. proceeds
-on. `guided` and `autonomous` still always stop for the `automation_always_ask`
-categories (scope changes, file deletions, schema changes)."
-
-**Why this is asked here.** `modes.automation` controls how often every skill
-stops to confirm. A project that wants to move fast should not have to discover
-the knob after fifty approval prompts — that is the frustration this setting
-answers. Asked once, at onboarding, like the others. Do **not** seed
-`modes.automation` into the Phase 3c template: Phase 3e skips when the key is
-already set, so seeding it would suppress its own question (the collision Y.3
-and Y.6 guard for the other knobs).
+**Why this is asked here.** `modes.automation` controls how often every skill stops.
+A team that wants to move fast should not discover the setting after fifty approval
+prompts.
 
 ---
 
-## Phase 4: Show the Path, Then Confirm
+## Phase 7: Write `project.yaml`
 
-**Now** present the recommended path — after Phase 3d, so it can match the rigor
-the user actually chose. Print **one** of the three below, using the `modes.rigor`
-value resolved or written in Phase 3d; if it is somehow still unset, use
-`standard` (its documented default) rather than skipping the path. (Paths A/B/C
-only; path D users are retrofitting an existing project and were given their
-path in Phase 3.)
+1. **Collect the changes** — only the keys that were unset: `project.stage` (Phase
+   4), `modes.rigor` (Phase 5), `modes.automation` (Phase 6). If all three were
+   already set, say "`project.yaml` already has all three settings — nothing to
+   write." and go to Phase 8.
+2. **Show the exact lines** that will be added, for example:
 
-Say first: "Here's your path at `rigor: [chosen]`. Every skill still runs at any
-level — rigor changes what's *required*, not what's allowed. So at `minimal` you can
-still call `/art-bible`, `/ux-design`, `/qa-plan` or anything else the moment you want
-it — nothing is locked, it simply is not demanded up front. And if one system alone
-deserves more care, raise just that one with
-`workflow_overrides.system_overrides.<system>` rather than the whole project."
+   ```yaml
+   project:
+     stage: Discovery
 
-**If `minimal` — 4 steps to running code:**
-- `/setup-engine` — configure the engine
-- `/brainstorm` — produce the one-page `design/game-brief.md` (the lean-tier design artifact; it replaces the full concept doc, systems decomposition, and per-system GDDs)
-- `/create-stories` — turn the brief's MVP list into implementable stories (the epic is implicit — no separate `/create-epics` or `/sprint-plan`; the brief's build order is the plan)
-- `/dev-story` — **first line of game code**
+   modes:
+     rigor: standard
+     automation: collaborative
+   ```
 
-**If `standard` (default) — the full pipeline:**
-- **Concept:** `/setup-engine` → `/brainstorm` → `/prototype` → `/art-bible` → `/map-systems` → `/design-system` (×N systems) → `/review-all-gdds` → `/gate-check`
-- **Architecture:** `/create-architecture` → `/architecture-decision` (×N) → `/create-control-manifest` → `/architecture-review`
-- **Pre-Production:** `/ux-design` → `/create-epics` → `/create-stories` → `/sprint-plan`
-- **Production:** `/dev-story`
+   Placement: the `project:` block directly after the `framework:` block; the
+   `modes:` block at the end of the file, after the header comment that explains it.
+   If a `project:` or `modes:` block already exists (for example `project.name`
+   written by `/brainstorm`), add the missing key inside it — never a second block.
+   Nothing else in the file changes: no other key, no reformatting, no removed
+   comments, and none of the six fronted knobs.
+3. **Ask**: "May I write this to `project.yaml`?" — one approval for the whole change.
+   On "no", keep the values in the conversation, say the settings are not saved and
+   that re-running `/start` asks again, and continue with Phase 8.
+4. **Write** — Read the file first (Edit requires it), then Edit.
+   **If `project.yaml` does not exist**, the framework's shipped configuration file
+   is missing. Say so, and offer to create a minimal one containing
+   `schema_version: 1` and the blocks above. Do not invent a `framework:` block —
+   the framework version is not known here; restoring the shipped `project.yaml`
+   (see `UPGRADING.md`) brings it back.
+5. **Verify** — re-read `project.yaml` and confirm:
+   - each written key is present with its value, and each value is valid:
+     `project.stage` ∈ `Discovery | Definition | Architecture | Validation | Build |
+     Hardening | Launch`, `modes.rigor` ∈ `minimal | standard | full`,
+     `modes.automation` ∈ `collaborative | guided | autonomous`;
+   - none of the six fronted knobs was added.
 
-**If `full` — the full pipeline plus validation builds:**
-- Everything in `standard`, plus `/vertical-slice` and `/playtest-report` (×1+)
-  in Pre-Production, and `/design-review` after each GDD.
+   Report the result in one line. If a check fails, say which, and do not claim the
+   settings were saved.
+6. **Pre-existing fronted knob** — if Phase 1 found one of the six set explicitly
+   (from an earlier manual edit), do not remove it. Say once: "`[key]` is set
+   explicitly in `project.yaml`, so `modes.rigor` does not change it. Review it with
+   `/settings` if that was not intended."
 
-> **Do not present the minimal path as lesser.** It is the tier's documented
-> floor (`.claude/docs/workflow-modes.md` — "engine choice and a filled
-> `design/game-brief.md` are required before code starts … everything else can
-> be skipped"), not a degraded mode. Equally, do not oversell it: at `minimal`
-> there are no GDDs to catch design problems before they reach code, which is
-> the trade being made.
+---
 
-If the user picked a rigor that contradicts what they described in Phase 2 —
-overriding the seeded recommendation, e.g. choosing `minimal` after describing a
-multi-year commercial project, or `full` for a weekend jam — apply the "mismatch"
-trigger in `.claude/docs/settings-guidance.md § 4`: say so once, in one sentence,
-and offer `/settings` to change it. Do not re-ask.
+## Phase 8: Show the Path, Then Confirm
 
-Then use `AskUserQuestion` to ask which step they'd like to take first. Never auto-run the next skill.
+For options A–C, present the recommended path now — after Phase 5, so it matches the
+rigor actually chosen. Print **one** of the three below, using the `modes.rigor`
+value from Phase 5; if it is somehow still unset, print the `minimal` path (the
+documented default) and say so. Option D users were given their path in Phase 3.
+
+Say first: "Here's your path at `rigor: [value]`. Every skill still runs at any
+level — rigor changes what is *required*, not what is *allowed*. At `minimal` you can
+still run `/prototype`, `/api-design`, `/ux-design` or anything else the moment you
+want it. And if one feature deserves more care — payments, say — raise just that one
+with `workflow_overrides.feature_overrides.<feature>` instead of the whole project."
+
+**`minimal` — about four steps to running code:**
+- `/brainstorm` — the one-page `design/product/one-pager.md` (it replaces the product
+  brief, the feature map and the PRDs at this tier)
+- `/setup-stack` — choose and pin the stack layers you have decided
+- `/create-stories` — turn the one-pager's `## Build Order` into stories (the
+  one-pager is the plan — no separate epic or sprint plan)
+- `/dev-story` — the first story in code
+- Later: `/smoke-check` before QA hand-off and on the release candidate, then
+  `/release-checklist` and `/security-audit quick` before launch (`standard` and
+  `full` need `/security-audit full` instead).
+
+**`standard` — the full pipeline:**
+- **Discovery**: `/brainstorm` → `/setup-stack` → `/prd-review` on the brief
+  (required — the Definition gate checks the review) → `/prototype` for the riskiest
+  assumption (optional) → `/gate-check definition`
+- **Definition**: `/map-features` → `/write-prd` (one per MVP feature) → `/prd-review`
+  (each PRD) → `/gate-check architecture`
+- **Architecture**: `/create-architecture` → `/architecture-decision` (the critical
+  ADRs) → `/api-design` and `/data-model` (with a backend) → `/security-audit
+  threat-model` (with personal data) → `/ux-design accessibility` (with a UI) →
+  `/architecture-review` → `/test-setup` → `/setup-stack refresh` (records the data
+  and cloud layers once their ADRs are Accepted) → `/gate-check validation`
+- **Validation**: with a UI, `/design-language` → `/ux-design shell` →
+  `/ux-design patterns` → `/ux-design` for the key screens → `/ux-review`; with a
+  backend and a UI, `/api-design reconcile` (recommended); then `/create-epics` →
+  `/create-stories` → `/sprint-plan` → `/walking-skeleton` on staging →
+  `/gate-check build`
+- **Build**: `/dev-story` → `/story-done` for each story, `/smoke-check` →
+  `/gate-check hardening`
+- **Hardening and Launch**: `/team-hardening`, `/security-audit full`,
+  `/usability-report`, `/team-qa`, `/localize qa` (with more than one locale),
+  `/incident runbook`, `/changelog <version>` → `/release-notes`, `/smoke-check` on
+  the release candidate, `/release-checklist`, `/rollout-plan`, `/launch-checklist` →
+  `/gate-check launch` → `/team-release`
+
+**`full` — the full pipeline with every check:**
+- Everything in `standard`, plus: brand direction offered inside `/brainstorm`;
+  `/review-all-prds` in Definition; at least three Foundation-layer ADRs in
+  Architecture; `/create-control-manifest` and `/api-design reconcile` (with a
+  backend and a UI) required in Validation; `/load-test` in Hardening; and every
+  director gate at every step (`review_mode: full`).
+
+> **Do not present `minimal` as lesser.** It is the documented floor
+> (`.claude/docs/workflow-modes.md`): a filled one-pager and a pinned stack before
+> code, nothing else demanded up front. Do not oversell it either: with no PRDs,
+> product and design problems reach the code before anyone catches them.
+
+**Mismatch.** If the user picked a rigor that contradicts what they described — a
+payments product on `minimal`, a weekend hackathon on `full` — apply the mismatch
+trigger of `.claude/docs/settings-guidance.md` § 4: say so once, in one sentence,
+offer `/settings`, and do not re-ask.
+
+Then use `AskUserQuestion` for the first step. Never run the next skill yourself.
 
 - **Prompt**: "Would you like to start with [recommended first step]?"
 - **Options**:
@@ -342,31 +397,50 @@ Then use `AskUserQuestion` to ask which step they'd like to take first. Never au
 
 ---
 
-## Phase 5: Hand Off
+## Phase 9: Hand Off
 
-When the user confirms their next step, respond with a single short line: "Type `[skill command]` to begin." Nothing else. Do not re-explain the skill or add encouragement. The `/start` skill's job is done.
+When the user confirms, reply with a single line: "Type `[skill command]` to begin."
+Nothing else — no re-explaining the skill, no encouragement. On "something else",
+ask what they have in mind and point to the matching skill, or to `/help`.
 
-Verdict: **COMPLETE** — user oriented and handed off to next step.
+Verdict: **COMPLETE** — user oriented, settings written (or explicitly declined), and
+handed off to the next step.
+
+The alternative is `Verdict: **NOT ASSESSED** — the stage could not be estimated
+(<error>).`, when option D's `stage-estimate.sh` run exits non-zero or prints no
+`STAGE:` line (Phase 3 D step 1).
 
 ---
 
 ## Edge Cases
 
-- **User picks D but project is empty**: Gently redirect — "It looks like the project is a fresh template with no artifacts yet. Would Path A or B be a better fit?"
-- **User picks A but project has code**: Mention what you found — "I noticed there's already code in `[code root]`. Did you mean to pick D (existing work)?"
-- **User is returning (engine configured, concept exists)**: Skip onboarding entirely — "It looks like you're already set up! Your engine is [X] and you have a game concept at `design/gdd/game-concept.md` (or a game brief at `design/game-brief.md`). Review mode: `[resolve modes.review_mode — an explicit value if set, otherwise it follows modes.rigor: minimal→solo, standard→lean, full→full]`. Want to pick up where you left off? Try `/sprint-plan` or just tell me what you'd like to work on."
-- **User doesn't fit any option**: Let them describe their situation in their own words and adapt.
+- **User picks D but the project is empty** — "It looks like a fresh template with no
+  product artifacts or code yet. Would A, B or C fit better?"
+- **User picks A or B but Phase 1 found code or PRDs** — mention what you found:
+  "I noticed [source code under apps/ / N PRDs]. Did you mean D (existing product)?"
+- **Returning user** (stage, rigor and automation set; a brief or one-pager exists) —
+  skip onboarding: "You're already set up: stage `[stage]`, rigor `[rigor]`,
+  automation `[automation]`, and a [product brief / one-pager] at `[path]`.
+  Review mode follows rigor unless set explicitly (`minimal`→`solo`,
+  `standard`→`lean`, `full`→`full`). Want to pick up where you left off? `/help`
+  shows the next step for this stage." Write nothing.
+- **Settings exist but no product record** — treat it as a normal run: the Phase 5
+  and 6 questions are skipped because the keys are set, and Phase 3 routes as usual.
+- **User doesn't fit any option** — let them describe their situation in their own
+  words and adapt; route to the closest option.
 
 ---
 
 ## Collaborative Protocol
 
-**Applies in `collaborative` mode (the default).** For `guided` and
-`autonomous` modes, see `.claude/docs/automation-modes.md` — the rules below
-describe what collaborative mode requires, not universal behavior.
+`/start` is always collaborative — the rules below apply in every automation mode:
 
-1. **Ask first** — never assume the user's state or intent
-2. **Present options** — give clear paths, not mandates
-3. **User decides** — they pick the direction
-4. **No auto-execution** — recommend the next skill, don't run it without asking
-5. **Adapt** — if the user's situation doesn't fit a template, listen and adjust
+1. **Ask first** — never assume the user's state or intent; Phase 1 findings inform
+   the questions, they do not replace them.
+2. **Present options** — clear paths with their trade-offs, not mandates.
+3. **User decides** — the starting point, the rigor and the automation mode are the
+   user's choices; recommendations are labelled as such.
+4. **"May I write this to `project.yaml`?"** before the single write, showing the exact
+   lines; nothing is written on "no".
+5. **No auto-execution** — recommend the next skill; never run it.
+6. **No commits** — committing is the user's decision.

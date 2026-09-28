@@ -2,27 +2,29 @@
 
 ## Trigger
 
-Manual trigger at the end of each sprint (typically invoked by the producer
-agent or the human developer).
+Manual trigger at the end of each sprint (typically invoked by the
+`delivery-manager` agent or the human developer).
 
 ## Purpose
 
 Automatically generates a retrospective starting point by analyzing the sprint
 data: what was planned vs completed, velocity changes, bug trends, and common
 blockers. This is not a git hook but a workflow hook invoked through the
-`producer` agent.
+`delivery-manager` agent. `/retrospective sprint-[N]` runs the same analysis as a
+skill, with the full facilitation flow; use it when the team holds the meeting.
 
 ## Implementation
 
 This is a workflow hook, not a git hook. It is invoked by running:
 
 ```
-@producer Generate sprint retrospective for Sprint [N]
+@delivery-manager Generate sprint retrospective for Sprint [N]
 ```
 
-The producer agent should:
+The delivery-manager agent should:
 
-1. **Read the sprint plan** from `production/sprints/sprint-[N].md`
+1. **Read the sprint plan** from `production/sprints/sprint-[N].md` and story
+   states from `production/sprint-status.yaml`
 2. **Calculate metrics**:
    - Tasks planned vs completed
    - Story points planned vs completed (if used)
@@ -75,4 +77,7 @@ Trend: [Improving / Stable / Declining]
 |------|------------|-----------|----------|
 ```
 
-5. **Save** to `production/sprints/sprint-[N]-retro.md`
+5. **Save** to `production/retrospectives/retro-sprint-[N]-YYYY-MM-DD.md` — the
+   path `/retrospective` writes, so a retrospective started here counts for the
+   catalog's retrospective step (never under `production/sprints/`, whose
+   `sprint-*.md` glob belongs to sprint plans)

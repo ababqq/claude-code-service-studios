@@ -18,13 +18,13 @@
 #
 # NOT an upward search: that resolves a nested project to its parent's config.
 if [ -f "project.yaml" ] || [ -d ".claude" ]; then
-  CCGS_ROOT="$PWD"
+  CCSS_ROOT="$PWD"
 elif [ -n "${CLAUDE_PROJECT_DIR:-}" ] && [ -d "${CLAUDE_PROJECT_DIR}" ]; then
-  CCGS_ROOT="$CLAUDE_PROJECT_DIR"
+  CCSS_ROOT="$CLAUDE_PROJECT_DIR"
 else
-  CCGS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
+  CCSS_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." 2>/dev/null && pwd)"
 fi
-[ -n "$CCGS_ROOT" ] && cd "$CCGS_ROOT" 2>/dev/null || true
+[ -n "$CCSS_ROOT" ] && cd "$CCSS_ROOT" 2>/dev/null || true
 
 # Claude Code InstructionsLoaded hook: record WHICH instruction file loaded and
 # WHY.
@@ -33,9 +33,10 @@ fi
 # `.claude/rules/*.md` files carry `paths:` frontmatter, and a path-scoped rule
 # loads only when Claude READS a file matching the pattern -- not on every tool
 # use, and not when it CREATES one. This framework's agents predominantly create
-# files: a new GDD, a new source file, a new test. So "does the rule for
-# src/gameplay/** ever actually reach the model?" has a real answer, and before
-# this hook the only way to get it was to infer it from behaviour afterwards.
+# files: a new PRD, a new source file, a new test. So "does the rule for
+# apps/api/src/modules/** ever actually reach the model?" has a real answer, and
+# before this hook the only way to get it was to infer it from behaviour
+# afterwards.
 #
 # That inference was made once here, expensively: a data-file rule specified one
 # key casing, agents wrote the other, and nothing surfaced the disagreement.
@@ -105,7 +106,7 @@ PARENT_VAL=$(pick "$INPUT" parent_file_path parentFilePath parent)
 # Paths arrive as absolute Windows paths with JSON-escaped separators. Left raw,
 # the readable line is the least readable thing in the log. Unescape, normalise
 # to forward slashes, strip the repo prefix -- so the column reads
-# `.claude/rules/gameplay-code.md`, which is what anyone scanning this is
+# `.claude/rules/domain-logic.md`, which is what anyone scanning this is
 # looking for. The RAW line below keeps the original bytes untouched.
 # TWO forms of the repo root, because the payload and the shell disagree about
 # what a path looks like on Windows. Git Bash reports $PWD as `/c/Users/...`

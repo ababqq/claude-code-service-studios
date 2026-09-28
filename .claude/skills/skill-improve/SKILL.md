@@ -1,6 +1,6 @@
 ---
 name: skill-improve
-description: "Improve a skill via a test-fix-retest loop — static checks, targeted fixes, keep or revert on score change."
+description: "Improve a skill via a static and category test-fix-retest loop; keep or revert on score change."
 argument-hint: "[skill-name]"
 user-invocable: true
 allowed-tools: Read, Glob, Grep, Write, Bash, Bash(bash "*/.claude/skills/skill-improve/../../hooks/yaml-helper.sh" resolve_config *)
@@ -8,6 +8,8 @@ model: sonnet
 ---
 
 !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys automation`
+
+Resolved above — use as-is. No block → defaults in `.claude/docs/config-resolution.md`.
 
 **Automation mode**: Resolve `modes.automation` (`project.local.yaml` →
 `project.yaml` → default `collaborative`). Every `AskUserQuestion` call and
@@ -29,10 +31,17 @@ Read the skill name from the first argument. If missing, output usage and stop:
 ```
 Usage: /skill-improve [skill-name]
 Example: /skill-improve tech-debt
+
+Verdict: **NOT ASSESSED** — no skill name given
 ```
 
 Verify `.claude/skills/[name]/SKILL.md` exists. If not, stop with:
-"Skill '[name]' not found."
+
+```
+Skill '[name]' not found.
+
+Verdict: **NOT ASSESSED** — skill '[name]' not found
+```
 
 ---
 
@@ -49,11 +58,15 @@ Static baseline:   [N] failures, [M] warnings
 Failing: Check 4 (no ask-before-write), Check 5 (no handoff)
 ```
 
+If `/skill-test` reports NOT ASSESSED or errors, record the static baseline as
+NOT ASSESSED — never as 0 FAILs and 0 WARNs — and carry it to Phase 6. The same
+applies to the category baseline in Phase 2b.
+
 If baseline is 0 FAILs and 0 WARNs, note it and proceed to Phase 2b.
 
 ### Phase 2b: Category Baseline
 
-Look up the skill's `category:` field in `CCGS Skill Testing Framework/catalog.yaml`.
+Look up the skill's `category:` field in `CCSS Skill Testing Framework/catalog.yaml`.
 
 If no `category:` field is found, display:
 "Category: not yet assigned — skipping category checks."
@@ -90,11 +103,13 @@ For each failing or warning **static** check, identify the exact gap:
 
 For each failing or warning **category** check (if category was assigned in Phase 2b),
 identify the exact gap in the skill's text. For example:
-- If G2 fails (gate mode, full directors not spawned): skill body never references all 4
-  PHASE-GATE director prompts
+- If G2 fails (gate mode, panel width wrong): skill body does not size the director
+  panel by `modes.workflow`, or does not name the directors it omits
 - If A2 fails (authoring, no per-section May-I-write): skill asks once at the end, not
   before each section write
 - If T3 fails (team, BLOCKED not surfaced): skill doesn't halt dependent work on blocked agent
+- If O2 fails (ops, production-mutating command): skill runs a deploy or migration
+  command itself instead of proposing it for a human to run
 
 Show the full combined diagnosis to the user before proposing any changes.
 
@@ -125,14 +140,28 @@ Display the comparison:
 ```
 Static:   Before [N] failures, [M] warnings  →  After [N'] failures, [M'] warnings
 Category: Before [N] failures, [M] warnings  →  After [N'] failures, [M'] warnings  (if applicable)
-Combined change: improved / no change / worse
+Combined change: improved / no change / worse / not assessed (a run could not complete)
 ```
 
 ---
 
 ## Phase 6: Verdict
 
-Count the combined failure total: static FAILs + category FAILs + static WARNs + category WARNs.
+The run ends in exactly one of three verdicts: **NOT ASSESSED**, "Score
+improved. Changes kept.", or "Combined score did not improve." Check them in
+this order.
+
+**If the baseline or the retest could not run** (a `/skill-test` result of
+NOT ASSESSED, or an error, for the static or the category run, before or after
+the edit):
+Report: "Verdict: **NOT ASSESSED** — [which run, and why]."
+Do not compute improved / not improved from a missing count, and keep or revert
+the edit only with the user's explicit choice: ask "Keep the edit to
+`.claude/skills/[name]/SKILL.md`, or revert it with git checkout?" and act on
+the answer.
+
+Otherwise, count the combined failure total: static FAILs + category FAILs +
+static WARNs + category WARNs.
 
 **If combined score improved (combined failure count is lower than baseline):**
 Report: "Score improved. Changes kept."
