@@ -199,6 +199,10 @@ Copy decks under `design/content/<area>.md` use one table per screen or template
 
 Columns follow `localization.locales`; ask when it is unset.
 
+Copy in a Claude Design or Figma mockup (or a `/design` artifact) is a draft or placeholder. The copy deck under
+`design/content/` and the message catalog are final; engineers wire strings by key, never copy them from the
+mockup.
+
 ### Worked example (Moa)
 
 - Empty state, Goals tab: "첫 목표를 만들어 보세요 · 매달 자동으로 모아 드릴게요" with the action

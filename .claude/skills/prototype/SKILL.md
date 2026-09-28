@@ -159,7 +159,9 @@ If `--path` was given, use it. Otherwise match the path to the kind of question:
 
 ### Path: clickable
 
-- **Build**: a Figma or ProtoPie prototype the user owns, or — built here — a single
+- **Build**: a Figma or ProtoPie prototype the user owns, a Claude Design prototype
+  (a claude.ai/design project, or a Design artifact the user drafts with the
+  bundled `/design` skill if it is present in the session), or — built here — a single
   self-contained `index.html` (all styles and data inline, opens by double-click, no
   server), or a local Vite or Expo app with hard-coded data when touch and gesture feel
   on a real phone matter (Expo Go).
@@ -266,8 +268,12 @@ and exposure rules above.
 By path:
 
 - **clickable** — write `index.html` (or the minimal Vite/Expo app) yourself. For a
-  Figma prototype the user builds, write only the session plan (Phase 7) and a
-  `prototype-link.md` with the share link.
+  Figma, ProtoPie or Claude Design prototype the user builds, write only the session
+  plan (Phase 7) and a `prototype-link.md` with the external link — the Figma or
+  ProtoPie share link, the `https://claude.ai/design/p/<PROJECT_ID>` project URL, or
+  the Design artifact's `https://claude.ai/code/artifact/<uuid>` URL — and the tool
+  that holds it. Publishing a Design artifact or editing a shared Figma file is the
+  user's external write, approved by them; this skill only records the link.
 - **fake-door** — write the page(s) and the analytics event list (`fake-door-events.md`:
   event names, what each proves). Hand the preview deploy command to the user; do not
   run it.

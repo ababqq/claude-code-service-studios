@@ -36,7 +36,7 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] Frontmatter has `name`, `description`, `argument-hint`, `user-invocable`, `allowed-tools`; `name: story-readiness` equals the directory, the catalog `name` and this spec's basename
 - [ ] `description` is exactly "Is a story implementation-ready? READY / NEEDS WORK / BLOCKED / NOT ASSESSED."
 - [ ] `argument-hint` offers `[story-file-path | all | sprint]` and `[--review full|lean|solo]`; `model: sonnet`; no `disable-model-invocation`, no `isolation`
-- [ ] First body line is exactly `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,qa.level,testing.strict,feature_overrides` ``
+- [ ] First body line is exactly `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,qa.level,testing.strict,feature_overrides,design` ``
 - [ ] `allowed-tools` is exactly `Read, Glob, Grep, AskUserQuestion, Agent` plus `Bash(bash "*/.claude/skills/story-readiness/../../hooks/yaml-helper.sh" resolve_config *)` — **no** `Write`, **no** `Edit`
 - [ ] The line after the bootstrap block is exactly `` Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`. ``, followed verbatim by the automation prelude block
 - [ ] ≥2 phase headings (`## Phase 0: Resolve Review Mode`, `## 1. Parse Arguments` … `## 7. Next-Story Handoff`, `## Phase 8: Director Gate — Story Readiness Review`)
@@ -45,9 +45,11 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] The single-story report carries `> **Verdict**: [READY / NEEDS WORK / BLOCKED / NOT ASSESSED]` directly under its heading; the aggregate has `Ready:`, `Needs Work:`, `Blocked:`, `Not Assessed:` counts
 - [ ] No "May I write" is required — the skill writes no file and says so ("This skill is read-only.")
 - [ ] The DoR items for `**API Contract**`, `**Migration**`, `**Feature Flag**`, `**Surface**`, the NFR budget, the design link and `**Analytics Events**` are present; the DoD carries the migration floor `production/qa/evidence/<story-slug>/migration-dry-run.log`, "never auto-passed — applies at every `qa.level` and regardless of `testing.strict.config`"
+- [ ] The **Design link present** item carries the design-reference rule: at `design.tool` `claude-design` or `figma`, a `Design reference:` line naming an existing `design/handoff/<slug>/HANDOFF.md` whose `> **Verdict**:` is `RETAINED` or `LINK ONLY`; missing line or record, or `NOT ASSESSED` → NEEDS WORK with fixes `/design-handoff --for <slug>` / `/design-handoff refresh <slug>`; `none` accepts `Design reference: none — markdown spec only`; unset is asked and, unanswered, prints `Design reference: NOT CHECKED — design.tool unset (record it with /settings)`
+- [ ] Remote design URLs are never fetched — the skill reads only local `design/handoff/*/HANDOFF.md` records
 - [ ] The test-evidence item maps Logic→`logic`, Integration→`integration`, UI→`ui`, E2E→`e2e`, Config→`config` from the resolved `testing.strict` line (never from `project.yaml` directly)
 - [ ] QL-STORY-READY review-mode check carries the lean suffix sentence; the spawn has `` Pass: story path · PRD path · resolved `testing.strict` line ``; the reply is parsed as `[QL-STORY-READY]: TOKEN`
-- [ ] Only one `!` injection; no `file:line` citation; handoffs name `/dev-story`, `/create-epics`, `/create-stories`, `/quick-spec`, `/api-design update <resource>`, `/data-model migration <slug>`, `/sprint-plan update`
+- [ ] Only one `!` injection; no `file:line` citation; handoffs name `/dev-story`, `/create-epics`, `/create-stories`, `/quick-spec`, `/api-design update <resource>`, `/data-model migration <slug>`, `/sprint-plan update`, `/design-handoff`
 
 ---
 
@@ -220,6 +222,40 @@ Fixtures use the Moa example story `production/epics/goals-core/story-001-create
 
 ---
 
+### Case 9: Design Tool — a UI story designed in Figma
+
+Fixture base: `production/epics/goals-core/story-003-goal-detail.md` (Type UI, Surface
+`web`, a `- UX spec:` bullet naming `design/ux/goal-detail.md`, which exists); every other item passes.
+
+**Fixture (9a):** the block prints `design.tool: figma file_url=https://www.figma.com/design/<fileKey>/Moa (project.yaml)`; the story has
+``- Design reference: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md` — …``;
+the record exists with `> **Verdict**: RETAINED`.
+
+**Fixture (9b):** as 9a, but the record's verdict is `> **Verdict**: NOT ASSESSED`.
+
+**Fixture (9c):** as 9a, but the story has no `Design reference:` line.
+
+**Fixture (9d):** the block prints `design.tool: (unset -- ask; unset is not none)`; the user answers `Not decided`.
+
+**Fixture (9e):** the block prints `design.tool: none (project.yaml)`; the story has `- Design reference: none — markdown spec only`.
+
+**Input:** `/story-readiness production/epics/goals-core/story-003-goal-detail.md`
+
+**Expected behavior:**
+1. (9a) The record's `> **Verdict**:` line is read with Grep; the design link item passes → **READY**
+2. (9b) NEEDS WORK — the record is unverified; Fix: `/design-handoff refresh goal-detail`
+3. (9c) NEEDS WORK — Fix: `/design-handoff --for goal-detail` (or copy the UX spec's `> **Design Source**:` line into the story)
+4. (9d) Asks once "Which design tool does this project use?"; on `Not decided` prints `Design reference: NOT CHECKED — design.tool unset (record it with /settings)` → **NOT ASSESSED**
+5. (9e) The UX spec link and the `none` line pass → **READY**
+
+**Assertions:**
+- [ ] No Figma or Claude Design URL is fetched; no MCP, connector or Artifact tool is called; nothing is written
+- [ ] 9b is never READY — `NOT ASSESSED` in the record is not a match
+- [ ] 9d never treats unset as `none` and never reports READY
+- [ ] The Case 1 story (Surface `api`) is N/A on the design reference whatever `design.tool` says, and triggers no question
+
+---
+
 ## Protocol Compliance
 
 - [ ] Never uses Write or Edit; drafts fixes in conversation as ready-to-paste text only
@@ -235,6 +271,9 @@ Fixtures use the Moa example story `production/epics/goals-core/story-001-create
 - Readiness rubric mapping: RD1 (six checklist dimensions — Case 1), RD2 (four verdicts
   and their precedence — Cases 1–4), RD3 (BLOCKED only for outside action — Case 2), RD4
   (QL-STORY-READY per review mode — Cases 6–8), RD5 (next-story handoff — Case 1).
+- The design-reference half of the design link (`design.tool` claude-design / figma /
+  none / unset, record verdicts RETAINED and NOT ASSESSED) is Case 9; `LINK ONLY` passes
+  like RETAINED and `claude-design` follows the figma path — neither is fixture-tested.
 - The asset-reference check (`design/inventory/`, `public/`, image and font extensions)
   and the Open Questions markers (`TBD`, `TODO`) are not fixture-tested separately.
 - Stories with several ADRs are assumed additive (every ADR must be Accepted for READY).

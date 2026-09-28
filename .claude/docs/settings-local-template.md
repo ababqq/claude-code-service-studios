@@ -54,6 +54,36 @@ commands, and a human runs them.
 shared deny rule (a prefix match on `vercel deploy --prod`) does not catch. Allow
 the exact preview command you use, with no trailing wildcard.
 
+### Optional: read-only Figma MCP tools
+
+When the project designs in Figma (`design.tool: figma`) and you have the Figma MCP
+server installed, `/design-handoff` reads frames through it and each call prompts in
+`default` mode. You may allow the **read-only** tools here to stop those prompts.
+MCP tool names are `mcp__<server>__<tool>` and the server name is whatever **your**
+install registered, so copy the exact names from your session (`/mcp` lists them) —
+the names below are an example, not a contract:
+
+```json
+{
+  "permissions": {
+    "allow": [
+      "mcp__figma__get_design_context",
+      "mcp__figma__get_screenshot",
+      "mcp__figma__get_metadata",
+      "mcp__figma__get_variable_defs",
+      "mcp__figma__get_code_connect_map",
+      "mcp__figma__search_design_system"
+    ]
+  }
+}
+```
+
+Never allow the Figma **write** tools (`use_figma`, `create_new_file`, Code Connect
+writes, asset uploads): a write to Figma changes shared external state and is always
+proposed and approved per call. Keep every MCP entry out of the shared
+`.claude/settings.json` — tool names vary per install, and the shared file would
+pre-approve a name that means nothing (or something else) on a teammate's machine.
+
 ## Permission Modes
 
 Claude Code supports different permission modes (`permissions.defaultMode`, or

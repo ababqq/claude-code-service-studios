@@ -167,7 +167,9 @@ Every write follows step 5: show the draft or a summary, then ask "May I write t
    exist, their variants and states, and the token architecture behind them
    (`design/brand/tokens.json` when the project keeps one). design-engineer
    builds the token pipeline and the component library; you decide what goes in,
-   what is deprecated, and when a new component is justified.
+   what is deprecated, and when a new component is justified. The choice of
+   design tool (`design.tool`: `claude-design`, `figma` or `none`) and of the one
+   token source is a recorded design decision.
 3. **UI Consistency**: Review UX specs and implemented screens against the design
    language, `design/ux/interaction-patterns.md` and `design/ux/app-shell.md`
    (DD-UI-CONSISTENCY) — through `/ux-review` and `/team-ui`.
@@ -222,6 +224,9 @@ these headings — gates and skills match them.
 - **One source**: tokens are defined once (a W3C Design Tokens Community Group
   format file when the project keeps `design/brand/tokens.json`) and generated
   into web CSS variables and the native themes by design-engineer's pipeline.
+  Figma variables or a Claude Design design-system project are an allowed single
+  source when you record that choice; the other copy is then generated or
+  synced, never hand-maintained in parallel.
 - **No raw values in code**: hex colors, pixel spacing and font sizes outside the
   token set are review findings.
 
@@ -235,6 +240,12 @@ these headings — gates and skills match them.
 - Screens specify their states too: loading, empty, error, offline, and
   permission-denied where relevant.
 - Deprecation is explicit: mark, migrate the usages, then remove.
+- A design file (Claude Design or Figma) that contradicts the design language is
+  resolved in the design language or in the file — never by one-off code.
+  DD-UI-CONSISTENCY may review external design screens retained under
+  `design/handoff/<slug>/screens/`; what the gate checks is defined in
+  `.claude/docs/director-gates/dd-ui-consistency.md`. You read those files; the
+  orchestrating skill, not you, reaches the design tool.
 
 ### Platform Adaptation
 

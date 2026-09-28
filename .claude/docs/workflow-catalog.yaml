@@ -289,6 +289,15 @@ phases:
           min_count: 3
         description: "Specs for sign-up/sign-in, onboarding, the core flow, settings/account, plus the app shell (`/ux-design shell`) and interaction patterns (`/ux-design patterns`)"
 
+      - id: design-handoff
+        name: "Design Handoff Records (external design)"
+        command: /design-handoff
+        required: false
+        repeatable: true
+        artifact:
+          glob: "design/handoff/*/HANDOFF.md"
+        description: "Only when design.tool is claude-design or figma: import each Claude Design handoff, exported bundle, /design artifact or Figma frame into design/handoff/<slug>/ and bind it to its UX spec. Never a substitute for the UX spec."
+
       - id: ux-review
         name: "UX Review"
         command: /ux-review

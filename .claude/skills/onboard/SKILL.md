@@ -85,7 +85,12 @@ one you chose, and scan the area's PRD, stories and code.
   `production/sprints/`.
 - **designer**: `design/brand/` (design language, tokens, voice and tone),
   `design/ux/` (specs, app shell, interaction patterns), `design/inventory/`,
-  `design/accessibility-requirements.md`.
+  `design/accessibility-requirements.md`, `design/handoff/` (retained Claude Design
+  and Figma records — each `HANDOFF.md` and the UX spec it backs), and the
+  configured design tool: read `design.tool` (with `design.figma.file_url` or
+  `design.claude_design.project_url`) from `project.yaml` with Read and name it —
+  `claude-design`, `figma` or `none`; absent means nobody has chosen yet (say so and
+  name `/setup-stack` or `/design-handoff`), never `none`.
 - **frontend / backend / mobile**: the layer's framework and version from the
   `stack` line; the layer's code roots from the `code_roots` line (`web`,
   `backend` or `mobile`, plus `shared`) — scan them for structure, patterns and key

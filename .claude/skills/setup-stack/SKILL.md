@@ -18,7 +18,7 @@ This skill decides what the product is built on and makes that decision safe for
 chooses each **stack layer** that has been decided — web, mobile, backend, data, cloud — pins every component's
 version **from a live source**, writes the sourced **stack reference** agents consult instead of their training data,
 declares the **code roots** each layer lives in, records the product facts later gates branch on (surfaces,
-distribution, regions, personal data, locales), and shows which **stack specialists** the configuration routes to.
+distribution, regions, personal data, locales, design tool), and shows which **stack specialists** the configuration routes to.
 
 `stack.pinned_on` is its completion marker: the catalog's `stack-setup` step, `/gate-check` and the session banner all
 read it. It is written **last**, and only when every configured component is pinned from a source, recorded as a
@@ -41,7 +41,7 @@ next steps Phase 14 offers:
 
 | Path | What is written |
 |------|-----------------|
-| `project.yaml` (stack.*, specialists.*, naming.*, commands.*, platform.*, release.*, privacy.*, compliance.*, localization.*) | The layer choices, pins, roots, overrides and product facts; `stack.pinned_on` last |
+| `project.yaml` (stack.*, specialists.*, naming.*, commands.*, platform.*, release.*, privacy.*, compliance.*, localization.*, design.*) | The layer choices, pins, roots, overrides and product facts; `stack.pinned_on` last |
 | `docs/stack-reference/VERSION.md` | The index: pin date, model knowledge cutoff, one Pinned Components row per configured component |
 | `docs/stack-reference/<component>/*.md` | Per component (folder = the component slug): `VERSION.md` from `.claude/docs/templates/stack-component-version.md`; for MEDIUM/HIGH also `breaking-changes.md`, `deprecated-apis.md`, `current-best-practices.md`; in `upgrade` mode `upgrade-<old>-to-<new>.md` |
 | `docs/architecture/tech-radar.md` | Seeded from `.claude/docs/templates/tech-radar.md`: `## Adopt` = the chosen components; `## Assess` = recorded integration candidates |
@@ -96,7 +96,7 @@ Re-running never silently overwrites an existing choice: each changed value is s
 ### 2a. Configuration
 
 Read `project.yaml` in full. Note every existing `stack.*`, `specialists.*`, `naming.*`, `commands.*`, `platform.*`,
-`release.distribution`, `privacy.handles_pii`, `compliance.regions` and `localization.locales` value, and
+`release.distribution`, `privacy.handles_pii`, `compliance.regions`, `localization.locales` and `design.*` value, and
 `project.category` (read-only here — it colours the preset suggestion). Keys without a `resolve_config` label
 (`naming.*`, `commands.*`, `localization.locales`, `platform.browsers`, `platform.min_os.*`, `stack.monorepo`,
 `stack.package_manager`) are read here, from `project.yaml`, not from `project.local.yaml`.
@@ -185,6 +185,13 @@ Ask with `AskUserQuestion`, at most four questions per call, proposing the answe
    Samsung Internet and the KakaoTalk and Naver in-app browsers explicitly rather than relying on `defaults`.
 7. **`platform.min_os.ios` / `platform.min_os.android`** — only when `ios` / `android` are surfaces. The minimums the
    chosen mobile framework supports are looked up live in Phase 5; propose them then, not from memory.
+8. **`design.tool`** — only when a UI surface (`web`, `ios`, `android`) is chosen in question 1 or the surfaces were
+   deferred: `Claude Design` (`claude-design`) / `Figma` (`figma`) / `None — markdown specs only` (`none`) /
+   `Decide later — leave unset`. Say plainly: unset is **not** `none` — `none` is a decision that markdown UX specs
+   are the whole design record, unset means the design skills ask. For `claude-design` or `figma`, optionally ask for
+   the project-level URL — `design.claude_design.project_url` (`https://claude.ai/design/p/<PROJECT_ID>`, never a
+   `?file=` screen link) or `design.figma.file_url` (`https://www.figma.com/design/<fileKey>/<fileName>`); a skipped
+   URL is simply absent. Per-screen designs are imported later with `/design-handoff`.
 
 Record the answers; nothing is written until Phase 7.
 
@@ -453,6 +460,10 @@ compliance:
   regions: [kr]
 localization:
   locales: [ko-KR, en-US]
+design:
+  tool: figma
+  figma:
+    file_url: "https://www.figma.com/design/<fileKey>/Moa"
 naming:
   files: kebab-case
 commands:
@@ -467,14 +478,16 @@ Ask: "May I write this to `project.yaml`?"
 ### 7b. Write rules
 
 - Read `project.yaml` first, then Edit it. For each block (`stack`, `specialists`, `naming`, `commands`,
-  `platform`, `release`, `privacy`, `compliance`, `localization`): absent → append it after the last top-level block;
+  `platform`, `release`, `privacy`, `compliance`, `localization`, `design`): absent → append it after the last top-level block;
   present → edit its keys in place and add the missing ones. Never write a second copy of a block. Preserve every
   other line — `schema_version`, `framework`, `project`, `modes`, comments.
 - Lists in **flow style** `[a, b]`. `[]` only for an explicit "none" (`compliance.regions`).
 - **Quote framework versions** (`version: "15.3"`): unquoted, `15.10` is read as the number 15.1 by any standard YAML
   parser (the commit hook's validation, CI tooling). Component strings with a trailing version (`PostgreSQL 16`) stay
   unquoted.
-- A deferred key is **absent** — never an empty value, `TBD`, or a placeholder.
+- A deferred key is **absent** — never an empty value, `TBD`, or a placeholder. A deferred `design.tool` writes no
+  `design:` block at all.
+- **Double-quote URLs** (`file_url: "https://…"`): an unquoted value is cut at the first ` #`.
 - `specialists.<layer>` is written only as an override (Phase 7c), never to restate the derived routing.
 - Never write `project.stage`, `modes.*`, or any of the six rigor-fronted knobs.
 
@@ -483,7 +496,7 @@ Ask: "May I write this to `project.yaml`?"
 Run:
 
 ```bash
-bash .claude/hooks/yaml-helper.sh resolve_config --keys stack,code_roots,surfaces,distribution,compliance
+bash .claude/hooks/yaml-helper.sh resolve_config --keys stack,code_roots,surfaces,distribution,compliance,design
 ```
 
 and show the result:
@@ -498,6 +511,8 @@ and show the result:
   Only web, mobile and backend take an override.
 - The `code_roots` line lists every root with its source; a `missing` root is expected for code not yet generated;
   `undeclared=` names workspace directories still to place.
+- The `design.tool` line shows the chosen tool and its URL (`=unset` when none was given), `none`, or the unset form
+  when the question was deferred or not asked.
 - A `notes:` line means a value was rejected (an enum outside its list, a surface that is not `web|ios|android|api`).
   Fix it with the user and write again — a rejected value reads as unset everywhere.
 
@@ -810,7 +825,7 @@ Stack Setup — <guided | refresh | upgrade>
 ==========================================
 Stack:           <the stack line from Phase 7c>
 Code roots:      <the code_roots line>
-Product facts:   surfaces=<…> distribution=<…> regions=<…> handles_pii=<…> locales=<…> (unset = asked later)
+Product facts:   surfaces=<…> distribution=<…> regions=<…> handles_pii=<…> locales=<…> design=<…> (unset = asked later)
 Pins:            <n> sourced · <n> managed · <n> accepted gaps · <n> unresolved
 Knowledge Risk:  HIGH: <components> · MEDIUM: <components> · model cutoff <value>
 Reference:       docs/stack-reference/VERSION.md + <n> component folders

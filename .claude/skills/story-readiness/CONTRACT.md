@@ -11,7 +11,7 @@ In `full` review mode it also runs QL-STORY-READY on each evaluable story.
 ### Files That Must Exist
 | File | Required Fields / Sections | Read-Only? |
 |------|---------------------------|-----------|
-| Resolved config block (`--keys review_mode,automation,workflow,qa.level,testing.strict,feature_overrides`) | `workflow` per story (via `feature_overrides` on the story's PRD stem), `qa.level`, `testing.strict` (`logic`, `integration`, `ui`, `e2e`, `config`), `review_mode` (QL-STORY-READY), `automation` | Yes |
+| Resolved config block (`--keys review_mode,automation,workflow,qa.level,testing.strict,feature_overrides,design`) | `workflow` per story (via `feature_overrides` on the story's PRD stem), `qa.level`, `testing.strict` (`logic`, `integration`, `ui`, `e2e`, `config`), `review_mode` (QL-STORY-READY), `automation`, `design` (`design.tool` — whether UI and E2E stories need a design-reference record; unset ⇒ ask) | Yes |
 | `production/epics/<epic-slug>/story-NNN-<slug>.md` | Header fields (`> **Status**`, `> **Layer**`, `> **Type**`, `> **Surface**`, `> **Estimate**`, `> **Manifest Version**`), `**PRD**`, `**Requirement**` (TR-ID), `**ADR Governing Implementation**`, `**Stack**` / `**Risk**`, `**Stack Notes**`, `**API Contract**`, `**Migration**`, `**Feature Flag**`, `**Analytics Events**`, `**Control Manifest Rules (this layer)**`, `## Acceptance Criteria`, `## Implementation Notes`, `## Out of Scope`, `## Test Evidence`, `## Dependencies` | Yes |
 | `docs/architecture/control-manifest.md` | `Manifest Version:` date in header | Yes (if exists) |
 | `docs/architecture/tr-registry.yaml` | `id`, `status` fields per TR entry | Yes (if exists) |
@@ -21,6 +21,7 @@ In `full` review mode it also runs QL-STORY-READY on each evaluable story.
 | `design/prd/<feature-slug>.md` | `## Configuration & Flags` (flag check), `## Non-Functional Requirements` (NFR budget source) | Yes |
 | `design/product/tracking-plan.md` | `## Events` | Yes (if exists) |
 | `design/ux/<slug>.md` | Existence of the UX spec a UI or E2E story links | Yes (if linked) |
+| `design/handoff/<slug>/HANDOFF.md` | Existence and `> **Verdict**:` line of the record a UI or E2E story's `Design reference:` line names | Yes (if named, or required by `design.tool`) |
 | `docs/stack-reference/VERSION.md` | Knowledge Risk per pinned component | Yes (if exists) |
 | `design/product/feature-map.md` | Which features have Approved PRDs | Yes |
 
@@ -36,7 +37,7 @@ None. This skill has no Write or Edit access and produces no file modifications 
 
 ### Definition of Ready (checked per story)
 - PRD requirement traced (a specific criterion or rule, not just the filename); acceptance criteria self-contained, testable and free of judgment calls
-- **Design link**: UI and E2E stories cite an existing UX spec `design/ux/<slug>.md`
+- **Design link**: UI and E2E stories cite an existing UX spec `design/ux/<slug>.md`; when `design.tool` is `claude-design` or `figma` they also carry a `Design reference:` line naming an existing `design/handoff/<slug>/HANDOFF.md` whose `> **Verdict**:` is `RETAINED` or `LINK ONLY` (missing line or record, or `NOT ASSESSED` → NEEDS WORK; fix `/design-handoff --for <slug>` or `/design-handoff refresh <slug>`); at `none`, `Design reference: none — markdown spec only` is acceptable; unset is asked, never treated as `none` — unanswered prints `Design reference: NOT CHECKED — design.tool unset (record it with /settings)` and the story cannot be READY
 - **Analytics event list**: `**Analytics Events**` present; each named event exists in `design/product/tracking-plan.md`
 - ADR referenced and `Accepted`; TR-ID active; manifest version current; stack notes for MEDIUM/HIGH-risk components; control manifest rules noted
 - `**API Contract**` present; the referenced operation exists in the contract (`None` only when the story calls no API)
@@ -65,7 +66,7 @@ None. This skill has no Write or Edit access and produces no file modifications 
 - The outcome line (`> **QA Lead Review (QL-STORY-READY)**: …`) is shown for the user to add to the story's `## QA Test Cases` section; this skill does not write it
 
 ## Immutability Rules
-- READS but does NOT modify: story files, `docs/architecture/control-manifest.md`, `docs/architecture/tr-registry.yaml`, all ADR files, the API contract, migration plans, PRDs, `design/product/tracking-plan.md`, UX specs, `design/product/feature-map.md`, sprint files, any referenced asset files (existence-only Glob checks)
+- READS but does NOT modify: story files, `docs/architecture/control-manifest.md`, `docs/architecture/tr-registry.yaml`, all ADR files, the API contract, migration plans, PRDs, `design/product/tracking-plan.md`, UX specs, design handoff records (`design/handoff/<slug>/HANDOFF.md` — local files only; remote design URLs are never fetched), `design/product/feature-map.md`, sprint files, any referenced asset files (existence-only Glob checks)
 - MODIFIES: nothing
 
 ## Hard Constraints (Never Violate)
@@ -79,6 +80,7 @@ None. This skill has no Write or Edit access and produces no file modifications 
 - Never re-read the same ADR file multiple times in one run — cache ADR statuses after the first read
 - Never penalize a story for missing `Manifest Version` if `control-manifest.md` does not exist
 - Never penalize a story for missing TR-ID if `tr-registry.yaml` does not exist
+- Never treat an unset `design.tool` as `none`, and never pass a design reference whose record is missing or `NOT ASSESSED`
 
 ## Downstream Skill Expects
 **Next skill:** /dev-story
@@ -96,6 +98,7 @@ It will rely on this skill's verdict as follows:
   - `Manifest Version` matches the current control manifest
   - `TR-ID` in `**Requirement**` is present and resolves in `docs/architecture/tr-registry.yaml` (when the registry exists)
   - `## Dependencies` section is present (may say "None")
+  - For UI and E2E stories when `design.tool` is `claude-design` or `figma`: the `Design reference:` line names a `design/handoff/<slug>/HANDOFF.md` record that exists with verdict `RETAINED` or `LINK ONLY`
   - `## Out of Scope` section is present (checked for existence; `/dev-story` uses it to enforce implementation boundaries)
 
 ## Known Fragile Points

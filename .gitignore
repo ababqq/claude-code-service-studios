@@ -126,6 +126,7 @@ secrets.json
 # *.webm
 # *.wav
 # *.mp3
+# *.fig
 
 # === OS Generated ===
 ehthumbs.db
@@ -138,6 +139,21 @@ $RECYCLE.BIN/
 *.msm
 *.msp
 *.lnk
+
+# === Imported designs (design/handoff/) ===
+# No ignore rule on purpose. /design-handoff unzips a Claude Design export or a
+# Design artifact's files into design/handoff/<slug>/bundle/ and keeps reference
+# images in screens/; the snapshot is committed so a session without the Claude
+# Design connector or the Figma MCP server can still read what was designed.
+# `*.zip` above is intentionally NOT re-included here: the bundle is committed
+# unzipped, never as an archive. A local .fig copy stays out too (see the Large
+# Binary Media block) -- the live Figma file is the source.
+# The unanchored rules above (`dist/`, `build/`, `out/`, `bin/`, `examples/`,
+# `node_modules/`, `*.log`, `.env`) match at any depth, so they silently drop
+# those parts of a bundle. Git cannot re-include a file whose parent directory
+# is excluded, so no negation is added; /design-handoff runs `git check-ignore`
+# on the snapshot and reports every dropped file in the record's
+# `## Ignored or Dropped Files`.
 
 # === Retained QA evidence (keep last) ===
 # Evidence only counts when it is committed. The generic `*.log` and `*.zip`

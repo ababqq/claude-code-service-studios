@@ -7,7 +7,7 @@ allowed-tools: Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion, Bash(bash 
 model: sonnet
 ---
 
-!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,docs.density,surfaces,accessibility`
+!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,docs.density,surfaces,accessibility,design`
 
 Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`.
 
@@ -79,6 +79,14 @@ accessibility target — creates no document and reports
   The target is decided with `/ux-design accessibility`, surfaces with
   `/setup-stack`, modes with `/settings`. This skill reads the resolved lines and
   asks when one is unset.
+- **Write `design.*` or anything under `design/handoff/`.** `/design-handoff`
+  retains external designs and writes the `design:` block only when it is unset;
+  `/setup-stack` and `/settings` also write it. This skill reads the resolved
+  `design` line and the handoff records, and asks when the line is unset.
+- **Write to Figma or Claude Design.** Pushing tokens to Figma variables and
+  uploading a component library to Claude Design are external writes the user
+  runs and approves through Figma's own skill or the bundled `/design-sync`
+  (Phase 5); this skill only names them.
 - **Edit the product brief.** A brand direction chosen here is recorded in
   `## 1. Brand Principles` of the design language, not in the brief.
 - **Define a voice.** `## 9. Content & Voice` points to
@@ -153,6 +161,9 @@ Do not full-read the brief. Grep its headings, then read only these sections:
 - `design/ux/app-shell.md`, `design/ux/interaction-patterns.md`,
   `design/inventory/screen-inventory.md` — existing screens and components the
   design language must cover.
+- `design/handoff/design-system/HANDOFF.md` (the design source's tokens and
+  components, below) and `design/handoff/brand-directions/HANDOFF.md` (directions
+  explored visually in an earlier run).
 - `project.yaml`, read with Read: `localization.locales` (which scripts the type
   system must set — Hangul, Latin, others) and `performance.bundle_kb` (the route
   budget web fonts compete with). Neither has a `resolve_config` label.
@@ -169,6 +180,19 @@ Do not full-read the brief. Grep its headings, then read only these sections:
   `Continue — check against wcag-aa as a working bar, recorded as not checked against a committed target`.
   On continue, every contrast row carries `NOT CHECKED — accessibility.target unset`,
   the `> **Not Checked**:` line says so, and the verdict cannot be `COMPLETE`.
+
+**Design source.** Read the resolved `design` line — where the design system also
+lives outside the repo.
+- `design.tool: claude-design …` or `design.tool: figma …` → a Claude Design
+  design-system project or a Figma library is declared. Glob
+  `design/handoff/design-system/HANDOFF.md` and, when it exists, read its
+  `> **Verdict**:`, `> **Retrieved**:` and `> **Not Checked**:` lines now; its
+  values are used in Phase 3.
+- `design.tool: none` → a recorded decision: this document and `tokens.json` are
+  the whole design system record; no reconcile step runs and no design-source
+  `NOT CHECKED` line is written.
+- Unset (`design.tool: (unset -- ask; unset is not none)`) → never treat it as
+  `none`; it is asked in Phase 2.
 
 **Retrofit mode.** Glob `design/brand/design-language.md`. If it exists, build the
 status table **without reading the document** — you are about to author only the
@@ -237,7 +261,9 @@ Use `AskUserQuestion`: `Build directly on this anchor` / `Revise it before expan
 brief's anchor stays untouched either way; a revised or new direction is recorded
 in `## 1. Brand Principles` and the header's `> **Brand Direction**:` line. With
 the anchor used, the header records DD-BRAND-DIRECTION as
-`not run — direction taken from the brief's anchor`.
+`not run — direction taken from the brief's anchor`. When the anchor carries a
+`**Visual reference**` URL other than "none", name it in the presentation and
+carry it into the `### Direction Record`'s Visual reference row.
 
 ### 1b. No anchor (or the user started fresh) — DD-BRAND-DIRECTION
 
@@ -268,6 +294,21 @@ token with `.claude/docs/director-gates.md` § Standard Verdict Format:
   option per direction plus `Combine elements — I'll describe how` and
   `Describe my own direction`. The chosen one is APPROVE-class; record
   `APPROVED [date]` in the header.
+
+  **Optional — see the directions before choosing.** When the bundled `/design`
+  skill is present in the session, add the option
+  `Visualise the directions first — /design-handoff new <directions> --for brand-directions`.
+  The main session does this, never the `design-director` agent (agents cannot
+  reach `/design` or the Artifact tool): it runs `/design-handoff new` with the
+  2–3 directions as the brief — through the `Skill` tool if it is present in the
+  session, else by asking the user to run it and rerun `/design-language`
+  afterwards. `/design-handoff` drafts them with `/design` (publishing a Design
+  artifact is an external write — approved first) and retains the result as
+  `design/handoff/brand-directions/HANDOFF.md`. Then ask the selection question
+  above again, with the record's screens named per direction. The record path goes
+  into the `### Direction Record`'s Visual reference row. When `/design` is absent,
+  omit the option and say once:
+  `NOT CHECKED — /design skill not available in this session (needs artifacts)`.
 - **STRONG** (APPROVE-class) → present the dominant direction together with the
   runner-up; the user still confirms the choice with `AskUserQuestion`.
 - **CONCERNS** (CONCERNS-class) → the principles do not give enough direction yet.
@@ -299,8 +340,9 @@ never in the brief.
 
 ## Phase 2: Framing
 
-Present the session context (product, surfaces, target, tier, direction) and ask
-two questions before authoring anything. Use `AskUserQuestion` with two tabs:
+Present the session context (product, surfaces, target, tier, direction, design
+source) and ask two questions before authoring anything — three when the `design`
+line is unset. Use `AskUserQuestion` with one tab per question:
 
 - Tab **"Scope"** — "Which sections do we author today?"
   Options: `All nine sections` / `Foundation — sections 1–5` /
@@ -326,6 +368,20 @@ two questions before authoring anything. Use `AskUserQuestion` with two tabs:
   existing brand assets (logo, colors, a Figma library link), products whose
   design the user admires or wants to avoid (Toss, KakaoBank, Banksalad, Monzo,
   Revolut for a fintech), platform constraints already decided.
+- Tab **"Design source"** — asked only when the resolved `design` line is unset
+  (unset is not `none`): "Where does the design system live besides this
+  document?" Options: `Claude Design — a design-system project` /
+  `Figma — a library file` / `None — this document and tokens.json only`. The
+  answer applies to this run only — this skill never writes `design.*`; name
+  `/design-handoff` (which records it when it imports the source), `/setup-stack`
+  or `/settings` as the place that records it. When the line is resolved, show it
+  in the session context instead of asking.
+
+The design source (resolved or answered) goes into the header's
+`> **Design Source**:` line — first token exactly `none`, `claude-design` or
+`figma`, then the project or library URL and the record
+`design/handoff/design-system/HANDOFF.md`, then the token direction (set in
+Phase 5).
 
 ---
 
@@ -368,7 +424,7 @@ Present the draft. Use `AskUserQuestion`:
 Before writing section 1 of a new file, ask: "May I write this to
 `design/brand/design-language.md`?" — create it from
 `.claude/docs/templates/design-language.md`: the H1, the verdict line set to
-`PARTIAL — SECTIONS 1-1`, the header block filled from Phase 0 and Phase 1, the
+`PARTIAL — SECTIONS 1-1`, the header block filled from Phases 0–2, the
 approved section 1, and the other eight section headings exactly as the template
 spells them, each with only `[To be designed]` beneath it. Do not copy the
 template's example tables or bracketed guidance into sections that have not been
@@ -379,9 +435,37 @@ replaces its `[To be designed]` placeholder with Edit, following the template's
 
 ### Sections 2–5: one draft, two checks
 
+**Design source values** — only when the design source is `claude-design` or
+`figma`; with `none` skip this step silently (a recorded decision, not a gap).
+Before the draft, the main session reads `design/handoff/design-system/HANDOFF.md`
+with Read: its `## Tokens & Components` section (the Figma variables — colors,
+type, spacing, modes — and library components, or the Claude Design design
+system's tokens and components), plus the retained bundle CSS under
+`design/handoff/design-system/bundle/` when the section points to it. Agents cannot
+reach the Figma MCP server, the Claude Design connector or the Artifact tool, so
+they get these values and the record path, never a live link to fetch.
+- Record verdict `RETAINED` or `LINK ONLY` → pass the values to the draft and both
+  checks below as **existing values to adopt or reconcile**.
+- Record verdict `NOT ASSESSED` → the values are unverified, never a match. Offer
+  `/design-handoff refresh design-system` the same way as the offer below; on
+  continue, carry the record's `> **Not Checked**:` items into this document's
+  `> **Not Checked**:` line and handle the source as not retained.
+- No record → offer it with `AskUserQuestion`:
+  `Import the design system first — /design-handoff --for design-system, then rerun /design-language (Recommended)` /
+  `Continue without it`. On continue (and for a `NOT ASSESSED` record), print
+  `NOT CHECKED — external design not retained (<url>)` — `<url>` being the
+  resolved `project_url` or `file_url`, or `unset` — into the header's
+  `> **Not Checked**:` line, and write the same line on its own at the end of
+  section 2 when that section is written, so a later retrofit run reads the section
+  as Complete (not checked) and reconciles it once the record exists. Like any
+  not-checked item, it keeps the verdict below `COMPLETE`.
+
 **Draft** — spawn `product-designer` via `Agent` with the locked section 1, the
-surfaces, the accessibility target line, `localization.locales` and the Phase 2
-references. Ask for four separately labelled blocks that are mutually consistent:
+surfaces, the accessibility target line, `localization.locales`, the Phase 2
+references and the design source values (when passed): "Adopt each existing
+value that fits section 1 and the accessibility target; where you change or drop
+one, say which and why." Ask for four separately labelled blocks that are
+mutually consistent:
 
 1. **Color System** — "Primitive palette with light and dark values; semantic
    tokens (`color.bg.*`, `color.text.*`, `color.action.*`, `color.feedback.*`,
@@ -413,7 +497,10 @@ references. Ask for four separately labelled blocks that are mutually consistent
   Flag any value that cannot be expressed as a token, any component state that
   needs a token the draft lacks, and the font loading and subsetting plan (which
   weights ship, subset strategy, fallback metrics) against the web route budget
-  `performance.bundle_kb` [value from `project.yaml`, or 'unset']."
+  `performance.bundle_kb` [value from `project.yaml`, or 'unset']." With design
+  source values: "Also flag every Figma variable or Claude Design token that
+  cannot map into the primitive → semantic → component tiers, and list each
+  existing value the draft changed (name, source value, draft value)."
 - **`accessibility-specialist`**: "Check this draft against the resolved
   accessibility target [line as printed]. Produce the contrast table for every
   foreground/background pair a component can produce, in every theme, with the
@@ -427,7 +514,8 @@ references. Ask for four separately labelled blocks that are mutually consistent
 
 **Merge.** Fold both checks into the four blocks. Where a check contradicts the
 draft — a brand color that fails contrast as button text, a type scale the font
-budget cannot carry — show both positions and let the user decide with
+budget cannot carry, a draft value that departs from the design source — show
+both positions and let the user decide with
 `AskUserQuestion` (for example `Darken the brand color for text use` /
 `Keep it for large text and icons only` / `Discuss`). Never resolve a conflict
 silently.
@@ -501,9 +589,28 @@ attributes or tone rules, move them out and tell the user to take them to
 
 Offer this when sections 2–4 are complete (and 7 when present), or when the scope
 is `Tokens only`. Use `AskUserQuestion`:
-`Generate design/brand/tokens.json` / `Skip — tokens live in Figma variables or code`.
+- `Generate design/brand/tokens.json from sections 2–4`
+- `Reconcile with Figma variables` — offered only when the design source is
+  `figma` and `design/handoff/design-system/HANDOFF.md` lists variables in its
+  `## Tokens & Components` section; otherwise omitted, and when the source is
+  `figma` without such a record, say why (the Phase 3 `NOT CHECKED` line)
+- `Skip — tokens live in Figma variables or code`
 
-Spawn `design-engineer` via `Agent` with sections 2, 3, 4 and 7 as written. Ask
+**Reconcile.** Spawn `design-engineer` via `Agent` with sections 2, 3, 4 and 7 as
+written and the record path (the values come from the record — the agent cannot
+reach Figma). Ask for the drift between the document's tokens and the Figma
+variables: tokens in the document missing from Figma, variables in Figma missing
+from the document, and names present in both with a different value or mode.
+Present the drift counts per family and each drifted token. The document wins: a
+drift is fixed in Figma (or the document is revised first, section by section with
+approval), never by adopting the Figma value silently. Then offer to generate
+`tokens.json` as below. Pushing the document's tokens into Figma variables is an
+external write: say that the user may do it through Figma's own skill (for
+example `/figma-generate-library`, if the Figma plugin is present in the session),
+proposed and explicitly approved at every automation mode — this skill never
+writes to Figma.
+
+**Generate.** Spawn `design-engineer` via `Agent` with sections 2, 3, 4 and 7 as written. Ask
 for a single JSON document in the W3C Design Tokens Community Group format:
 groups per token family, `$type` on every token or group, `$value`, aliases
 (`{color.green.500}`) from semantic to primitive tokens, light and dark values
@@ -516,7 +623,20 @@ from the file, any token in the file missing from the document). Ask: "May I
 write this to `design/brand/tokens.json`?" After writing, Read the file back and
 confirm it is intact. The document stays the source of intent; the file is the
 machine form of it. If they ever disagree, the document wins and the file is
-regenerated.
+regenerated. The same holds for Figma variables and a Claude Design design system:
+they are reconciled to the document, never the reverse.
+
+Record the token direction in the header's `> **Design Source**:` line (the
+chosen option — `tokens.json` generated, reconciled with Figma variables on
+[date], or tokens live in Figma variables or code), after "May I write this to
+`design/brand/design-language.md`?".
+
+When the design source is `claude-design` and the repo has a React component
+library, say that the user may run the bundled `/design-sync` (with
+`/design-login` in a session without a claude.ai login), if it is present in the
+session, to push that component library to Claude Design so its designs use the
+real components. It is an external write the user runs and approves; this skill
+never runs it and it is not a next step.
 
 ---
 
@@ -587,7 +707,8 @@ Tier: [workflow] — requires [sections 1–5 | all nine | none]  →  [met | no
 Not checked: [items with reasons, or "none"]
 DD-BRAND-DIRECTION: [outcome or skip note]
 DD-DESIGN-LANGUAGE: [outcome or skip note]
-Tokens: [design/brand/tokens.json written | skipped]
+Tokens: [design/brand/tokens.json written | reconciled with Figma variables — <n> drifts | skipped]
+Design source: [none | claude-design — record <path> (<verdict>) | figma — record <path> (<verdict>) | NOT CHECKED — <reason>]
 Skipped specialists: [agent — reason, or "none"]
 ```
 
@@ -610,6 +731,7 @@ next:
 - `[_] /ux-design [key screen] — spec the next key screen (sign-up, onboarding, the core flow, settings)`
 - `[_] /ui-inventory media — specify icons, illustrations, store screenshots and OG images from sections 6–8` (include when section 6 is complete)
 - `[_] /team-content voice — write the voice-and-tone guide section 9 points to` (skip if voice-and-tone.md exists)
+- `[_] /design-handoff --for design-system — retain the Figma library or Claude Design design system the tokens reconcile against` (include only when the design source is `claude-design` or `figma` and `design/handoff/design-system/HANDOFF.md` is missing or `NOT ASSESSED`)
 - `[_] /design-language — resume the remaining sections` (include when the verdict is PARTIAL beyond the tier's requirement or NOT ASSESSED)
 - `[_] Stop here`
 
@@ -650,6 +772,9 @@ specialist) → Checks → Approval → Write to file**
 - Ask "May I write this to `<path>`?" before every write to
   `design/brand/design-language.md` and `design/brand/tokens.json`. Specialists
   never write under `design/` themselves — the orchestrator writes after approval.
+- Writes to Figma and uploads to Claude Design are external writes: always
+  proposed and explicitly approved, at every automation mode, and done by the
+  user-run Figma skill or bundled `/design-sync` — never by this skill.
 - Surface every disagreement between product-designer, design-engineer and
   accessibility-specialist to the user — never resolve one silently.
 - Announce every skip in the output and in the document: a skipped gate, a

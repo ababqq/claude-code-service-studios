@@ -281,6 +281,15 @@ At `individual`, spawn `performance-engineer` once with every section's brief.
   for this build.
 - Reuse the UX review records in `design/ux/reviews/` (their design-director review
   outcome lines); a screen shipped without a review record is a Condition.
+- For each spec whose `> **Design Source**:` line names `claude-design` or `figma`, also
+  compare the implemented screens with the retained screens of its record
+  `design/handoff/<slug>/HANDOFF.md` (this skill passes the record and `screens/` paths —
+  agents read no design tool); each unexplained deviation is a Note or Condition, never a
+  Blocker on its own (the spec and the design language decide). A record that is missing,
+  unreadable, `NOT ASSESSED` or `LINK ONLY` with nothing retained is not a match: write
+  `NOT CHECKED — external design not retained (<url>)` under `Not checked:`. At `individual`
+  and `small` this comparison needs the design-engineer's judgment, so it is listed under
+  `Not checked` with `design-engineer` named.
 
 **Stack leads** (`studio`, per configured layer; their notes go into `## Performance`
 or `## Reliability`, tagged with the layer)

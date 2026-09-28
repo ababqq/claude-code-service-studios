@@ -11,6 +11,7 @@
 > **Screen Inventory**: [`design/inventory/screen-inventory.md` — the destinations the navigation model must reach]
 > **Accessibility Target**: [The committed `accessibility.target` from `design/accessibility-requirements.md`]
 > **Design Language**: [`design/brand/design-language.md` — the components and tokens the shell is built from]
+> **Design Source**: [none — markdown spec only | claude-design — <locator> · record `design/handoff/app-shell/HANDOFF.md` | figma — <node URL> · record `design/handoff/app-shell/HANDOFF.md` — the shell frames per breakpoint; the record is written by `/design-handoff`]
 > **Open Questions**: [none — or the count; each is written as an "Open:" line in the section it belongs to, with an owner and a date]
 
 > **Note — Scope boundary**: The app shell is the global UI that persists across

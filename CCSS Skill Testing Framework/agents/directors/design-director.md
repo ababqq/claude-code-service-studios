@@ -60,6 +60,7 @@ surface is configured. It owns five director gates, spawned by `/design-language
 - [ ] Every agent named in `Delegates to:` or `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; code and token-pipeline scripts (design-engineer), final microcopy (ux-writer), product scope (product-director, product-manager) and schedule (delivery-manager) are stated as outside it
 - [ ] Escalation path documented: escalates to product-director
+- [ ] Design tools: the choice of `design.tool` and of the one token source is a recorded design decision; the "**One source**" bullet allows Figma variables or a Claude Design design-system project as that source; a design file contradicting the design language is resolved in the language or in the file, never by one-off code; DD-UI-CONSISTENCY may review external design screens, with the checks defined in `.claude/docs/director-gates/dd-ui-consistency.md`
 - [ ] Does not make decisions outside its domain; never lowers the accessibility target or waives a contrast or target-size failure
 
 ---

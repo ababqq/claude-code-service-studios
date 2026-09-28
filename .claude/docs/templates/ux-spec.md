@@ -13,6 +13,7 @@
 > **Related ADRs**: [Decisions that constrain this screen — e.g., `docs/architecture/adr-0001-identity-and-auth.md`]
 > **Related UX Specs**: [Parent, sibling and flow specs — e.g., `design/ux/goal-create.md`, and the app shell `design/ux/app-shell.md`]
 > **Accessibility Target**: [The committed `accessibility.target` from `design/accessibility-requirements.md` — `none` | `wcag-a` | `wcag-aa` | `wcag-aaa` — plus the regional standards listed there]
+> **Design Source**: [none — markdown spec only | claude-design — <locator> · record `design/handoff/<slug>/HANDOFF.md` | figma — <node URL> · record `design/handoff/<slug>/HANDOFF.md` — the first token is exactly `none`, `claude-design` or `figma`; the record is written by `/design-handoff`]
 
 > **Note — Scope boundary**: This template covers one screen — a page, a modal, a
 > bottom sheet or a settings panel — on every surface it ships on. Global UI that
@@ -115,6 +116,14 @@
 
 ### Wireframe
 
+> With an external Design Source (claude-design or figma), the drawing may be
+> replaced by the line "external: see Design Source — screens listed from the
+> handoff record", followed by one line per breakpoint naming the retained screen
+> under `design/handoff/<slug>/screens/` (or the frame / node locator for a
+> `LINK ONLY` record). Keep the **Hierarchy** line below either way — reviewers
+> without the design tool read the layout from it. A record whose verdict is
+> `NOT ASSESSED`, or no record, never replaces the drawing.
+
 ```
 [Draw the layout for the smallest breakpoint first, then the widest, using ASCII art.
  Suggested characters:
@@ -127,6 +136,8 @@
 
  See the guide's Layout Specification section for a completed example.]
 ```
+
+**Hierarchy**: [A short text description of the layout, region by region in priority order — kept with an ASCII wireframe and with an external Design Source alike]
 
 ### Breakpoints
 
@@ -183,7 +194,9 @@
 
 > Document every state before implementation — at minimum loading, empty,
 > populated, error and offline. The states table is also the test matrix for QA.
-> See the guide's section of the same name for a worked example.
+> With an external Design Source, the Notes column names each state's screen from
+> the handoff record, and a state the design lacks is still specified here (the spec
+> wins on behaviour). See the guide's section of the same name for a worked example.
 
 | State Name | Trigger | What Changes Visually | What Changes Behaviorally | Notes |
 |------------|---------|-----------------------|---------------------------|-------|

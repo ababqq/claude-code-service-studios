@@ -20,7 +20,7 @@ feature flags and tracking-plan events — sits between `/create-epics` and
 | API contract named in the epic (`docs/api/openapi.yaml` or the GraphQL / proto / AsyncAPI file) | The operations the stories implement or call | Yes |
 | `docs/data/migrations/NNNN-<slug>.md` named in the epic | `## Change`, `## Status` | Yes |
 | `design/product/tracking-plan.md` | `## Events` rows owned by the epic's PRD | Yes (if exists) |
-| `design/ux/<slug>.md` | States and `## API Data` of the screens the UI stories implement | Yes (if exist) |
+| `design/ux/<slug>.md` | States, `## API Data` and the `> **Design Source**:` header line of the screens the UI stories implement | Yes (if exist) |
 | `docs/stack-reference/VERSION.md` | Pinned components and Knowledge Risk | Yes |
 | `project.yaml` | `testing.patterns` (read with Read; no `resolve_config` label) | Yes |
 | `production/qa/qa-plan-*.md` (most recent) | `## Automated Tests Required` — the heading from `.claude/docs/templates/test-plan.md` | Yes (if exists) |
@@ -82,6 +82,7 @@ Story header contract (exact — shared with `/dev-story`, `/story-done` and `/s
 - Every story file has a `## Acceptance Criteria` section with at least one checkbox item copied from the PRD, and an NFR budget or a "No NFR impact — [reason]" note
 - Every story file has a `## QA Test Cases` section whose first line is the QL-STORY-READY review line (`> **QA Lead Review (QL-STORY-READY)**: APPROVED | CONCERNS (accepted) | REVISED [date]`) or its skip note (`> [QL-STORY-READY] skipped — Lean mode` / `— Solo mode`)
 - Every story file has a `## Dependencies` section (may say "None" but is never omitted)
+- Every UI and E2E story's `## Implementation Notes` carries, directly below `- UX spec:`, a `- Design reference:` line copied from that UX spec's `> **Design Source**:` line — first token `none`, `claude-design` or `figma`, plus the `design/handoff/<slug>/HANDOFF.md` record path for the latter two — or `Design reference: NOT CHECKED — <reason>` when the spec has no such line; other stories write `N/A — no user-facing surface`. It is a bullet, not a header field: the header contract above is unchanged
 - The EPIC.md `## Stories` table has one row per story including `#`, `Story` title, `Type`, `Status`, and `ADR` — never a duplicate row for an existing number
 - Stories with a `Proposed` ADR have `> **Status**: Blocked` and a note: `BLOCKED: ADR-NNNN is Proposed — run /architecture-decision to advance it`
 - Every story file has a `**Stack**` and a `**Risk**` field. `Risk` comes from the governing ADR's `**Knowledge Risk**`, or at `minimal` from `docs/stack-reference/VERSION.md`; when that file is missing or assigns no level, `Risk` is **`NOT ASSESSED (no VERSION.md risk rating)`** — never a guessed level
@@ -113,7 +114,7 @@ Story header contract (exact — shared with `/dev-story`, `/story-done` and `/s
 **Next skill:** /story-readiness (then /dev-story)
 
 It will read:
-- Each `story-NNN-<slug>.md` file — specifically: `> **Status**:`, `> **Type**:`, `> **Surface**:`, `> **Manifest Version**:` (header), `**PRD**`, `**Requirement**` (TR-ID), `**ADR Governing Implementation**`, `**Stack Notes**`, `**API Contract**`, `**Migration**`, `**Feature Flag**`, `**Analytics Events**`, `## Acceptance Criteria`, `## Implementation Notes` (UX spec link), `## Test Evidence` section, `## Dependencies` section
+- Each `story-NNN-<slug>.md` file — specifically: `> **Status**:`, `> **Type**:`, `> **Surface**:`, `> **Manifest Version**:` (header), `**PRD**`, `**Requirement**` (TR-ID), `**ADR Governing Implementation**`, `**Stack Notes**`, `**API Contract**`, `**Migration**`, `**Feature Flag**`, `**Analytics Events**`, `## Acceptance Criteria`, `## Implementation Notes` (UX spec link, design reference), `## Test Evidence` section, `## Dependencies` section
 - `docs/architecture/control-manifest.md` — to compare its `Manifest Version:` against the story's embedded version
 - The referenced ADR file — to verify its `Status:` field is still `Accepted`
 - The referenced contract operation and migration plan — to verify they exist
@@ -122,6 +123,7 @@ It assumes:
 - `Manifest Version` in the story header is a date string that can be compared against the manifest's current `Manifest Version:` date
 - `TR-[feature-slug]-NNN` IDs are resolvable in `docs/architecture/tr-registry.yaml`
 - The ADR referenced by name in `**ADR Governing Implementation**:` exists as a file in `docs/architecture/` (pattern: `adr-NNNN-<slug>.md`)
+- The `Design reference:` line's first token is exactly `none`, `claude-design` or `figma` (or the line reads `NOT CHECKED — <reason>` / `N/A — no user-facing surface`); for `claude-design` and `figma` it names the record `design/handoff/<slug>/HANDOFF.md`, which `/story-readiness` checks exists and `/dev-story` reads
 - `> **Status**: Ready` means the story is a candidate for assignment (not in progress, not blocked)
 - `## Acceptance Criteria` contains checkbox items that are directly testable
 - `## Test Evidence` specifies an exact file path or evidence directory where proof will be stored

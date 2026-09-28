@@ -51,6 +51,7 @@ reports to design-director; qa-lead also hands it testing work.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; visual and brand decisions (design-director), flows (product-designer), copy (ux-writer) and S1 assignment or release approval (qa-lead) are stated as outside it
 - [ ] Escalation path documented: escalates to design-director; possible legal or compliance exposure goes to qa-lead and design-director for an `S1-Critical` decision
+- [ ] Design review includes external design screens under `design/handoff/<slug>/screens/` (contrast of their color pairs against `accessibility.target`, target sizes, text in images); focus and screen-reader semantics stay the UX spec's job
 - [ ] Does not make decisions outside its domain; never lowers the target or accepts an exception itself
 
 ---

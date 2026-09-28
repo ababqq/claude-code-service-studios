@@ -54,6 +54,7 @@ decisions are outside it.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; mobile architecture decisions (mobile-specialist), server logic and the API contract, store submission and OTA publishing, and product, UX, copy and monetization decisions are stated as outside it
 - [ ] Escalation path documented: escalates to mobile-specialist
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — layout and visual reference only, rebuilt with React Native primitives, the component library and semantic tokens — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never publishes updates, submits builds or prints credentials
 
 ---

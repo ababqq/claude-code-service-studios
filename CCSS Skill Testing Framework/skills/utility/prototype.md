@@ -267,6 +267,30 @@ These should pass before any behavioral testing:
 
 ---
 
+### Case 10: Edge Case — Clickable prototype built in Claude Design
+
+**Fixture:**
+- Case 1 state; the user builds the clickable prototype themselves as a Claude Design project
+  (`https://claude.ai/design/p/moa-payday`) — variant: as a Design artifact drafted with the bundled `/design` skill
+  (`https://claude.ai/code/artifact/<uuid>`)
+
+**Input:** `/prototype payday auto-debit onboarding --path clickable`
+
+**Expected behavior:**
+1. Phase 4's clickable path names a Claude Design prototype (a claude.ai/design project or a `/design` Design artifact)
+   alongside Figma and ProtoPie; `/design` is named only conditionally, as a tool the user runs
+2. The build writes only the session plan and `prototype-link.md` holding the external link and the tool that holds it —
+   no `index.html` is written
+3. `REPORT.md` `## Path` names that external link under **What was built**
+
+**Assertions:**
+- [ ] The skill never publishes a Design artifact or writes to Figma or Claude Design — it only records the link
+- [ ] `allowed-tools` and `--keys` are unchanged; no MCP tool, `Artifact` or `Skill` is listed
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
 ## Protocol Compliance
 
 - [ ] Uses "May I write this to `<path>`?" before every write

@@ -56,6 +56,7 @@ contract checks below.
 - [ ] Tier reductions only relax: `qa.level` relaxes per-story test items but the smoke report stays the floor; `performance.enforce` applies at every tier; a gate left with zero required items reports NOT ASSESSED, never PASS (unless its reference file declares it not applicable at that tier)
 - [ ] No `!` injection other than the bootstrap line; no `file:line` citations of other files
 - [ ] Has a next-step handoff at the end (Section 7 closing widget and Section 8 Follow-Up Actions), naming skills by their current names
+- [ ] Section 3 Cross-Reference Checks carries the external design check (record `design/handoff/<slug>/HANDOFF.md`, `> **Retrieved**:` date against the `/ux-review` record's file-name date, `NOT CHECKED — external design not retained (<url>)`, never calling a Figma MCP tool, the Claude Design connector or the `Artifact` tool); Section 8 contains "**External design changed after review?** → `/ux-review [file]`" and "**Imported design without a record?** → `/design-handoff --for <slug>`"; `CONTRACT.md`'s `build` row lists `design/handoff/*/HANDOFF.md`; `--keys` and `allowed-tools` are unchanged (no `design`, no `automation`, no MCP or host-conditional tool)
 
 ---
 
@@ -316,6 +317,33 @@ wide** it is (the Section 4b table — 1 / 2 / 4 directors).
 
 ---
 
+### Case 11: Build gate — external design sources (retained, stale, not retained)
+
+**Fixture:**
+- `modes.rigor: full` (resolves `workflow: full`); `platform.surfaces: [web, ios, android, api]`; every other Validation → Build item passes
+- `design/ux/goal-detail.md` has `> **Design Source**: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md``, and its `### Wireframe` cites the record's screens instead of ASCII (a text hierarchy is kept); its record is `RETAINED` with `> **Retrieved**: 2026-11-02`; `design/ux/reviews/goal-detail-ux-review-2026-11-05.md` is APPROVED
+- Variant A (stale): the same record has `> **Retrieved**: 2026-11-09`
+- Variant B (not retained): `design/ux/onboarding.md` declares `> **Design Source**: claude-design — https://claude.ai/design/p/<PROJECT_ID>?file=Onboarding.dc.html · record `design/handoff/onboarding/HANDOFF.md``, and that record has `> **Verdict**: NOT ASSESSED`
+- Variant C: `modes.rigor: minimal` with variant B's files
+
+**Input:** `/gate-check build`
+
+**Expected behavior:**
+1. The UX specs item counts `design/ux/goal-detail.md` although its wireframe is the cited external design; no external design is counted in place of a missing spec file
+2. Base fixture: the external design sources item passes (RETAINED, retrieved 2026-11-02 ≤ the review's file-name date 2026-11-05)
+3. Variant A: the item is unmet — the design changed after the review, so the review is stale; Follow-Up Actions name `/ux-review design/ux/goal-detail.md`
+4. Variant B: the item prints `NOT CHECKED — external design not retained (https://claude.ai/design/p/<PROJECT_ID>?file=Onboarding.dc.html)` and is never PASS; at `full` the verdict is at best NOT ASSESSED; Follow-Up Actions name `/design-handoff --for onboarding` when the record is missing
+5. Variant C: the item is dropped at `minimal` and not scored
+6. In no variant does the skill call a Figma MCP tool, the Claude Design connector or the `Artifact` tool
+
+**Assertions:**
+- [ ] The review date is taken from the record file name `<spec-stem>-ux-review-YYYY-MM-DD.md`, not from a header field
+- [ ] A `NOT ASSESSED` or missing record is never scored PASS and carries the exact NOT CHECKED line
+- [ ] The new item is named in all three `## Workflow tier reductions` lines of `gate-build.md` (conditional at `full`, recommended at `standard`, dropped at `minimal`)
+- [ ] The verdict is decided from files on disk only
+
+---
+
 ## Protocol Compliance
 
 - [ ] Uses "May I write this to `production/gate-checks/gate-<target>-YYYY-MM-DD.md`?" before saving the report
@@ -341,6 +369,8 @@ wide** it is (the Section 4b table — 1 / 2 / 4 directors).
 - The Hardening → Launch gate (release records, store submission, regional
   compliance items) is not covered; it follows the same pattern with more
   conditional items.
+- The external design sources item of the Validation → Build gate is covered by
+  Case 11; the other gates have no design-source item.
 - The per-feature override check (`feature_overrides` keys with no matching
   `design/prd/<stem>.md` ⇒ CONCERNS) and the smoke-report spot-read rule are
   exercised only indirectly.

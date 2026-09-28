@@ -53,6 +53,7 @@ questions escalate to web-specialist.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; the rendering/caching strategy (web-specialist), the API contract and backend endpoints, and product, UX and copy decisions are stated as outside it
 - [ ] Escalation path documented: escalates to web-specialist
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — translated into Next.js idioms, the component library and semantic tokens — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never deploys or changes a production feature flag
 
 ---

@@ -129,6 +129,8 @@ bootstrap receives the result through the `--keys` labels; the mechanics are in
 | `compliance.regions` | list ⊆ `kr\|eu\|us` | unset ⇒ ask | live | — | `compliance` | `compliance.regions` |
 | `localization.locales` | flow list of BCP 47 tags | unset ⇒ ask | live | — | — | `localization.locales` |
 | `accessibility.target` | `none\|wcag-a\|wcag-aa\|wcag-aaa` | unset ⇒ ask | live | — | `accessibility` | `accessibility.target` |
+| `design.tool` | `claude-design\|figma\|none` | unset ⇒ ask | live | — | `design` | `design` |
+| `design.claude_design.project_url`, `design.figma.file_url` | URL string | unset | live | — | `design` | `design` |
 | `performance.api_p95_ms` … `performance.crash_free_pct` (9 budgets) | number | unset | live | — | — | one section each |
 | `performance.enforce` | `warn\|block\|off` | `warn` | live | ✓ | `performance.enforce` | `performance.enforce` |
 | `workflow_overrides.{edge_cases,config_flags,design_language_strict}` | `true\|false` | unset | live | — | — | `workflow_overrides` |
@@ -223,6 +225,7 @@ what `/settings --local` may write is exactly what resolution reads):
 | `platform.*`, `release.distribution` | What ships where, and how it is distributed |
 | `privacy.handles_pii`, `compliance.regions`, `localization.locales` | Legal and product commitments |
 | `accessibility.target` | A product commitment, not a preference |
+| `design.*` | The design source of truth decides which design artifacts exist on disk (`design/handoff/<slug>/` records, `> **Design Source**:` lines, story design references) |
 | `performance.*` budgets | Shared SLO and budget targets |
 | `cadence.*` | Sprint and milestone length coordinate the team (RESERVED) |
 | `modes.rigor` | Fronts four on-disk knobs — locked for the same reason they are |
@@ -286,7 +289,7 @@ what `/settings --local` may write is exactly what resolution reads):
 |---|---|
 | Fresh clone of the template | `project.yaml` ships with `schema_version` and `framework` only — no `modes:` block. |
 | `/start` | Adds `project.stage`, `modes.rigor` and `modes.automation` to `project.yaml`. Never creates `project.local.yaml`. |
-| `/setup-stack` | Adds the `stack.*` block and the product facts (surfaces, distribution, regions, locales, naming, commands). |
+| `/setup-stack` | Adds the `stack.*` block and the product facts (surfaces, distribution, regions, locales, design tool, naming, commands). |
 | `/settings --local <key>=<value>` with no local file | Creates `project.local.yaml` containing just that setting. |
 | `project.local.yaml` exists but `project.yaml` doesn't | Hard error: *"`project.yaml` missing — run `/start` to create one. Local overrides require a base."* |
 | Both files set the same whitelisted key | `project.local.yaml` wins. No prompting. |
@@ -1041,6 +1044,7 @@ The three categories outside the default list (`architecture_decisions`,
 | **`/team-growth`** | `billing_changes` (pricing experiments) |
 | **`/team-release`** | `production_deploys` (every deploy stage — and it never runs deploy commands itself) |
 | **`/dev-story`, `/team-feature`** | `scope_changes`, `file_deletions`, `db_migrations`, `schema_changes` as the story requires |
+| **`/design-handoff`** | `external_calls` (reading a Figma frame, a Claude Design project or a Design artifact; downloading screenshots) |
 
 ---
 
@@ -1985,6 +1989,74 @@ Accessibility Act for `eu`; ADA / Section 508 for `us`.
 
 ---
 
+## design
+
+**Controls:** Which external design tool, if any, the project's design process runs
+through — Claude Design, Figma, or none (markdown UX specs are the whole design
+record) — and the project-level locator of that tool's project or file
+
+**Values:** `design.tool` → `claude-design` | `figma` | `none`; `design.claude_design.project_url` → URL string, project level only (`https://claude.ai/design/p/<PROJECT_ID>` — no `?file=`); `design.figma.file_url` → URL string (`https://www.figma.com/design/<fileKey>/<fileName>`)
+
+- **Default:** unset ⇒ ask. **Unset is not `none`**: `none` is a recorded decision
+  (no external design tool), unset is an unanswered question. No terminal default
+  exists, so the ask branch stays reachable.
+- **Status:** live
+- **Local override:** no — the design source of truth decides which design
+  artifacts exist on disk; a value in `project.local.yaml` is ignored and named on
+  `notes:`
+- **Label:** `design` → exactly one line, resolved through `resolve_setting` (an
+  invalid value is dropped with a note and the unset form printed); only the chosen
+  tool's URL is printed, read from `project.yaml`:
+  - `design.tool: claude-design project_url=<url|unset> (project.yaml)`
+  - `design.tool: figma file_url=<url|unset> (project.yaml)`
+  - `design.tool: none (project.yaml)`
+  - `design.tool: (unset -- ask; unset is not none)`
+- **Set by:** `/setup-stack` (Phase 3 product fact, asked only when a UI surface is
+  chosen or surfaces were deferred; `Decide later — leave unset` writes nothing),
+  `/settings`, and `/design-handoff` (only when `design.tool` is unset, after "May I
+  write this to `project.yaml`?", writing only the `design:` block)
+- **Read by:** every skill whose bootstrap requests `design` (derive with
+  `grep -lE 'resolve_config --keys ([a-z_.]+,)*design' .claude/skills/*/SKILL.md`)
+  — `/design-handoff`, `/ux-design`, `/ux-review`, `/design-language`, `/team-ui`,
+  `/team-feature`, `/story-readiness` — and `/setup-stack`'s Phase 7c read-back
+
+**URLs are project-level locators, double-quoted.** An unquoted value is cut at the
+first ` #`, and no escape sequence is decoded. Per-screen locators — a Claude Design
+`?file=<FILE>.dc.html`, a Figma `?node-id=<n>-<m>` — never go here; they live in the
+handoff record `design/handoff/<slug>/HANDOFF.md` and the `> **Design Source**:`
+line of the UX spec it backs. The helper does no URL-shape check.
+
+---
+
+### Value intent
+
+| Value | Meaning |
+|---|---|
+| `claude-design` | Designs are made in Claude Design (claude.ai/design), or as Design artifacts drafted with Claude Code's bundled `/design` skill when it is present in the session; each is imported by `/design-handoff` into `design/handoff/<slug>/` — through the Claude Design connector when present, else the export's "Download zip instead" bundle — and bound to its UX spec |
+| `figma` | Designs live in Figma; frames are read through the Figma MCP server when its tools are present in the session, snapshotted into `design/handoff/<slug>/` by `/design-handoff`, and bound to their UX spec |
+| `none` | No external design tool — a deliberate decision. Markdown UX specs are the whole design record; no `> **Design Source**:` parity is checked and no handoff record is expected |
+
+**Design output is reference, not source.** Whatever the value, a UX spec is still
+required, the design language and the accessibility target win on visuals, the UX
+spec wins on behaviour, and exported code is rebuilt with library components and
+semantic tokens, never pasted into a code root.
+
+---
+
+### Affected skills
+
+| Skill | Effect |
+|---|---|
+| **`/design-handoff`** | Imports the external design into `design/handoff/<slug>/` and binds it to its UX spec; unset ⇒ asks, and may write the `design:` block after asking |
+| **`/ux-design`** | Design Source context step; the skeleton's `> **Design Source**:` line; offers `/design-handoff` when the tool is `claude-design` or `figma` and no record exists; unset ⇒ ask |
+| **`/ux-review`** | Header completeness includes `Design Source` and the **Design Source Parity** dimension runs when the tool is `claude-design` or `figma`; `none` ⇒ `N/A — none` |
+| **`/design-language`** | Reads tokens from `design/handoff/design-system/HANDOFF.md` (Figma variables, Claude Design bundle tokens) as existing values to adopt or reconcile |
+| **`/team-ui`, `/team-feature`** | Resolve the design reference in the main session from the handoff record and brief engineers with local paths; unreachable references print `Design reference: NOT CHECKED — <reason>` |
+| **`/story-readiness`** | With `claude-design` or `figma`, a UI or E2E story needs its `Design reference:` line and a handoff record whose verdict is not NOT ASSESSED, else NEEDS WORK |
+| **`/setup-stack`** | Asks the design tool in Phase 3 and reads the `design` line back in Phase 7c |
+
+---
+
 ## performance.api_p95_ms
 
 **Controls:** The API latency budget — server-side p95 response time, in milliseconds
@@ -2684,6 +2756,11 @@ testing:
 
 accessibility:
   target: wcag-aa
+
+design:
+  tool: figma
+  figma:
+    file_url: "https://www.figma.com/design/<fileKey>/Moa"
 
 performance:
   api_p95_ms: 300

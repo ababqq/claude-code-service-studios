@@ -1,7 +1,7 @@
 # /dev-story — Handoff Contract
 
 ## Role in Pipeline
-Bridges planning and code for a single story: loads its full context (story file, TR registry entry, ADR summary and freshness, control-manifest layer rules, tech radar, API contract operation, migration plan, flag and tracking events, stack risk), routes it by the story's `> **Type**:` and `> **Surface**:` to the right engineer and stack specialist, drives implementation and tests into the resolved code roots, runs and observes the product, and leaves the story `In Progress` and ready for `/code-review` then `/story-done`.
+Bridges planning and code for a single story: loads its full context (story file, TR registry entry, ADR summary and freshness, control-manifest layer rules, tech radar, API contract operation, migration plan, flag and tracking events, the design reference, stack risk), routes it by the story's `> **Type**:` and `> **Surface**:` to the right engineer and stack specialist, drives implementation and tests into the resolved code roots, runs and observes the product, and leaves the story `In Progress` and ready for `/code-review` then `/story-done`.
 
 ## Configuration Consumed
 Bootstrap `--keys` (exact): `automation,automation_always_ask,workflow,story_granularity,qa.level,testing.strict,feature_overrides,stack,code_roots,surfaces`.
@@ -17,7 +17,7 @@ Bootstrap `--keys` (exact): `automation,automation_always_ask,workflow,story_gra
 ### Files That Must Exist
 | File | Required Fields / Sections | Read-Only? |
 |------|---------------------------|-----------|
-| `production/epics/<epic-slug>/story-NNN-<slug>.md` (the story) | `> **Status**: Ready`, `> **Type**:`, `> **Surface**:`, `> **Layer**:`, `> **Manifest Version**:`, `**PRD**:`, `**Requirement**:`, `**ADR Governing Implementation**:`, `**ADR Decision Summary**:`, `**ADR Version**:`, `**Stack**:` / `**Risk**:`, `**Stack Notes**:`, `**API Contract**:`, `**Migration**:`, `**Feature Flag**:`, `**Analytics Events**:`, `## Acceptance Criteria`, `## Implementation Notes`, `## Out of Scope`, `## Test Evidence`, `## Dependencies` | **Partially mutable.** Sets `> **Status**: In Progress` and `> **Last Updated**:` before spawning any agent; may update `**ADR Version**` / `> **Manifest Version**:` (and add `> **Manifest-Note**:`) after the user chooses to. Everything else is read-only |
+| `production/epics/<epic-slug>/story-NNN-<slug>.md` (the story) | `> **Status**: Ready`, `> **Type**:`, `> **Surface**:`, `> **Layer**:`, `> **Manifest Version**:`, `**PRD**:`, `**Requirement**:`, `**ADR Governing Implementation**:`, `**ADR Decision Summary**:`, `**ADR Version**:`, `**Stack**:` / `**Risk**:`, `**Stack Notes**:`, `**API Contract**:`, `**Migration**:`, `**Feature Flag**:`, `**Analytics Events**:`, `## Acceptance Criteria`, `## Implementation Notes` (UX spec link, design reference), `## Out of Scope`, `## Test Evidence`, `## Dependencies` | **Partially mutable.** Sets `> **Status**: In Progress` and `> **Last Updated**:` before spawning any agent; may update `**ADR Version**` / `> **Manifest Version**:` (and add `> **Manifest-Note**:`) after the user chooses to. Everything else is read-only |
 | `docs/architecture/tr-registry.yaml` | Entry matching the story's TR-ID with current `requirement` and `prd:` | Yes — required at `full` only |
 | `docs/architecture/adr-NNNN-<slug>.md` (the governing ADR) | `## Last Verified` (freshness check); on mismatch `## Decision`, `## Stack Compatibility` (incl. the `**Domain**` row), `## ADR Dependencies`, `## Security & Privacy Implications`, `## Migration Plan` | Yes — required at `full`; at `standard`/`minimal` only when the story references one |
 | `docs/architecture/control-manifest.md` | Header date; `## <Layer> Layer Rules` | Yes — WARN when absent |
@@ -26,6 +26,7 @@ Bootstrap `--keys` (exact): `automation,automation_always_ask,workflow,story_gra
 | `docs/data/migrations/NNNN-<slug>.md` named by `**Migration**` | `## Expand`, `## Rollback per Phase`, `## Status`, `## Lock & Duration Budget` | Yes — required when the field is not `None`, at every tier |
 | `design/prd/<feature-slug>.md` | `## Functional Requirements`, `## Business Rules & Calculations`, `## Edge Cases`, `## Configuration & Flags` (flag default) | Yes |
 | `design/product/tracking-plan.md` | `## Events` rows for the story's events | Yes |
+| `design/handoff/<slug>/HANDOFF.md` named by the story's `Design reference:` line (UI and E2E stories) | `> **Verdict**:`, `> **Retrieved**:`, `## Screens & States`, `## Tokens & Components`; the local `screens/` and `bundle/` files | Yes — optional: missing or unreadable ⇒ `Design reference: NOT CHECKED — <reason>` and the build proceeds from the UX spec |
 | `docs/stack-reference/VERSION.md` | `## Pinned Components` row of the primary surface's component (`Knowledge Risk`) | Yes |
 | `project.yaml` | `naming.*`, `commands.*`, `testing.patterns`, `performance.*` | Yes |
 | `production/session-state/active.md` | Active story when no argument is given | No — session extract appended |
@@ -92,11 +93,15 @@ Only an `app` root ⇒ used for every surface. Only `detected`/`undeclared` root
 - A story with `**Migration**` ≠ `None` gets `migration-dry-run.log` (Expand applied and rolled back on a disposable database) or an explicit `Migration dry-run: NOT VERIFIED — <reason>`
 - At `qa.level: minimal` no test file is written and the summary prints the waiver line; a waived run and a forgotten one never produce the same artifact
 - The routing line names the matched row, the agents and the root(s); a layer with no specialist prints its `NOT CHECKED` line
+- UI and E2E stories: the summary carries a `**Design reference**:` line — the story's `Design reference:` line with the record's verdict, `Design reference: NOT CHECKED — <reason>` when the reference could not be resolved (missing record, `LINK ONLY` / `NOT ASSESSED` with no live tool present, or no line), or `N/A — no user-facing surface`; a build from the UX spec alone never reads like a design-faithful one
+- Brief item 12 carries the local reference paths (`design/handoff/<slug>/screens/`, `bundle/`) and the precedence paragraph ("Design output is reference, not source. …"); items 1–11 keep their numbers
+- Captures are compared with the reference screens; visible divergences are listed under `**Design deviations** (ADVISORY)` and never change the `Run result:` token unless an acceptance criterion names the look
+- Live reads of a design source (Figma MCP server, Claude Design connector, Artifact tool) happen only in the main session, only when those tools are present, and are `external_calls` decisions; they are never listed in `allowed-tools`
 - `NOT ASSESSED` is an accepted inbound value of the story's `**Risk**`; it counts as HIGH for the lead-instead-of-sub decision
 - **Completion is not assumed.** An agent that stopped early, or code that fails to build, makes the story **INCOMPLETE** with the breakage named; `Implementation Complete` is not emitted and the status is not advanced
 
 ## Immutability Rules
-- READS but does NOT modify: `project.yaml`, `docs/architecture/tr-registry.yaml`, ADR files, PRDs in `design/prd/`, `docs/architecture/control-manifest.md`, `docs/architecture/tech-radar.md`, the API contract under `docs/api/`, migration plans under `docs/data/migrations/`, `design/product/tracking-plan.md`, `docs/stack-reference/VERSION.md`
+- READS but does NOT modify: `project.yaml`, `docs/architecture/tr-registry.yaml`, ADR files, PRDs in `design/prd/`, `docs/architecture/control-manifest.md`, `docs/architecture/tech-radar.md`, the API contract under `docs/api/`, migration plans under `docs/data/migrations/`, `design/product/tracking-plan.md`, `docs/stack-reference/VERSION.md`, design handoff records and snapshots under `design/handoff/` (this skill writes nothing under `design/`; retaining a snapshot is `/design-handoff refresh <slug>`)
 - MODIFIES: files under the resolved code roots and the migrations directory (via engineer agents), test files (via engineer agents), Config-story configuration (directly, after approval), `production/qa/evidence/<story-slug>/**`, the story's entry in `production/sprint-status.yaml`, the story header fields listed above, `production/session-state/active.md` (append)
 - Writes only the `In Progress` status (story) and `in-progress` (sprint status). Advancing a story to `Complete` / `done` belongs to `/story-done` alone
 
@@ -109,6 +114,7 @@ Only an `app` root ⇒ used for every surface. Only `detected`/`undeclared` root
 - Never runs a migration or a deploy against production, staging or any shared database, and never creates, rotates or commits a secret; the migration dry-run targets a disposable database only, and API snapshots on staging use a test account
 - Never changes a feature flag's production state; `production_deploys` decisions go to `/rollout-plan` or a human
 - Never writes evidence under `production/session-logs/`
+- Never saves a design reference image under `production/qa/evidence/` — it would satisfy the UI evidence gates without a real capture; never pastes design-tool export code into a code root
 - Never marks a Logic, Integration, UI or E2E story implemented at `qa.level: standard`/`full` without the test file declared in `## Test Evidence`
 - Never touches files outside the story's `## Out of Scope` boundary without explicit user approval
 
@@ -117,6 +123,7 @@ Only an `app` root ⇒ used for every surface. Only `detected`/`undeclared` root
 - `/story-done` reads the story file (`> **Type**:`, `> **Surface**:`, `**Migration**:`, `**API Contract**:`, `**Feature Flag**:`, `**Analytics Events**:`, `## Acceptance Criteria`, `## Test Evidence`)
 - It reads the `Run result:` line from `production/qa/evidence/<story-slug>/evidence.md`, else from the session extract, else from `## Completion Notes`
 - It assumes the test file declared in `## Test Evidence` exists (Logic, Integration, UI component tests, E2E) and that captures and `migration-dry-run.log` are under `production/qa/evidence/<story-slug>/`
+- It compares retained captures with the reference screens of the record the story's `Design reference:` line names (ADVISORY deviation check); files under `design/handoff/` never count as evidence
 - It assumes source files under the resolved roots match the criteria, so Grep-based deviation checks (contract drift, PII in logs, hardcoded values) can run
 - `/sprint-status` and `/help` read `status: in-progress` from `production/sprint-status.yaml`
 

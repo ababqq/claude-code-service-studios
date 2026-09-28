@@ -92,6 +92,11 @@ Web screenshots come from the capture script (`tests/e2e/capture.spec.ts`,
 screenshots from the simulator or emulator. *If video: note the timestamp and what
 it demonstrates.*
 
+**Design reference** *(optional — only when the story's `Design reference:` line names a
+record)*: compared with `design/handoff/<slug>/screens/` — [matches | divergences listed
+under `## Observations` | `Design reference: NOT CHECKED — <reason>`]. Reference images
+stay under `design/handoff/`; they are never copied here and never count as captures.
+
 ---
 
 ## Accessibility (axe)

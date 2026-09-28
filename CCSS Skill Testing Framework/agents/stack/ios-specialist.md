@@ -55,6 +55,7 @@ it.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; mobile architecture decisions (mobile-specialist), payment-method and store-policy decisions, App Review submission and phased release, server logic and the API contract, and product, UX and copy decisions are stated as outside it
 - [ ] Escalation path documented: escalates to mobile-specialist
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — layout and visual reference only, rebuilt with SwiftUI/UIKit components and semantic tokens — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never submits to App Review or commits signing material
 
 ---

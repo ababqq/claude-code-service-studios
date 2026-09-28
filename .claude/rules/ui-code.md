@@ -23,6 +23,9 @@ design language (`design/brand/design-language.md`) says what it looks like. Sty
 - Build screens from the component library (for example `packages/ui`), themed by tokens. No one-off restyled
   native elements, no copied-and-tweaked components, no second button. A missing component or variant is a request
   to the `design-engineer`, not an inline improvisation.
+- Code exported by a design tool — Claude Design HTML/CSS/JS, Figma design-context code (React + Tailwind) — is a
+  visual reference. Rebuild the screen from library components and tokens; never paste the export into a code root.
+  The snapshots under `design/handoff/**` are governed by `.claude/rules/design-handoff.md`, not by this rule.
 - Icons and illustrations come from the design language's sets, sized by tokens.
 - Destructive and money-moving actions (cancel subscription, delete account, confirm deposit) use the confirmation
   pattern of the design language's `### Confirmation for Destructive and Money-Moving Actions`.

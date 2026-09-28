@@ -9,6 +9,7 @@
 > **Brand Direction**: [direction name — from the brief's `## Brand Direction Anchor`, or selected in `/design-language` on YYYY-MM-DD]
 > **Surfaces**: [resolved `platform.surfaces` line, copied as printed — e.g. `web, ios, android`]
 > **Accessibility Target**: [resolved `accessibility.target` line, copied as printed — unset is not `none`]
+> **Design Source**: [none — markdown spec only | claude-design — <design-system project URL> · record `design/handoff/design-system/HANDOFF.md` | figma — <library file URL> · record `design/handoff/design-system/HANDOFF.md`] — token direction: [this document → `design/brand/tokens.json` | this document, reconciled with Figma variables YYYY-MM-DD | this document only — tokens live in Figma variables or code]
 > **Sections Deferred**: [e.g. "6–9 (standard tier)" — or "none"]
 > **Not Checked**: [items that could not be verified in this run, each with its reason — or "none"]
 > **Design Director Review (DD-BRAND-DIRECTION)**: [APPROVED YYYY-MM-DD | CONCERNS (accepted) YYYY-MM-DD | REVISED YYYY-MM-DD | `[DD-BRAND-DIRECTION] skipped — <Mode> mode` | not run — direction taken from the brief's anchor]
@@ -33,6 +34,15 @@
 > `standard` tier). `NOT ASSESSED` = all nine sections are written but something
 > required could not be verified (listed in **Not Checked** above). A known gap
 > outranks an unverified one: PARTIAL > NOT ASSESSED > COMPLETE.
+>
+> **Design Source line**: where the design system also lives outside the repo — a
+> Figma library or a Claude Design design-system project, retained in
+> `design/handoff/design-system/HANDOFF.md` by `/design-handoff` — and which way the
+> tokens flow. This document stays the source of intent: Figma variables and the
+> Claude Design design system are reconciled to it, and drift between them is a
+> finding. A declared source whose record could not be read puts a `NOT CHECKED — …`
+> item on the **Not Checked** line, which keeps the verdict below `COMPLETE`. `none`
+> is a recorded decision; an unset `design.tool` is asked, never read as `none`.
 >
 > Keep every heading below exactly as written — `/gate-check`, `/ux-review` and
 > the director gates match on them. Write the body in the team's working
@@ -71,6 +81,7 @@ childish". These feed `design/brand/voice-and-tone.md`; they do not replace it.]
 | Selected direction | [name + one-line rule] |
 | Source | [brief `## Brand Direction Anchor` / DD-BRAND-DIRECTION on YYYY-MM-DD / described by the user / drafted by product-designer] |
 | Alternatives considered | [names of the directions not chosen and why] |
+| Visual reference | [record `design/handoff/brand-directions/HANDOFF.md`, the brief anchor's **Visual reference** URL, or "none"] |
 
 ### References
 

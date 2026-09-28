@@ -56,6 +56,7 @@ no director gate. Words describe rules; they never set them.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; flows and screen structure (product-designer), prices, limits, eligibility and refund rules (product-manager, business-analyst, monetization-strategist), code and messaging/CMS/translation API calls, and sending or scheduling messages are stated as outside it
 - [ ] Escalation path documented: voice or terminology conflicts go to design-director; a term rename updates `## Terminology` and flags registry impact
+- [ ] Copy in a Claude Design or Figma mockup (or a `/design` artifact) is a draft; the copy deck under `design/content/` and the message catalog are final; engineers wire strings by key
 - [ ] Does not make decisions outside its domain
 
 ---

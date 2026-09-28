@@ -61,7 +61,9 @@ complete authorisation without help."
 - **What this path cannot tell us**: [e.g. a clickable prototype says nothing about
   real payment failures; a fake door says nothing about retention]
 - **What was built**: [files in this directory, sandbox accounts used, preview URL
-  if any (noindex, torn down after the sessions)]
+  if any (noindex, torn down after the sessions); for a prototype built in an external
+  tool, the external link recorded in `prototype-link.md` — Figma or ProtoPie share
+  link, Claude Design project URL or Design artifact URL — or "none"]
 - **Shortcuts taken on purpose**: [hard-coded data, faked steps, skipped screens]
 
 ## Method

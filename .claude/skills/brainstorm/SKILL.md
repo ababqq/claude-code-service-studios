@@ -497,6 +497,12 @@ When it runs, spawn `design-director` via `Agent`:
 Parse `[DD-BRAND-DIRECTION]: TOKEN` (OPTIONS / STRONG / CONCERNS):
 - **OPTIONS** — present the 2–3 directions with `AskUserQuestion`: one option per
   named direction, `Combine elements across directions`, `Describe my own direction`.
+  Before choosing, the user may visualise the directions themselves — in a Claude
+  Design project, as a Design artifact with the bundled `/design` skill if it is
+  present in the session, or in Figma — and paste the link back. Publishing an
+  artifact or editing a shared file is the user's external write, approved by them.
+  Only the URL is recorded; this skill writes no snapshot files (retaining the
+  designs is `/design-handoff`'s job, later).
 - **STRONG** — present the dominant direction with the runner-up; the user still
   chooses.
 - **CONCERNS** — the principles do not differentiate a brand yet: offer to revise the
@@ -506,7 +512,7 @@ Parse `[DD-BRAND-DIRECTION]: TOKEN` (OPTIONS / STRONG / CONCERNS):
 
 Write the chosen direction into `## Brand Direction Anchor` (direction, brand rule,
 personality, color philosophy, typography direction, platform stance, rejected
-directions) and record the review line.
+directions, visual reference — the pasted URL, or "none") and record the review line.
 
 ---
 

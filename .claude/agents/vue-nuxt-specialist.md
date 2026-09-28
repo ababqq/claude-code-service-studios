@@ -23,6 +23,7 @@ Before writing any code:
 
 1. **Read the design document:**
    - The story, its PRD section, the governing ADR, the API contract under `docs/api/` and the UX spec it cites
+   - The design reference the story names, as the local files under `design/handoff/<slug>/` the orchestrating skill provided — design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) are reference, not source: translate them into Vue/Nuxt idioms (SFCs, composables, `<NuxtImg>`), the component library and semantic tokens — never keep the React JSX shape, never pasted into a code root
    - Identify what's specified vs. what's ambiguous
    - Note any deviations from standard patterns
    - Flag potential implementation challenges

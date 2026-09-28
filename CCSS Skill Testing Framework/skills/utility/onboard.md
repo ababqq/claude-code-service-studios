@@ -118,19 +118,21 @@ no `Agent` tool. No director gates apply.
 
 **Fixture:**
 - `design/brand/design-language.md`, `design/ux/app-shell.md`, `design/ux/goals-create.md`, `design/accessibility-requirements.md` exist
+- `design/handoff/goal-detail/HANDOFF.md` exists; `project.yaml` sets `design.tool: figma` with `design.figma.file_url`
 - The active sprint has UI stories for `goals`
 
 **Input:** `/onboard designer`
 
 **Expected behavior:**
 1. Reads `product-designer` as the primary agent and `design-director`, `ux-writer`, `design-engineer`, `accessibility-specialist`
-2. Scans `design/brand/`, `design/ux/`, `design/inventory/`, `design/accessibility-requirements.md`
+2. Scans `design/brand/`, `design/ux/`, `design/inventory/`, `design/accessibility-requirements.md`, `design/handoff/`, and reads `design.tool` from `project.yaml` with Read
 3. The document is tailored to the designer role; code structure and ADRs are secondary
 
 **Assertions:**
 - [ ] The H1 follows `# Onboarding: [Role/Area]` and names the designer role
 - [ ] The design language and UX specs are summarized when they exist
 - [ ] Current UI stories from the active sprint are shown
+- [ ] The configured design tool (`figma`, with the file URL) and the handoff records are named; an absent `design.tool` is reported as not chosen yet, never as `none`; `--keys` stays `automation,stack,code_roots,project.stage`
 
 ---
 

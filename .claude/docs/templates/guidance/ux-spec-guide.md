@@ -38,7 +38,20 @@ Toss Payments auto-debit and push + 알림톡 notifications. The spec's file is
 > **Related ADRs**: `docs/architecture/adr-0001-identity-and-auth.md`
 > **Related UX Specs**: `design/ux/app-shell.md` (History tab), `design/ux/goal-detail.md`
 > **Accessibility Target**: wcag-aa (from `design/accessibility-requirements.md`)
+> **Design Source**: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=48-210 · record `design/handoff/savings-history/HANDOFF.md`
 ```
+
+**Design Source** — the first token is exactly `none`, `claude-design` or `figma`
+and follows `design.tool` in `project.yaml`. With `none`, write
+`none — markdown spec only`: this spec is the whole design record. With an external
+tool, give the node-specific locator (the Figma `?node-id=` URL, or the Claude Design
+`…?file=<FILE>.dc.html` / Design artifact URL) and the handoff record
+`/design-handoff` wrote for this spec — for Moa's goal detail screen:
+`` figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-345 · record `design/handoff/goal-detail/HANDOFF.md` ``.
+The record under `design/handoff/<slug>/` is a reference snapshot, not the source:
+the design language wins on visuals, this spec wins on behaviour. `design.tool`
+unset is not `none` — ask, and leave the line `[To be designed]` until it is
+decided.
 
 Use the slug the screen inventory (`design/inventory/screen-inventory.md`) gives
 the screen, so the inventory's `UX Spec` column finds this file.
@@ -182,6 +195,24 @@ navigation smell — resolve it in the app shell instead.
 
 **Worked example — web `lg`**: list (max 440 px) on the left, detail pane on the
 right; the attention banner spans the list; filters in a bar above the list.
+
+**Worked example — the same wireframe from an external Design Source** (the header
+reads `` figma — … · record `design/handoff/savings-history/HANDOFF.md` ``, verdict
+RETAINED):
+
+```
+external: see Design Source — screens listed from the handoff record
+- compact: design/handoff/savings-history/screens/list-compact.png, detail-failed-compact.png
+- web lg:  design/handoff/savings-history/screens/list-detail-lg.png
+- web md:  no frame — listed as an open question for the designer (check 8)
+```
+
+**Hierarchy**: status of the latest debit first (attention banner when any failed),
+then the dated transaction list, then filters; on the detail, the status hero, the
+amount and the reason, then the recovery actions, then the reference data. The
+Hierarchy line stays even when screens are cited — a reviewer without Figma access
+reads the layout from it. A frame width the design language does not define (the
+file's 1280 px desktop frame) is mapped to `lg`, never added as a new breakpoint.
 
 **Worked example — zones per breakpoint**:
 

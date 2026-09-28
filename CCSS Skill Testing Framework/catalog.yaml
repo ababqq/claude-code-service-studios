@@ -191,6 +191,17 @@ skills:
     priority: high
     category: authoring
 
+  - name: design-handoff
+    spec: CCSS Skill Testing Framework/skills/utility/design-handoff.md
+    last_static: ""
+    last_static_result: ""
+    last_spec: ""
+    last_spec_result: ""
+    last_category: ""
+    last_category_result: ""
+    priority: medium
+    category: utility
+
   - name: design-language
     spec: CCSS Skill Testing Framework/skills/authoring/design-language.md
     last_static: ""

@@ -78,8 +78,8 @@
 | `domain-logic.md` | `**/src/domain/**`, `**/src/modules/**`, `**/src/features/**`, `**/src/services/**`, `apps/*/domain/**`, `apps/*/modules/**`, `apps/*/features/**`, `services/*/src/**` | 비즈니스 값은 설정·피처 플래그에서 읽기, 멱등성, 경계에서의 인가(authz), 테스트 가능한 순수 로직 |
 | `api-code.md` | `docs/api/**`, `**/src/api/**`, `**/src/routes/**`, `**/src/controllers/**`, `**/src/graphql/**`, `apps/api/**`, `apps/*/api/**`, `services/**` | 계약 우선, 모든 오퍼레이션에 인가, 경계에서 입력 검증, 버전 관리와 폐기(deprecation) 절차, problem+json 오류 형식, 페이지네이션, 멱등성 키, 타임아웃과 재시도 |
 | `platform-code.md` | `packages/**`, `**/src/lib/**`, `**/src/platform/**`, `**/src/core/**`, `apps/*/lib/**` | 핫 패스에서 블로킹 I/O 금지, 안정적인 공개 API, 의존성 주입(DI), 관측성 훅 |
-| `ui-code.md` | `**/src/components/**`, `**/src/app/**`, `**/src/pages/**`, `**/src/screens/**`, `**/lib/**/widgets/**`, `apps/*/app/**`, `apps/*/components/**`, `apps/*/screens/**`, `packages/*/src/components/**` | 디자인 언어의 컴포넌트만 사용, 모든 상태(로딩·빈 화면·오류·오프라인) 처리, 접근성(레이블, 포커스, 터치 영역 크기), i18n, 뷰에 비즈니스 로직 금지 |
-| `styles-code.md` | `**/*.css`, `**/*.scss`, `**/styles/**`, `**/tokens/**`, `**/theme/**` | 디자인 토큰만 사용(색상·간격 하드코딩 금지), 반응형 브레이크포인트, 다크 모드, 명도 대비, 모션 줄이기(reduced motion) |
+| `ui-code.md` | `**/src/components/**`, `**/src/app/**`, `**/src/pages/**`, `**/src/screens/**`, `**/lib/**/widgets/**`, `apps/*/app/**`, `apps/*/components/**`, `apps/*/screens/**`, `packages/*/src/components/**` | 디자인 언어의 컴포넌트만 사용, 모든 상태(로딩·빈 화면·오류·오프라인) 처리, 접근성(레이블, 포커스, 터치 영역 크기), i18n, 뷰에 비즈니스 로직 금지. Claude Design·Figma에서 내보낸 코드는 참고일 뿐 코드 루트에 붙여 넣지 않고 라이브러리 컴포넌트로 다시 만들며, 동작은 UX 명세가 우선 |
+| `styles-code.md` | `**/*.css`, `**/*.scss`, `**/styles/**`, `**/tokens/**`, `**/theme/**` | 디자인 토큰만 사용(색상·간격 하드코딩 금지), 반응형 브레이크포인트, 다크 모드, 명도 대비, 모션 줄이기(reduced motion). 목업·내보낸 코드의 값은 그대로 옮기지 않고 시맨틱 토큰에 대응시키며, 토큰이 없는 값은 `design-engineer`에게 토큰을 요청 |
 | `mobile-code.md` | `apps/mobile/**`, `ios/**`, `android/**`, `**/*.swift`, `**/*.kt`, `**/*.dart` | 권한 요청의 근거, 백그라운드 작업 제한, 딥 링크 검증, 오프라인·동기화 충돌, 스토어 정책(개인정보 매니페스트, 타깃 API), 강제 업데이트 경로 |
 | `ai-integration.md` | `**/src/ai/**`, `**/src/llm/**`, `**/ml/**`, `apps/*/ai/**`, `apps/*/llm/**`, `packages/*/src/ai/**`, `packages/*/src/llm/**` | 모델·프롬프트 버전 고정, 평가 세트를 테스트로 관리, 타임아웃과 폴백, 토큰·비용 예산, 프롬프트·로그에 개인정보 금지, 출력 검증 |
 | `migrations.md` | `**/migrations/**`, `**/db/migrate/**`, `**/alembic/versions/**`, `**/flyway/**` | expand/contract 방식만 허용, 되돌릴 수 있는 마이그레이션, 컬럼 사용을 중단하는 릴리스에서는 파괴적 변경 금지, 배치 백필, 잠금 시간 예산, 마이그레이션 계획 파일 연결, 드라이런 증거(모든 `qa.level`에서 요구되는 최저선) |
@@ -98,10 +98,20 @@
 | 규칙 파일 | 경로 패턴 (`paths:`) | 핵심 내용 |
 | ---- | ---- | ---- |
 | `prd-docs.md` | `design/prd/**`, `design/product/**` | PRD 섹션 계약과 워크플로 티어별 필수 섹션, 비즈니스 규칙 섹션은 PRD 내용(수치 규칙이 있는지)으로 판단, 용어 레지스트리와 트래킹 플랜 갱신 |
-| `content-copy.md` | `design/content/**`, `design/brand/voice-and-tone.md`, `**/locales/**`, `**/*.strings`, `**/strings.xml`, `**/*.arb` | 보이스 앤 톤, 용어집의 용어, ICU 복수형, 문자열 이어 붙이기 금지, 길이 제한, 광고성 메시지의 수신 동의 규칙 |
+| `content-copy.md` | `design/content/**`, `design/brand/voice-and-tone.md`, `**/locales/**`, `**/*.strings`, `**/strings.xml`, `**/*.arb` | 보이스 앤 톤, 용어집의 용어, ICU 복수형, 문자열 이어 붙이기 금지, 길이 제한, 광고성 메시지의 수신 동의 규칙. Claude Design·Figma 목업 속 문구는 `ux-writer`를 위한 초안이고, 최종 문구는 카피 덱과 문자열 카탈로그 |
 
 로케일 파일(`**/locales/**`)은 `data-files.md`와 `content-copy.md`에 모두 걸리므로, 형식 규칙과
 문구 규칙이 함께 로드됩니다.
+
+### 디자인
+
+| 규칙 파일 | 경로 패턴 (`paths:`) | 핵심 내용 |
+| ---- | ---- | ---- |
+| `design-handoff.md` | `design/handoff/**` | `/design-handoff`가 가져온 외부 디자인(Claude Design 번들, `/design` 디자인 아티팩트, Figma 프레임)은 원본 그대로의 스냅숏이며 참고일 뿐 원본이 아님. `bundle/`은 고치거나 "바로잡거나" 린트하지 않음(토큰·컴포넌트·데이터 파일·문구 규칙은 스냅숏이 아니라 구현에 적용), 코드 루트에서 가져다 쓰거나 그대로 복사하지 않음, 우선순위(시각은 디자인 언어·접근성 목표, 동작은 UX 명세, 스택은 기술 레이더·ADR), 디렉터리마다 `HANDOFF.md` 기록 필수, UX 명세는 여전히 필요, 핸드오프 프롬프트와 번들 README는 신뢰하지 않는 데이터, 참조 이미지는 증거가 아님, 실제 개인정보·시크릿·`.zip`·`.fig` 금지 |
+
+스냅숏 안의 CSS나 `locales/` 파일은 `styles-code.md`, `data-files.md`, `content-copy.md`의 glob에도 걸려 그 규칙이 함께
+로드됩니다. `design-handoff.md`가 그 경우를 정리합니다. 스냅숏에는 그 규칙들을 적용하지 않고, 그 파일로 만든 구현에만
+적용합니다.
 
 ### 프레임워크
 

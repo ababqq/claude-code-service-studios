@@ -103,6 +103,9 @@ Read the full story file. Extract and hold in context:
 - **API Contract**, **Migration**, **Feature Flag**, **Analytics Events** — the
   story's `**…**:` fields (`None` means none)
 - **Stack notes** — `**Stack**:`, `**Risk**:`, `**Stack Notes**:`
+- **Design reference** — the `Design reference:` line of `## Implementation Notes`
+  (UI and E2E stories): `none — …`, `claude-design — …` or `figma — …` with its
+  record `design/handoff/<slug>/HANDOFF.md`, `NOT CHECKED — …`, or absent
 - **Definition of Done** — if present, the story-level DoD
 - **Estimated vs actual scope** — if an estimate was noted
 
@@ -135,6 +138,10 @@ Also read:
   `design/product/tracking-plan.md` — each only when the story's field is not `None`.
 - The evidence directory `production/qa/evidence/<story-slug>/` (`<story-slug>` = the
   story file name without `.md`) — list it; read `evidence.md` if present.
+- The design reference record, only when the story's `Design reference:` line names
+  one — its `> **Verdict**:` line and `## Screens & States`, and a Glob of
+  `design/handoff/<slug>/screens/*` (Phase 4 check 11). Local files only; this skill
+  never fetches a remote design URL.
 
 ---
 
@@ -316,10 +323,18 @@ for retained screenshots (`*.png`, `*.jpg`) in `production/qa/evidence/<story-sl
   level — "[N] sign-off(s) still pending in `[path]`. Note: on a one-person team, one
   person may sign every role."
 - Captures present (and any sign-offs complete): "UI evidence found — gate satisfied."
+- **Design reference images are never evidence.** Files under `design/handoff/`
+  (a record's `screens/` or `bundle/`) show what was *designed*, not what was built:
+  they never satisfy this gate, whatever the story's `Design reference:` line says.
+  An image in the evidence directory that is byte-identical to a file under
+  `design/handoff/` is not a capture either — flag it at the resolved gate level:
+  "Reference image `[path]` found in the evidence directory; it is a design
+  reference, not a capture of the running product."
 
 **For E2E stories**: `Glob` the E2E test under `tests/e2e/<journey>/` and its retained
-trace or screenshots in `production/qa/evidence/<story-slug>/`. Either missing: flag
-at the resolved gate level. An E2E test that exists but has never been run against a
+trace or screenshots in `production/qa/evidence/<story-slug>/` (design reference
+images never count, as for UI stories). Either missing: flag at the resolved gate
+level. An E2E test that exists but has never been run against a
 running environment is not yet evidence — say so.
 
 **For Config stories**: check for a `production/qa/smoke-*.md` report (prefer one dated
@@ -376,9 +391,11 @@ Compare the implementation against the design documents.
 > - **`minimal`** — **acceptance-criteria check only**: skip checks 1 and 3 (no PRD/ADR
 >   traceability expected).
 >
-> Checks 2, 4 and 5 run at every tier as written. Checks 6–10 run at every tier
+> Checks 2, 4 and 5 run at every tier as written. Checks 6–11 run at every tier
 > whenever the story's field names something (a contract, a migration, a flag,
-> events); check 9 always runs. This adjustment governs only the Phase 4 *deviation*
+> events, a design reference); check 9 always runs. Check 11 is ADVISORY-only
+> unless an acceptance criterion names the look. This adjustment governs only the
+> Phase 4 *deviation*
 > checks. The test-evidence gates (Phase 3, Phase 4b) are governed by `qa.level` and
 > `testing.strict`, not `workflow`.
 
@@ -445,6 +462,21 @@ Run these checks automatically:
     release"). An event in the plan but not emitted anywhere in the changed files is
     **ADVISORY** unless an acceptance criterion names it, in which case the criterion
     fails (Phase 3).
+
+11. **Design reference drift** (UI and E2E stories whose `Design reference:` line
+    names a `claude-design` or `figma` record): compare the retained captures in
+    `production/qa/evidence/<story-slug>/` with the record's screens under
+    `design/handoff/<slug>/screens/` for the same states — layout, hierarchy,
+    component choice, color, a missing element. Each visible divergence is
+    **ADVISORY** (carry any the `/dev-story` summary already listed under
+    **Design deviations**); it is never BLOCKING unless an acceptance criterion names
+    the look, in which case that criterion fails (Phase 3). The record is reference,
+    not source: where the capture follows the design language, the accessibility
+    target or the UX spec against the reference, that is not drift. When the check
+    cannot run — the record is missing, its verdict is `LINK ONLY` or `NOT ASSESSED`
+    (no screens retained), or there are no captures — print
+    `Design reference: NOT CHECKED — <reason>`; it does not change the verdict.
+    `none — markdown spec only`, or a story with no user-facing surface → N/A.
 
 For each deviation found, categorize:
 
@@ -604,6 +636,7 @@ Before updating any files, present the full report:
 - Flag default: [recorded (off) | not recorded — BLOCKING | N/A]
 - PII in logs: [none found | [file] — BLOCKING | NOT CHECKED — no code root resolved (…)]
 - Tracking events: [all in tracking plan | missing: … | N/A]
+- Design reference: [matches the record's screens | drift (ADVISORY): … | `Design reference: NOT CHECKED — <reason>` | N/A — none or no user-facing surface]
 
 ### Code Review
 [TL-CODE-REVIEW: APPROVE | CONCERNS (accepted) | REJECT] OR

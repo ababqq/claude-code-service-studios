@@ -27,6 +27,10 @@ agent owns the token pipeline.
   (Swift, Kotlin/Compose, Dart) are built from the token source and carry a "generated — do not edit" header; change
   the source and rebuild.
 - A value the design language lacks is a request to the `design-engineer` / `design-director`, not a new literal.
+- **Design-tool exports are mapped, never copied.** Raw values in a Claude Design bundle's CSS or in Figma-generated
+  Tailwind classes are mapped to tokens (a value with no token is a request, as above). When Figma variables are
+  the token source, they reach code only through the token build. Bundle CSS under `design/handoff/**` is verbatim
+  reference material, exempt from this rule — see `.claude/rules/design-handoff.md`.
 
 ## Responsive breakpoints
 

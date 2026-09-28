@@ -41,6 +41,7 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] Contains "May I write this to `production/qa/evidence-review-YYYY-MM-DD.md`?" before the optional report write
 - [ ] The report template starts `# Test Evidence Review` followed by one blank line and `> **Verdict**: [ADEQUATE | INCOMPLETE | MISSING | NOT ASSESSED]`
 - [ ] The five story types and the `testing.strict.logic|integration|ui|e2e|config` override keys are named; the migration floor is stated as independent of `testing.strict`; the skill states it resolves neither `testing.strict` nor `qa.level`, and the report's `> **Strictness**:` line says so
+- [ ] The artefact-completeness check states that images under `design/handoff/` are design references and never evidence, with the line `Reference image <path> is a design reference, not a capture`
 - [ ] No `!` injection other than the bootstrap line; no `file:line` citations
 - [ ] Has a next-step handoff naming current skills (`/story-done`, `/test-helpers`, `/test-setup`, `/sprint-plan new`, `/create-stories`)
 
@@ -159,6 +160,7 @@ invoked and `review_mode` is not among its keys. QL-TEST-COVERAGE is spawned by
 - [ ] An absent axe report is never read as a clean accessibility result
 - [ ] The migration floor is applied regardless of `testing.strict`
 - [ ] Evidence under `production/session-logs/` does not count
+- [ ] Variant: when `02-filled-mobile.png` in the evidence directory is a copy of `design/handoff/goal-progress-ring/screens/02-filled.png`, the report says `Reference image production/qa/evidence/story-003-goal-progress-ring/02-filled-mobile.png is a design reference, not a capture` and the filled state still counts as having no retained image (INCOMPLETE); files under `design/handoff/` never count
 
 ---
 
@@ -206,5 +208,7 @@ invoked and `review_mode` is not among its keys. QL-TEST-COVERAGE is spawned by
   worst story verdict; only the empty-scope boundary is tested explicitly.
 - The QL-TEST-COVERAGE director gate (spawned by `/story-done` and `/team-qa`) is a
   separate concern and is intentionally not invoked here.
+- The design-reference exclusion is asserted as a Case 5 variant; detecting a copied
+  reference image needs the files on disk, so it is not exercised statically.
 - Redaction checks depend on reading screenshots and traces; a live run is needed to
   confirm personal data is noticed in images.

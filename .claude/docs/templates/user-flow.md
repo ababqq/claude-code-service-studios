@@ -10,6 +10,7 @@
 > **Screen Specs**: [The `design/ux/<slug>.md` spec of each screen on the critical path — written from `ux-spec.md`]
 > **Success Metric**: [The PRD metric this flow moves — e.g., goal-creation completion rate, from `## Success Metrics & Instrumentation`]
 > **Accessibility Target**: [The committed `accessibility.target` from `design/accessibility-requirements.md`]
+> **Design Source**: [none — markdown spec only | claude-design — <locator> · record `design/handoff/<flow-id>/HANDOFF.md` | figma — <node URL> · record `design/handoff/<flow-id>/HANDOFF.md` — the flow's screens or prototype; the record is written by `/design-handoff`]
 > **Open Questions**: [none — or the count; each is written as an "Open:" line in the section it belongs to, with an owner and a date]
 
 > **Note — Scope boundary**: A flow spec maps a multi-screen task from its entry

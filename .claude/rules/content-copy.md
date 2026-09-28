@@ -40,6 +40,9 @@ Android `strings.xml` and Flutter `.arb` files. Copy ships in the locale(s) it i
   typed into the string: a price change must not require a copy change in five places.
 - Legal and billing text (terms, refund and cancellation conditions, auto-debit disclosures, consent text) is
   approved by the owner the PRD names and is never paraphrased in microcopy; link to it instead.
+- **Mockup copy is a draft.** Text in a Claude Design or Figma mockup or a `/design` artifact is a draft or
+  placeholder; the copy deck under `design/content/` and the message catalogs are final. Engineers wire strings by
+  key, never by copying them out of a mockup.
 
 ## Plurals, placeholders and concatenation
 

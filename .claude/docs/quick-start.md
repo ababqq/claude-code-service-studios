@@ -7,11 +7,11 @@ Claude Code 세션 하나를 웹·모바일·API 서비스를 만드는 제품 �
 | 구성 요소 | 개수 | 위치 |
 |---|---|---|
 | 에이전트 | 46 | `.claude/agents/` |
-| 스킬 (슬래시 명령) | 76 | `.claude/skills/` |
+| 스킬 (슬래시 명령) | 77 | `.claude/skills/` |
 | 훅 | 등록 12 (파일 14) | `.claude/hooks/` |
 | 스크립트 | 8 | `.claude/scripts/` |
-| 경로별 규칙 | 16 | `.claude/rules/` |
-| 문서 템플릿 | 56 | `.claude/docs/templates/` |
+| 경로별 규칙 | 17 | `.claude/rules/` |
+| 문서 템플릿 | 57 | `.claude/docs/templates/` |
 | 디렉터 게이트 | 29 | `.claude/docs/director-gates/` |
 
 에이전트는 디렉터 → 리드 → 스페셜리스트로 배치되고, 웹·모바일·백엔드·데이터·클라우드 레이어마다 스택 스페셜리스트가
@@ -68,7 +68,7 @@ Opus, `tech-lead`·`prototyper`와 스택 하위 스페셜리스트 9개는 Sonn
 | 역할 | 첫 명령 | 주로 함께 일하는 에이전트 | 먼저 읽을 곳 |
 |---|---|---|---|
 | PM·서비스 기획 | `/onboard pm` → 새 제품이면 `/brainstorm`, 새 기능이면 `/write-prd <feature>`, 작은 변경이면 `/quick-spec` | `product-manager`, `business-analyst`, `product-director` | `design/product/`, `design/prd/` |
-| 디자이너 | `/onboard designer` → `/design-language` 또는 `/ux-design <화면>` | `product-designer`, `design-director`, `ux-writer`, `design-engineer`, `accessibility-specialist` | `design/brand/`, `design/ux/`, `design/accessibility-requirements.md` |
+| 디자이너 | `/onboard designer` → `/design-language` 또는 `/ux-design <화면>` (Claude Design·Figma로 그렸다면 `/design-handoff <URL>`로 가져온 뒤 `/ux-design <화면>`) | `product-designer`, `design-director`, `ux-writer`, `design-engineer`, `accessibility-specialist` | `design/brand/`, `design/ux/`, `design/handoff/`, `design/accessibility-requirements.md` |
 | 프런트엔드 | `/onboard frontend` → `/story-readiness <story>` → `/dev-story <story>` | `frontend-engineer`, `web-specialist`와 하위 스페셜리스트 | 웹 코드 루트의 `CLAUDE.md`, `docs/api/`, `docs/stack-reference/` |
 | 백엔드 | `/onboard backend` → `/api-design review` → `/dev-story <story>` | `backend-engineer`, `backend-specialist`와 하위 스페셜리스트, `data-specialist` | `docs/api/`, `docs/data/`, `docs/architecture/` |
 | 모바일 | `/onboard mobile` → `/dev-story <story>` | `mobile-engineer`, `mobile-specialist`와 하위 스페셜리스트 | 모바일 코드 루트, `design/ux/app-shell.md` |
@@ -139,6 +139,7 @@ Opus, `tech-lead`·`prototyper`와 스택 하위 스페셜리스트 9개는 Sonn
 | `/test-setup` | 레이어별 테스트 러너와 CI 워크플로 스캐폴드 |
 | `/design-language` | 디자인 언어(9개 섹션) 작성 |
 | `/ux-design` | 화면·흐름 UX 명세, 앱 셸, 인터랙션 패턴, 접근성, 사용자 여정 |
+| `/design-handoff` | Claude Design 핸드오프·번들, `/design` 아티팩트, Figma 프레임을 `design/handoff/<slug>/`로 가져와 UX 명세에 연결 |
 | `/walking-skeleton` | 스테이징에 배포되는 얇은 끝에서 끝까지 경로(Sprint 0) |
 | `/create-epics`, `/create-stories` | PRD·ADR·API 계약에서 에픽과 스토리 생성 |
 | `/sprint-plan` | 스프린트 계획과 `production/sprint-status.yaml` 작성 |
@@ -159,7 +160,8 @@ Opus, `tech-lead`·`prototyper`와 스택 하위 스페셜리스트 9개는 Sonn
   `/review-all-prds`, `/quick-spec`, `/consistency-check`, `/propagate-prd-change`
 - **아키텍처와 계약**: `/create-architecture`, `/architecture-decision`, `/architecture-review`,
   `/create-control-manifest`, `/api-design`, `/data-model`, `/security-audit`
-- **UX와 디자인**: `/design-language`, `/ux-design`, `/ux-review`, `/ui-inventory`, `/usability-report`
+- **UX와 디자인**: `/design-language`, `/ux-design`, `/design-handoff`, `/ux-review`, `/ui-inventory`,
+  `/usability-report`
 - **스토리와 스프린트**: `/create-epics`, `/create-stories`, `/story-readiness`, `/dev-story`, `/code-review`,
   `/story-done`, `/walking-skeleton`, `/sprint-plan`, `/sprint-status`, `/estimate`, `/scope-check`,
   `/milestone-review`, `/retrospective`, `/tech-debt`
@@ -179,7 +181,7 @@ Opus, `tech-lead`·`prototyper`와 스택 하위 스페셜리스트 9개는 Sonn
 
 ## 자주 쓰는 템플릿
 
-스킬이 산출물을 쓸 때 `.claude/docs/templates/`의 템플릿(56개)을 그대로 따릅니다. 템플릿의 제목과 굵은 필드 이름은
+스킬이 산출물을 쓸 때 `.claude/docs/templates/`의 템플릿(57개)을 그대로 따릅니다. 템플릿의 제목과 굵은 필드 이름은
 스크립트와 게이트가 읽는 계약이므로 번역하거나 바꾸지 마세요.
 
 | 템플릿 | 쓰임 | 주로 쓰는 스킬 |
@@ -193,6 +195,7 @@ Opus, `tech-lead`·`prototyper`와 스택 하위 스페셜리스트 9개는 Sonn
 | `data-model.md`, `migration-plan.md` | 데이터 모델, expand/contract 마이그레이션 계획 | `/data-model` |
 | `threat-model.md`, `slo.md`, `runbook.md` | 위협 모델, SLO, 런북 | `/security-audit`, `/create-architecture`, `/incident` |
 | `design-language.md`, `ux-spec.md`, `app-shell.md`, `voice-and-tone.md` | 디자인 언어, 화면 명세, 앱 셸, 보이스 앤 톤 | `/design-language`, `/ux-design`, `/team-content` |
+| `design-handoff.md` | 가져온 외부 디자인의 기록 `design/handoff/<slug>/HANDOFF.md`(출처, 스냅숏, 화면·상태, 토큰) | `/design-handoff` |
 | `sprint-plan.md`, `test-plan.md`, `test-evidence.md` | 스프린트 계획, QA 계획, 테스트 증거 | `/sprint-plan`, `/qa-plan`, `/dev-story` |
 | `walking-skeleton-report.md` | 워킹 스켈레톤 검증 보고서 | `/walking-skeleton` |
 | `release-checklist-template.md`, `rollout-plan.md`, `release-notes.md` | 릴리스 체크리스트, 롤아웃 계획, 릴리스 노트 | `/release-checklist`, `/rollout-plan`, `/release-notes` |
@@ -244,10 +247,10 @@ project.yaml                       # 프로젝트 설정의 원본 — 스택, �
 .claude/
   settings.json                    # 훅 등록, 권한, 안전 규칙
   agents/                          # 에이전트 정의 46개
-  skills/                          # 스킬 76개 (스킬마다 디렉터리 하나)
+  skills/                          # 스킬 77개 (스킬마다 디렉터리 하나)
   hooks/                           # 훅 파일 14개 (등록 12 + yaml-helper.sh + 선택형 log-instructions.sh)
   scripts/                         # 관측 전용 스크립트 8개 (artifact-check.sh, stage-estimate.sh 등)
-  rules/                           # 경로별 규칙 16개
+  rules/                           # 경로별 규칙 17개
   statusline.sh                    # 상태 줄
   docs/
     quick-start.md                 # 이 파일
@@ -268,7 +271,7 @@ project.yaml                       # 프로젝트 설정의 원본 — 스택, �
     agent-roster.md                # 에이전트 목록
     skills-reference.md            # 스킬 목록
     rules-reference.md             # 규칙 목록
-    templates/                     # 문서 템플릿 56개
+    templates/                     # 문서 템플릿 57개
 ```
 
 ---

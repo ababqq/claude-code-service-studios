@@ -469,6 +469,7 @@ severity is its `**Severity**:` value (`S1-Critical`, `S2-Major`, `S3-Minor`,
 - Check that every module the architecture document names has corresponding code in its declared root
 - Verify sprint plans reference real story paths in `production/epics/`
 - Verify every API operation a key UX spec's `## API Data` section references exists in the contract under `docs/api/`
+- For each key UX spec whose `> **Design Source**:` first token is `claude-design` or `figma`, check its record `design/handoff/<slug>/HANDOFF.md`: `> **Verdict**:` `RETAINED` or `LINK ONLY`, and a `> **Retrieved**:` date not newer than the date in the file name of the spec's latest accepted `/ux-review` record (`<spec-stem>-ux-review-YYYY-MM-DD.md`) — newer means the design changed after the review, so the review is stale. A missing or `NOT ASSESSED` record prints `NOT CHECKED — external design not retained (<url>)` and is never PASS. Decide from these files only: never call a Figma MCP tool, the Claude Design connector or the `Artifact` tool for the verdict
 
 ---
 
@@ -969,6 +970,8 @@ Based on the verdict, suggest specific next steps:
 - **No screen inventory?** → `/ui-inventory`
 - **No UX specs?** → `/ux-design [screen name]`, `/ux-design shell` for the app shell, `/ux-design patterns` for the interaction pattern library, or `/team-ui [feature]` for the full pipeline
 - **UX specs not reviewed?** → `/ux-review [file]` or `/ux-review all`
+- **External design changed after review?** → `/ux-review [file]`
+- **Imported design without a record?** → `/design-handoff --for <slug>`
 - **No user journey map?** → `/ux-design journey` (writes `design/product/user-journey.md`)
 - **No usability evidence?** → `/usability-report` (usability, beta or interview)
 - **Missing epics?** → `/create-epics layer: foundation` then `/create-epics layer: core`

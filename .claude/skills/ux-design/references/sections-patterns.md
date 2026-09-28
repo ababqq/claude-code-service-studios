@@ -48,10 +48,21 @@ For each pattern (existing or new), document:
 **When to Use**: [Conditions where this pattern is appropriate]
 **When NOT to Use**: [Conditions where another pattern is more appropriate]
 
-**Implementation Notes**: [The component-library component per surface]
+**Implementation Notes**: [The component-library component per surface — plus its Code Connect mapping (Figma component → repo component) when the design-system handoff record lists one]
 
-**Reference**: [Design file link, screenshot path or ASCII example, if available]
+**Reference**: [A screen under `design/handoff/<slug>/screens/`, the Figma component or node link, or the Claude Design design-system component — each from a handoff record — or an ASCII example, if available]
 ```
+
+When `design.tool` is claude-design or figma, read
+`design/handoff/design-system/HANDOFF.md` (if it exists) for the header's
+`> **Component Library**:` line — the Figma library or Claude Design design-system
+link and the Code Connect mappings — and its `## Tokens & Components` for each
+pattern's component. The record is reference, not source: behaviour is decided here,
+and a design component with no library counterpart is a gap for the
+`design-engineer`, not a pattern. No record ⇒ write the line without the link and
+note `NOT CHECKED — external design not retained (<url>)` as an open question
+(`/design-handoff` imports it). This session reads the record with Read; live
+design tools are used only conditionally (Phase 2i of the skill).
 
 Work through patterns in groups. Use `AskUserQuestion`:
 - "How do you want to work through these patterns?"

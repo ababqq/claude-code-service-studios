@@ -9,16 +9,21 @@
 Orchestrates a feature squad from PRD to validated build for one feature. Phase 1
 (Define) checks the PRD and its acceptance criteria with `product-manager`; Phase 2
 (UX delta) runs `/ux-design` through `product-designer` only when screens are added or
-changed; Phase 3 (Contract) has `tech-lead` update the API contract through
+changed and, when the project designs in Claude Design or Figma, records each screen's design
+reference (`> **Design Source**:` line and `design/handoff/<slug>/HANDOFF.md` via
+`/design-handoff`); Phase 3 (Contract) has `tech-lead` update the API contract through
 `/api-design` and the data model and migration plan through `/data-model`, both invoked
 with `--review <resolved review_mode>`, and split the work per surface; Phase 4
 (Implement) spawns one stream per surface in parallel — `backend-engineer` (`api`),
 `frontend-engineer` (`web`), `mobile-engineer` (`ios` / `android` / `mobile`) — each writing
-in the root the resolved `code_roots` line gives its layer; Phase 5
+in the root the resolved `code_roots` line gives its layer, with the design references resolved
+once in the main session and passed as local paths plus the "Design output is reference, not
+source." paragraph; Phase 5
 (Integrate) proves the contract and the critical journey with contract and E2E tests;
 Phase 6 (Validate) has `qa-engineer` write and walk test cases and file bugs as
 `production/qa/bugs/BUG-NNNN.md`; Phase 7 (Sign-off) is a spoken status report with no
-artifact: COMPLETE / NEEDS WORK / BLOCKED / NOT ASSESSED. The skill spawns no director
+artifact: COMPLETE / NEEDS WORK / BLOCKED / NOT ASSESSED, listing every
+`Design reference: NOT CHECKED — …` line verbatim. The skill spawns no director
 gate itself; the gates its sub-skills own apply the same review mode.
 
 ---
@@ -28,11 +33,14 @@ gate itself; the gates its sub-skills own apply the same review mode.
 These should pass before any behavioral testing:
 
 - [ ] Frontmatter has all required fields (`name`, `description`, `argument-hint`, `user-invocable`, `allowed-tools`); `name` is `team-feature`, equal to the directory `.claude/skills/team-feature/` and the catalog `name`
-- [ ] Bootstrap: the first body line is `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,automation_always_ask,team.size,surfaces,stack,code_roots` `` and `allowed-tools` grants `Bash(bash "*/.claude/skills/team-feature/../../hooks/yaml-helper.sh" resolve_config *)`
-- [ ] `--keys` is exactly `review_mode,automation,automation_always_ask,team.size,surfaces,stack,code_roots`
+- [ ] Bootstrap: the first body line is `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,automation_always_ask,team.size,surfaces,stack,code_roots,design` `` and `allowed-tools` grants `Bash(bash "*/.claude/skills/team-feature/../../hooks/yaml-helper.sh" resolve_config *)`
+- [ ] `--keys` is exactly `review_mode,automation,automation_always_ask,team.size,surfaces,stack,code_roots,design`
 - [ ] The line after the bootstrap block is exactly: ``Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`.``
 - [ ] Automation prelude (the block beginning "**Automation mode**: Resolve `modes.automation`") present verbatim right after that line
-- [ ] `allowed-tools` is exactly: `Read, Glob, Grep, Write, Edit, Bash, Agent, AskUserQuestion, TaskCreate, TaskGet, TaskList, TaskUpdate` plus the bootstrap grant
+- [ ] `allowed-tools` is exactly: `Read, Glob, Grep, Write, Edit, Bash, Agent, AskUserQuestion, TaskCreate, TaskGet, TaskList, TaskUpdate` plus the bootstrap grant — no MCP tool name, no `Artifact` or `Skill`
+- [ ] Phase 0 reads the `design` line; its unset form is asked, never read as `none`, and the skill never writes `design.tool`
+- [ ] Phase 2 names `/design-handoff --for <slug>` for Claude Design or Figma screens and the bundled `/design` skill only conditionally ("only if it is present in the session", publishing approved), with `NOT CHECKED — /design skill not available in this session (needs artifacts)` when absent
+- [ ] Phase 4 resolves design references in the main session (Figma MCP server and Claude Design connector named only conditionally, never by an agent) and each web/mobile brief carries the local reference paths and the paragraph beginning "**Design output is reference, not source.**"
 - [ ] 2+ phase headings found — the seven pipeline phases in order: `### Phase 1: Define (PRD & acceptance criteria check)`, `### Phase 2: UX delta (…)`, `### Phase 3: Contract (API & data delta)`, `### Phase 4: Implement (parallel per surface)`, `### Phase 5: Integrate (contract tests + E2E)`, `### Phase 6: Validate (qa-engineer)`, `### Phase 7: Sign-off (spoken status report, no artifact)`, after `## Phase 0: Resolve Config`
 - [ ] Phase 2 carries the skip line verbatim: `UX delta: skipped — no screens added or changed`
 - [ ] Verdict keywords present, exactly: `COMPLETE`, `NEEDS WORK`, `BLOCKED`, `NOT ASSESSED`; Phase 1 returns `READY` or `GAPS`
@@ -237,6 +245,33 @@ of `SKILL.md`; at run time the model renders them in the user's conversation lan
 - [ ] Each listed always-ask category prompts at `autonomous`
 - [ ] The categories are checked against the resolved `automation_always_ask` line, not a remembered list
 - [ ] No command that changes production, shared infrastructure, a shared database or secrets is run by an agent
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
+### Case 8: Design references — Figma record resolved, one screen NOT CHECKED
+
+**Fixture:**
+- As Case 1, with the resolved line `design.tool: figma file_url=https://www.figma.com/design/<fileKey>/Moa (project.yaml)`
+- The progress ring changes `goal-detail` and adds `goal-progress-sheet`
+- `design/handoff/goal-detail/HANDOFF.md` has `> **Verdict**: RETAINED` with `screens/default-sm.png` and `screens/empty-sm.png`
+- `design/handoff/goal-progress-sheet/HANDOFF.md` has `> **Verdict**: NOT ASSESSED`; the session has no Figma MCP tools
+
+**Input:** `/team-feature goals`
+
+**Expected behavior:**
+1. Phase 2: each changed spec carries `> **Design Source**: figma — <node URL> · record `design/handoff/<slug>/HANDOFF.md``; the delta lists which record screens back which states
+2. Phase 4: before spawning, the skill reads both records itself; the `frontend-engineer` and `mobile-engineer` briefs for `goal-detail` carry `design/handoff/goal-detail/HANDOFF.md` and its `screens/` paths plus the "Design output is reference, not source." paragraph
+3. For `goal-progress-sheet` the brief carries `Design reference: NOT CHECKED — <reason>` instead of paths, and the run records `NOT CHECKED — Figma MCP tools not present in this session`
+4. Phase 7 lists each design reference per screen and both NOT CHECKED lines verbatim
+
+**Assertions:**
+- [ ] No agent is asked to call a Figma MCP tool, the Claude Design connector, the `Artifact` tool or `/design`
+- [ ] A `NOT ASSESSED` record is never reported as a match; its NOT CHECKED lines reach the sign-off verbatim
+- [ ] Exported or design-context code is never pasted into a code root (the precedence paragraph is in the brief)
+- [ ] With `design.tool: none`, Phase 2 records no design reference and the markdown spec is the whole design record
+- [ ] With the unset form, the tool is asked in Phase 2, not assumed
 
 **Case Verdict**: PASS / FAIL / PARTIAL
 

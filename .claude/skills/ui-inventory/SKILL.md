@@ -67,7 +67,11 @@ checked.
 - **Add a screen the documents do not imply** without the user confirming it.
   Commonly forgotten screens are asked about, never added by default.
 - **Call an image generator or any other external service.** Production briefs
-  are text for a designer, an illustrator or a tool the team runs itself.
+  are text for a designer, an illustrator or a tool the team runs itself. Reading
+  the design records already retained in the repo
+  (`design/handoff/*/HANDOFF.md`, written by `/design-handoff`) is reading a
+  local source, not calling a service; this skill never fetches a Figma or Claude
+  Design link itself.
 - **State a platform- or store-mandated value without a source.** Icon sizes,
   screenshot dimensions and file limits change with OS and store releases; each one
   carries `Source: <url>, retrieved YYYY-MM-DD` from a specialist's lookup in this
@@ -139,6 +143,13 @@ errors, but each one is named in the context summary and in the file's
 - **Existing specs** — Glob `design/ux/*.md` (a screen with a spec is `Specced`)
   and `design/ux/reviews/*-ux-review-*.md` (a spec with a review record is
   `Reviewed`).
+- **Design handoff records** — Glob `design/handoff/*/HANDOFF.md` (records of
+  Claude Design or Figma designs retained by `/design-handoff`). Read each
+  record's `> **Verdict**:`, `> **Tool**:` and `> **Backs**:` lines and its
+  `## Screens & States` section — the frames or screens the external design holds.
+  Skip the `design-system` and `brand-directions` records (tokens and
+  explorations, not screens). A `NOT ASSESSED` record's screens are unverified:
+  list them as such, never as confirmed.
 - **Design language** — `design/brand/design-language.md`: Grep for
   `^## 5. Components & States`, `^## 6. Iconography & Illustration` and
   `^## 8. Platform Adaptation` and read only those sections.
@@ -155,7 +166,7 @@ Present the context summary:
 > - Surfaces: [line as printed, or the answer given]
 > - Sources: feature map [read / not found] · PRDs with UI content [N of M] ·
 >   journey [read / not found] · app shell [read / not found] · design language
->   [read / not found]
+>   [read / not found] · design handoff records [N read / none]
 > - Existing: [N screens / none] · [N media assets / none]
 > - Specialists this run: [per the mode table above]
 
@@ -177,6 +188,11 @@ Derive the screen list per surface, in this order:
 3. **Journey stages** — sign-up, onboarding and activation, the habit loop,
    retention touchpoints (notifications inbox), monetization (plans, checkout,
    receipts), advocacy (invite, share).
+4. **Design handoff records** — each record's `## Screens & States` confirms
+   screens already in the list (note the record path beside them). A frame the
+   documents do not imply — a screen drawn in Figma or Claude Design that no PRD,
+   shell or journey stage names — is asked about like the forgotten screens
+   below, never added by default.
 
 **Ask about the screens services most often forget** — ask, never add by
 default: sign-in recovery (password reset, email verification); terms and consent
@@ -242,7 +258,7 @@ order web, iOS, Android:
 
 > **Last Updated**: [YYYY-MM-DD]
 > **Surfaces**: [resolved platform.surfaces line, or the answer given in this run]
-> **Sources**: [feature map · PRDs (N) · one-pager · journey · app shell · design language — each read / not found]
+> **Sources**: [feature map · PRDs (N) · one-pager · journey · app shell · design language · design handoff records (`design/handoff/<slug>/HANDOFF.md`, …) — each read / not found]
 > **Specialists**: [product-designer, design-engineer | "<agent> not consulted — <Mode> mode"]
 
 ## Web

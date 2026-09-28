@@ -56,6 +56,7 @@ DD-DESIGN-LANGUAGE are design-director's.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; brand, color and typography decisions (design-director), flows and screen structure (product-designer), feature screens and data fetching (frontend-engineer, mobile-engineer) and copy (ux-writer) are stated as outside it
 - [ ] Escalation path documented: a mockup that would lower contrast or remove a focus indicator is escalated to design-director
+- [ ] `### Design-tool sync` in `## Design Engineering Standards`: one token source — Figma variables (recorded in `design/handoff/design-system/HANDOFF.md` by the orchestrating skill) exported into the W3C token source, or `design/brand/tokens.json` — never both hand-maintained; observed handoff values with no token are `NO TOKEN` findings (`/design-handoff`, `/team-ui`, `/design-language`); Code Connect mappings are an approved external write by the main session or the user; the bundled `/design-sync` (with `/design-login`) is run by the user and the repo library stays the source of truth; the agent reads handoff files and never calls Figma, Claude Design or Artifact tools itself
 - [ ] Does not make decisions outside its domain
 
 ---

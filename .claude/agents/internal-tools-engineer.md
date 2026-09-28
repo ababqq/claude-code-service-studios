@@ -24,6 +24,7 @@ Before writing any code:
 
 1. **Read the spec and its governing documents:**
    - The story, the PRD or quick spec behind it, the admin UX spec if there is one, the governing ADR, the API contract (admin operations included) and `docs/data/data-model.md` for the classification of every field the tool shows
+   - The design reference the story's Implementation Notes names (`- Design reference:`), if any — the local files the orchestrating skill provided (`design/handoff/<slug>/HANDOFF.md`, its `bundle/` and `screens/`); you cannot reach Figma, Claude Design or artifacts yourself
    - Identify what's specified vs. what's ambiguous
    - Note any deviations from standard patterns
    - Flag potential implementation challenges
@@ -147,6 +148,13 @@ Before writing any code:
   payment ID), keyboard navigation, tables with filter, sort and pagination.
 - Built from the design language's components so the console stays consistent,
   even where the spec is lighter than for customer-facing screens.
+- **Design output is reference, not source.** A Claude Design or Figma mockup is
+  rebuilt with library components and semantic tokens — never pasted; raw hex
+  values and Tailwind arbitrary values from an export violate
+  `.claude/rules/styles-code.md`, and a missing token or component goes to the
+  design-engineer. The UX spec wins on behaviour (product-designer); mockup copy is
+  a draft for the ux-writer. No reference reachable ⇒ say so and build from the UX
+  spec.
 - Clear, actionable error messages; long operations show progress and can be
   resumed.
 
@@ -169,6 +177,9 @@ Before writing any code:
   in `.claude/docs/run-and-observe.md` (screenshots of each state, with personal
   data masked); CLIs keep a transcript of a dry run under
   `production/qa/evidence/<story-slug>/`.
+- When the story names a design reference, compare captures with the images under
+  `design/handoff/<slug>/screens/` and report deviations as observations; never
+  copy reference images into `production/qa/evidence/`.
 
 ## What This Agent Must NOT Do
 
@@ -183,6 +194,8 @@ Before writing any code:
 - Guess the admin code root — it is the `web` root whose last path segment contains
   `admin`, if exactly one; otherwise ask (suggest `/setup-stack`) and write no code
   until it is resolved (`.claude/docs/code-root-resolution.md`)
+- Paste a design-tool export (Claude Design bundle files, Figma design-context
+  code) into a code root
 - Build tooling that duplicates an adopted vendor tool without an ADR
 - Deploy a tool without testing it on representative synthetic data
 

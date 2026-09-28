@@ -13,14 +13,15 @@
 `/setup-stack` decides what the product is built on and makes that decision safe for
 every agent after it. It detects manifests and workspace layout, asks the product facts
 later gates branch on (`platform.surfaces`, `release.distribution`,
-`compliance.regions`, `privacy.handles_pii`, `localization.locales` — each may be
-deferred, and a deferred key stays unset), chooses each **decided** stack layer (web,
+`compliance.regions`, `privacy.handles_pii`, `localization.locales`, and `design.tool`
+when a UI surface is chosen or surfaces were deferred — each may be deferred, and a
+deferred key stays unset), chooses each **decided** stack layer (web,
 mobile, backend, data, cloud — data and cloud may wait for their Foundation ADRs),
 optionally validates the choices with the layer leads, pins every configured component
 **from a live source** (Context7 if its tools are present in the session, else
 WebSearch/WebFetch) with source URL, retrieval date and Knowledge Risk, declares the code
 roots, and writes `project.yaml` (`stack.*`, `specialists.*`, `naming.*`, `commands.*`,
-`platform.*`, `release.*`, `privacy.*`, `compliance.*`, `localization.*`).
+`platform.*`, `release.*`, `privacy.*`, `compliance.*`, `localization.*`, `design.*`).
 
 It then fills `docs/stack-reference/VERSION.md` and `docs/stack-reference/<component>/*.md`,
 seeds `docs/architecture/tech-radar.md`, offers `<root>/CLAUDE.md` per root, runs
@@ -80,11 +81,11 @@ These should pass before any behavioral testing:
 
 **Expected behavior:**
 1. Phase 2 reads `project.yaml` and the brief, Globs the manifests (skipping `node_modules`, `.next`, `dist` and the rest of the prune list) and presents detected layers as proposals
-2. Phase 3 asks the product facts with `Decide later — leave unset` available; the answers are `platform.surfaces: [web, ios, android]` (the API the apps call is not the `api` surface), `release.distribution: web+stores`, `compliance.regions: [kr]`, `privacy.handles_pii: true`, `localization.locales: [ko-KR]`
+2. Phase 3 asks the product facts with `Decide later — leave unset` available; the answers are `platform.surfaces: [web, ios, android]` (the API the apps call is not the `api` surface), `release.distribution: web+stores`, `compliance.regions: [kr]`, `privacy.handles_pii: true`, `localization.locales: [ko-KR]`; because a UI surface is chosen, question 8 asks `design.tool` with `Claude Design` / `Figma` / `None — markdown specs only` / `Decide later — leave unset`, and the answer is `Figma` with the project-level `design.figma.file_url`
 3. Phase 4 confirms web (`[apps/web, apps/admin]`), mobile (`apps/mobile`), backend (`apps/api`); data and cloud get `Leave unset until the ADR (Recommended)`; with `kr`, Kakao Login, Naver Login, Sign in with Apple, Toss Payments and in-app billing are offered as `## Assess` candidates only
 4. Phase 4e asks "Validate these layer choices with the stack leads before pinning versions?"; on validate, spawns `web-specialist`, `mobile-specialist`, `backend-specialist` in parallel
 5. Phase 5 pins each component from a live source and shows one table: `| Layer | Component | Version | Release date | Knowledge Risk | Source | Retrieved |`
-6. Phase 7 shows the draft and asks "May I write this to `project.yaml`?" — flow-style lists, quoted framework versions, no `stack.pinned_on`; then reads back with `bash .claude/hooks/yaml-helper.sh resolve_config --keys stack,code_roots,surfaces,distribution,compliance`
+6. Phase 7 shows the draft and asks "May I write this to `project.yaml`?" — flow-style lists, quoted framework versions, no `stack.pinned_on`; the `design:` block carries `tool: figma` and the double-quoted `file_url`; then reads back with `bash .claude/hooks/yaml-helper.sh resolve_config --keys stack,code_roots,surfaces,distribution,compliance,design`, which prints `design.tool: figma file_url=<url> (project.yaml)`
 7. Phases 8–10 write the reference set, seed the tech radar (`## Adopt` without versions in the names) and offer `<root>/CLAUDE.md` per root, each after its approval
 8. Phase 11 runs `project-coherence.sh`, then writes `stack.pinned_on` and the `**Stack Pinned**` row after the marker question, re-reads both, and confirms `bash .claude/scripts/artifact-check.sh --phase discovery` reports `stack-setup` `status=PRESENT`
 9. Phase 14 prints the summary with `Verdict: COMPLETE` and the `standard / full` next steps
@@ -95,6 +96,7 @@ These should pass before any behavioral testing:
 - [ ] `VERSION.md` rows use Layer ∈ `web|mobile|backend|data|cloud` and the Component name without a trailing version
 - [ ] The repository-root `CLAUDE.md` is not modified
 - [ ] Unset data and cloud layers do not block `stack.pinned_on`
+- [ ] The Phase 14 `Product facts:` line includes `design=figma`
 
 **Case Verdict**: PASS / FAIL / PARTIAL
 
@@ -276,7 +278,9 @@ These should pass before any behavioral testing:
 
 - [ ] Question → Options → Decision → Draft → Approval for each layer, pin, root, command and product fact
 - [ ] Uses "May I write this to `<path>`?" before every write; a multi-file write is approved as one listed changeset
-- [ ] Unset stays unset; a deferred key is absent, never empty or `TBD`
+- [ ] Unset stays unset; a deferred key is absent, never empty or `TBD` — a deferred `design.tool` (`Decide later — leave unset`) writes no `design:` block, is never written as `none`, and the 7c read-back prints `design.tool: (unset -- ask; unset is not none)`
+- [ ] `design.tool` is asked only when a UI surface (`web`, `ios`, `android`) is chosen or the surfaces were deferred; an `api`-only product is not asked
+- [ ] A design URL is written double-quoted, and `design.claude_design.project_url` is project level only (no `?file=`)
 - [ ] Never records a production deploy command; never runs installs, generators, migrations or deploys
 - [ ] Writes nothing under `production/session-logs/`; never writes `modes.review_mode` or any other knob that `modes.rigor` fronts
 - [ ] Ends with a recommended next step (AskUserQuestion) and never runs it
