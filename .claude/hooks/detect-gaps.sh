@@ -51,6 +51,8 @@ fi
 #                              docs/data/data-model.md          -> /data-model
 #   6  stage lag               stage-estimate.sh is >= 2 phases
 #                              ahead of project.stage           -> /gate-check
+#   7  unrecorded import       a design/handoff/<slug>/ directory
+#                              without HANDOFF.md               -> /design-handoff --for <slug>
 #
 # TIER-AWARE. Checks 1, 3, 4 and 5 ask "where is the document for this code?".
 # At `modes.workflow: minimal` the answer is that there deliberately is none:
@@ -58,8 +60,9 @@ fi
 # starts. Reporting their absence nags the user about work their own
 # configuration told them to skip -- and a warning that fires when nothing is
 # wrong trains the user to ignore the ones that matter. So at minimal those
-# four checks are skipped, and the skip is announced once. Checks 2 and 6 are
-# not tiered: an undocumented prototype and a stale stage are gaps at any tier.
+# four checks are skipped, and the skip is announced once. Checks 2, 6 and 7
+# are not tiered: an undocumented prototype, a stale stage and an imported
+# design nobody recorded are gaps at any tier.
 #
 # CODE ROOTS come from yaml-helper resolve_code_roots, never from a literal
 # directory: every layer's declared root, the data layer's migrations_dir,
@@ -397,6 +400,34 @@ if [ -f "$SE_SCRIPT" ]; then
   fi
 else
   echo "ℹ️  Check 6 (stage lag): NOT CHECKED — $SE_SCRIPT not found"
+fi
+
+# --- Check 7: Imported designs without their record ---
+#
+# /design-handoff keeps one directory per imported external design (a Claude
+# Design export, a Design artifact, a Figma frame) with the record HANDOFF.md
+# (templates/design-handoff.md) beside the snapshot. A directory without it is
+# a snapshot nobody can date, trace to a UX spec, or tell apart from a verified
+# one -- the same gap Check 2 reports for prototypes.
+if [ -d "design/handoff" ]; then
+  UNRECORDED_HANDOFFS=()
+  while IFS= read -r handoff_dir; do
+    [ -z "$handoff_dir" ] && continue
+    handoff_dir=$(echo "$handoff_dir" | sed 's|\\|/|g')
+    if [ ! -f "${handoff_dir}/HANDOFF.md" ]; then
+      UNRECORDED_HANDOFFS+=("$(basename "$handoff_dir")")
+    fi
+  done <<EOF
+$(find design/handoff -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
+EOF
+
+  if [ ${#UNRECORDED_HANDOFFS[@]} -gt 0 ]; then
+    echo "⚠️  GAP: ${#UNRECORDED_HANDOFFS[@]} imported design(s) without a record (no HANDOFF.md):"
+    for handoff in "${UNRECORDED_HANDOFFS[@]}"; do
+      echo "    - design/handoff/$handoff/"
+      echo "      Suggested action: /design-handoff --for $handoff"
+    done
+  fi
 fi
 
 # --- Summary ---

@@ -94,6 +94,8 @@ plain text. Follow the **Explain -> Capture** pattern:
    breakpoint (`sm`/`md`/`lg` on web; compact/regular on mobile), input methods (keyboard, pointer, touch,
    screen reader), route or deep link, auth and permission state, every screen state, the `## API Data` the
    screen needs, and its analytics events. Hi-fi visuals use the design language's components and tokens only.
+   When the project designs in Claude Design or Figma (`design.tool`), the hi-fi visuals live in that tool and
+   the UX spec stays the behavioural contract (see `### Design tools`).
 4. **Interaction patterns**: Maintain `design/ux/interaction-patterns.md` (`/ux-design patterns`) — forms and
    inline validation, data tables, search/filter/sort, pagination vs infinite scroll, date and time pickers,
    file upload, payment sheet, OTP and identity verification, permission prompts, pull-to-refresh, toasts and
@@ -194,6 +196,19 @@ Pair with the accessibility-specialist on anything beyond these defaults.
   analytics-engineer.
 - Platform guidance changes (HIG, Material, store review rules): check with WebSearch and cite the source URL
   and retrieval date; never present remembered guidance as current.
+
+### Design tools
+
+When `design.tool` is `claude-design` or `figma`:
+- The hi-fi visuals live in the design tool; the UX spec stays the behavioural contract — states, `## API
+  Data`, analytics events, focus order and accessibility. A mockup never replaces the spec.
+- The spec records `> **Design Source**:` (first token exactly `none`, `claude-design` or `figma`, plus the
+  locator and the record `design/handoff/<slug>/HANDOFF.md`) and names the frame or screen for each state.
+- A state the spec lists but the design lacks is a design gap to close in the tool, not an implementation
+  choice left to the engineer.
+- You cannot call MCP, connector or Artifact tools (none are in your tools, and Bash is disallowed): record
+  the links and handoff records the user or the orchestrating skill supplies, and ask before every write under
+  `design/`.
 
 ### Worked example (Moa)
 

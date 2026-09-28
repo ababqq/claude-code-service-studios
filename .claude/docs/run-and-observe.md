@@ -36,14 +36,19 @@ of the running product unattended, and every surface has a native way.
    account and the story's feature flag switched on locally (see
    [Reaching the state](#reaching-the-state)).
 3. **Capture** with the surface's mechanism below.
-4. **Look.** `Read` every capture and compare it with the acceptance criteria.
+4. **Look.** `Read` every capture and compare it with the acceptance criteria and,
+   when the story names a design reference, with its reference screens under
+   `design/handoff/<slug>/screens/`; divergences are recorded as observations.
    Clipped or overflowing text, a missing element, the wrong state, an empty list
    where data was seeded, an unexpected field or status code — these are defects,
-   and this is the only step that finds them.
+   and this is the only step that finds them. A divergence from a reference screen
+   is not a defect by itself (the design language, the accessibility target and the
+   UX spec outrank the reference) unless an acceptance criterion names the look.
 5. **Retain.** The capture lives in `production/qa/evidence/<story-slug>/`, named
    `NN-<state-or-operation>…` in capture order. A capture that was taken and
    discarded is an assertion, not evidence. Never retain it only under a
-   gitignored path such as `production/session-logs/`.
+   gitignored path such as `production/session-logs/`. Design reference images
+   stay under `design/handoff/` and are never copied here — they are not captures.
 6. **Stop what you started** (the background server, the simulator if you booted
    it) and **report** one `Run result:` line — vocabulary below.
 

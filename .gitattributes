@@ -19,3 +19,26 @@
 # .gitattributes governs the INDEX. It does not retro-fix a working tree that
 # predates the rule -- run `git add --renormalize .` for that.
 .claude/**/*.md text eol=lf
+
+# Design media is binary. Git usually autodetects PNG, but under
+# core.autocrlf=true a misdetected image or PDF gets its bytes rewritten on
+# checkout and is corrupted. Declaring them binary also stops text diffs of
+# reference screens and exported artboards (design/handoff/<slug>/screens/).
+# .fig is listed defensively: a local Figma file is not meant to be committed
+# (see .gitignore), but if one slips in it must not be line-ending converted.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.gif binary
+*.pdf binary
+*.fig binary
+
+# Imported design snapshots are verbatim exports from Claude Design, Design
+# artifacts or Figma -- nobody reviews them line by line, and they are never
+# edited (.claude/rules/design-handoff.md). Marking them generated collapses
+# their diffs in pull requests and keeps exported HTML/CSS/JS out of the
+# repository's language statistics. The record HANDOFF.md is written with the
+# user, not exported, so it is un-marked and stays visible in review.
+design/handoff/** linguist-generated=true
+design/handoff/*/HANDOFF.md -linguist-generated

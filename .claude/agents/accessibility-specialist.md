@@ -75,7 +75,10 @@ Before writing any code:
    and a POUR-organized requirement matrix per surface.
 2. **Design review**: Check UX specs, the app shell and the design language for focus order, keyboard paths,
    announcements, target sizes, text scaling, color contrast of token pairs and reduced-motion variants
-   before anything is built.
+   before anything is built. When the project designs in Claude Design or Figma, include the external design
+   screens retained under `design/handoff/<slug>/screens/`: contrast of their color pairs against
+   `accessibility.target`, target sizes and text baked into images. Mockups do not show focus or
+   screen-reader semantics — those stay the UX spec's job; flag a gap rather than assume it is covered.
 3. **Audits**: Audit a screen, flow or component set with automated tools plus manual keyboard,
    screen-reader, zoom and text-size passes; report findings with success-criterion references.
 4. **Accessible implementation**: Write or pair on fixes — semantics, focus management, live regions,

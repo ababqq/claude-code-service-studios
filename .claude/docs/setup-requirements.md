@@ -49,6 +49,28 @@ PyYAML은 **훅이 실제로 고르는 인터프리터**(위 순서의 첫 번�
 Flutter SDK, JDK·Gradle, Python 가상 환경처럼 스택 자체가 요구하는 도구는 `/setup-stack`이
 기록한 `docs/stack-reference/VERSION.md`의 고정 버전을 따르십시오.
 
+## 디자인 도구 연동 (선택)
+
+`project.yaml`의 `design.tool`이 `claude-design`이나 `figma`일 때만 해당합니다. `none`이면 마크다운 UX 명세가 디자인
+기록의 전부이므로 아래 도구가 필요 없습니다. 이 도구들은 설치와 호스트에 따라 있을 수도 없을 수도 있으므로, CCSS
+스킬은 도구 이름을 `allowed-tools`에 적지 않고 "세션에 있으면 쓴다"는 식으로 조건부로만 씁니다. 도구를 부르는
+일은 메인 세션(`/design-handoff`, `/ux-design`, `/dev-story` 같은 스킬)이 하고, 서브에이전트에게는
+`design/handoff/<slug>/`의 로컬 경로만 넘깁니다.
+
+| 도구 | 필요한 경우 | 쓰는 곳 | 준비 |
+| ---- | ---- | ---- | ---- |
+| **Figma MCP 서버** | `design.tool: figma` | `/design-handoff`가 Figma 노드 URL에서 디자인 컨텍스트, 스크린샷, 프레임 목록, 변수(색·타이포·간격), Code Connect 대응을 읽습니다. `/design-language`가 Figma 변수를 기존 값으로 읽습니다 | Figma의 공식 MCP 서버를 Claude Code에 연결하십시오. 도구 이름은 설치마다 다릅니다 |
+| **Claude Design 커넥터** | `design.tool: claude-design`, **Claude Code on the web에서만** | 핸드오프 프롬프트의 `https://claude.ai/design/p/<PROJECT_ID>?file=<FILE>.dc.html`을 직접 읽습니다 | 웹 세션에 있는 커넥터입니다. 로컬 CLI에는 없고 설치할 수도 없으며, 인증이 필요한 이 URL은 `WebFetch`로도 읽을 수 없습니다 |
+| **아티팩트** (번들 `/design` 스킬, `Artifact` 도구) | `/design-handoff new <brief>`로 초안을 그리거나 `/design` 디자인 아티팩트 URL을 가져올 때 | 번들 `/design`이 목업을 아트보드로 그려 디자인 아티팩트로 게시하고, `Artifact` 도구의 `read`로 아티팩트를 읽습니다 | claude.ai 로그인(또는 Anthropic API)과 Claude Code v2.1.265 이상이 필요합니다 |
+
+`/design-sync`(저장소의 React 디자인 시스템을 Claude Design에 올림)와 `/design-login`도 Claude Code 번들 스킬입니다.
+사용자가 직접 실행하며 CCSS 스킬은 부르지 않습니다. Figma에 쓰기, `/design-sync`로 올리기, `/design`으로 게시하기는
+공유된 외부 상태를 바꾸므로 자동화 모드와 관계없이 항상 명시적으로 승인받습니다.
+
+도구를 부를 때마다 기본 권한 모드에서 확인을 묻습니다. 읽기 전용 Figma 도구처럼 자주 쓰는 호출을 미리 허용하려면
+공유 `.claude/settings.json`이 아니라 개인 설정 `.claude/settings.local.json`의 `permissions.allow`에 자기 설치의
+도구 이름으로 적으십시오.
+
 ## Claude Code 설치
 
 Claude Code는 Pro, Max, Team, Enterprise 요금제나 Console(API) 계정이 있어야 쓸 수 있습니다.
@@ -182,6 +204,9 @@ k6 version                           # 부하 테스트
 | **PyYAML** | YAML 검사가 구조 검사로 대체되고 `NOT CHECKED: full YAML parse (PyYAML unavailable)`가 출력됩니다. 구조 검사가 잡지 못하는 문법 오류(예: 들여쓰기 구조가 어긋난 매핑)는 그대로 커밋될 수 있습니다. |
 | **jq** | 훅이 grep 기반 대체 파서로 입력을 읽습니다. 대부분 그대로 동작하지만 이스케이프된 따옴표나 Windows 경로가 섞인 입력에서는 정확도가 떨어집니다. `validate-commit.sh`는 jq가 없으면 Python으로 명령을 해석합니다. |
 | **Python 3와 jq 모두** | 훅은 계속 실행되고(exit 0) 시크릿·자격 증명 파일 차단도 동작하지만, 설정 해석과 파일 형식 검사는 사실상 모두 빠집니다. 안전망 없이 작업하는 상태입니다. |
+| **Figma MCP 서버** | `/design-handoff`가 `NOT CHECKED — Figma MCP tools not present in this session`을 기록하고, 핸드오프 기록은 `NOT ASSESSED`(위치와 `NOT CHECKED` 줄만)가 됩니다. Figma에서 프레임을 PNG로 내보내 주면 `design/handoff/<slug>/screens/`에 참조 이미지로 남길 수 있습니다(`> **Retrieved Via**: user-supplied exports`). |
+| **Claude Design 커넥터** (로컬 CLI에는 항상 없음) | `NOT CHECKED — Claude Design connector not present in this session (use the export's "Download zip instead" bundle)`를 출력합니다. Claude Design 내보내기 대화상자에서 "Download zip instead"로 받은 번들을 넘기면 `design/handoff/<slug>/bundle/`에 원본 그대로 풀어 파일로 읽으므로, 기록은 `RETAINED`가 될 수 있습니다. |
+| **아티팩트** (`Artifact` 도구, 번들 `/design`) | `NOT CHECKED — Artifact tool not available in this session` 또는 `NOT CHECKED — /design skill not available in this session (needs artifacts)`를 출력합니다. `new <brief>`로 초안을 그릴 수 없고, 아티팩트 URL은 위치만 기록됩니다. 아트보드에서 내보낸 PNG·PDF를 넘기면 `screens/`에 남길 수 있습니다. |
 | **스택별 선택 도구** | 해당 표면의 실행·관찰 단계가 `Run result: NOT VERIFIED — <이유>`로 기록되고, UI·E2E 스토리에 필요한 스크린샷·트레이스 증거를 남길 수 없습니다(예: 웹 캡처 스크립트가 없으면 `Run result: NOT VERIFIED — no capture script (run /test-setup)`). |
 
 ## 선택 성능 설정

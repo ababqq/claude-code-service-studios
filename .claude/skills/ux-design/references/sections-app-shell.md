@@ -77,6 +77,15 @@ Base the regions on:
 
 Offer 2–3 region arrangements for the smallest and the widest breakpoint, with
 rationale based on the navigation principle and the categorization from Section A.
+With an external design source (Phase 2i — the `app-shell` handoff record,
+`design/handoff/app-shell/HANDOFF.md`), the arrangement its screens show is the
+first option: cite the screen per breakpoint from `design/handoff/app-shell/screens/`
+instead of drawing it, keep a short text description of each region arrangement, map
+frame widths to design-language breakpoints without inventing new ones, and list
+covered breakpoints the design has no frame for (and frames with no breakpoint) for
+cross-reference check 8. No usable record (none yet, or `NOT ASSESSED`) ⇒ draw the
+arrangements as text or ASCII and note `NOT CHECKED — external design not retained
+(<url>)`.
 Then record, per region: surface, breakpoint, position, contents, stickiness and
 when it hides (keyboard open, full-screen flows such as checkout).
 
@@ -122,8 +131,10 @@ Minimum set:
   version in remote config; blocking, with a store link; plus the dismissible
   soft-update variant
 
-Ask for any product-specific states (account suspended, region unavailable, plan
-expired). Every state must be triggerable on staging — by flag, remote config or a
+With an external design source, map each global state to its screen in the record's
+`## Screens & States` and list the states the design lacks as open questions — the
+shell still specifies them. Ask for any product-specific states (account suspended,
+region unavailable, plan expired). Every state must be triggerable on staging — by flag, remote config or a
 test account — so QA can verify it; note how.
 
 ---

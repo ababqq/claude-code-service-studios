@@ -56,6 +56,7 @@ writes production code or builds the walking skeleton.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; production code in code roots, the walking skeleton (routed engineers via `/walking-skeleton`), in-product fake doors (a growth experiment behind a flag via `/team-growth`) and product decisions are stated as outside it
 - [ ] Escalation path documented: scope or path disputes go to product-manager
+- [ ] A Claude Design or Figma clickable prototype is the Clickable path, owned by `/prototype` or the user; the prototyper never builds it or imports it into a code root
 - [ ] Does not make decisions outside its domain
 
 ---

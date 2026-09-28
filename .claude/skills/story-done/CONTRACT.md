@@ -18,7 +18,7 @@ Bootstrap `--keys` (exact): `review_mode,automation,workflow,story_granularity,q
 ### Files That Must Exist
 | File | Required Fields / Sections | Read-Only? |
 |------|---------------------------|-----------|
-| `production/epics/<epic-slug>/story-NNN-<slug>.md` (the story) | `> **Status**:` (expected `In Progress`, or `Ready` if `/dev-story` was skipped — `/dev-story` sets `In Progress`, and `/story-done` is the only skill that writes `Complete`), `> **Type**:`, `> **Surface**:`, `> **Manifest Version**:`, `**PRD**:`, `**Requirement**:` (TR-IDs), ADR reference, `**API Contract**:`, `**Migration**:`, `**Feature Flag**:`, `**Analytics Events**:`, `## Acceptance Criteria`, `## Test Evidence` path | No — status, `> **Last Updated**:` and `## Completion Notes` written after approval |
+| `production/epics/<epic-slug>/story-NNN-<slug>.md` (the story) | `> **Status**:` (expected `In Progress`, or `Ready` if `/dev-story` was skipped — `/dev-story` sets `In Progress`, and `/story-done` is the only skill that writes `Complete`), `> **Type**:`, `> **Surface**:`, `> **Manifest Version**:`, `**PRD**:`, `**Requirement**:` (TR-IDs), ADR reference, `**API Contract**:`, `**Migration**:`, `**Feature Flag**:`, `**Analytics Events**:`, `## Acceptance Criteria`, `## Implementation Notes` (`Design reference:` line), `## Test Evidence` path | No — status, `> **Last Updated**:` and `## Completion Notes` written after approval |
 | `docs/architecture/tr-registry.yaml` | Entry per TR-ID with current `requirement` text | Yes |
 | `design/prd/<feature-slug>.md` | `## Acceptance Criteria`; the requirement's rules in `## Functional Requirements` / `## Business Rules & Calculations`; the flag row of `## Configuration & Flags` | Yes |
 | `docs/architecture/adr-NNNN-<slug>.md` (referenced ADR) | `## Decision`, `## Consequences` (bounded reads only) | Yes |
@@ -27,6 +27,7 @@ Bootstrap `--keys` (exact): `review_mode,automation,workflow,story_granularity,q
 | API contract named by `**API Contract**` | The operation the story uses | Yes (only when the field is not `None`) |
 | `docs/data/migrations/NNNN-<slug>.md` named by `**Migration**` | `## Status` | Yes (only when the field is not `None`) |
 | `design/product/tracking-plan.md` | `## Events` rows for the story's events | Yes (only when `**Analytics Events**` is not `None`) |
+| `design/handoff/<slug>/HANDOFF.md` named by the story's `Design reference:` line | `> **Verdict**:`, `## Screens & States`; the local `screens/` files | Yes (only when the line names a record; absent ⇒ check 11 prints `Design reference: NOT CHECKED — <reason>`) |
 | `production/session-state/active.md` | Active story path and the `/dev-story` extract (changed files, run result) | No — session extract appended |
 
 ### Evidence Checked (presence checked, not pre-required — absence triggers the gate)
@@ -41,6 +42,7 @@ Bootstrap `--keys` (exact): `review_mode,automation,workflow,story_granularity,q
 - **Migration floor**: a story whose `**Migration**` is not `None` (any Type) requires `production/qa/evidence/<story-slug>/migration-dry-run.log` — Expand applied and rolled back on a disposable database — at every `qa.level` and regardless of `testing.strict.config`. Absent ⇒ BLOCKING.
 - **Run result**: the `Run result: OBSERVED | NOT VERIFIED | N/A` line (tokens unchanged; `.claude/docs/run-and-observe.md`) is read from `production/qa/evidence/<story-slug>/evidence.md`, else the `/dev-story` session extract, else `## Completion Notes`. `NOT VERIFIED` on a UI or E2E story, or on any story whose criteria name something observable, is flagged at the type's resolved gate level; a missing line is ADVISORY. Not waived at `qa.level: minimal`.
 - `<story-slug>` = the story file name without `.md`. Evidence under `production/session-logs/` (gitignored) never counts.
+- **Design reference images are never evidence.** Files under `design/handoff/` (a record's `screens/` or `bundle/`) never satisfy the UI or E2E gate; a copy of one found in the evidence directory is flagged at the type's resolved gate level.
 
 ### Preconditions
 - The story is findable by argument path, in `production/session-state/active.md`, or as an `in-progress`/`review` entry of `production/sprint-status.yaml`
@@ -65,7 +67,7 @@ Bootstrap `--keys` (exact): `review_mode,automation,workflow,story_granularity,q
 `NOT ASSESSED` outranks `COMPLETE` — one or more acceptance criteria could not be evaluated at all, which is not the same as evaluating them and finding them met. Precedence is `BLOCKED`, then `NOT ASSESSED`, then `COMPLETE WITH NOTES`, then `COMPLETE`; see the verdict section of `SKILL.md`. `NOT CHECKED — code review` caps the verdict at `COMPLETE WITH NOTES`. The verdict is recorded in the report and as `**Verdict**:` in `## Completion Notes`.
 
 ## Deviation Checks
-1 PRD rules (tier-dependent) · 2 manifest staleness · 3 ADR constraints + tech-radar forbidden patterns (tier-dependent) · 4 hardcoded values · 5 scope · 6 API contract drift (missing operation / status / required field / type mismatch ⇒ BLOCKING; undeclared response field ⇒ ADVISORY) · 7 migration plan phase state (drop or rename inside an Expand story ⇒ BLOCKING; `## Status` not updated ⇒ ADVISORY) · 8 flag default recorded (none or disagreeing ⇒ BLOCKING) · 9 no PII in new log statements (any hit ⇒ BLOCKING) · 10 tracking events present in `design/product/tracking-plan.md` (missing ⇒ ADVISORY). Checks 6–10 run at every tier whenever the story's field names something; check 9 always runs.
+1 PRD rules (tier-dependent) · 2 manifest staleness · 3 ADR constraints + tech-radar forbidden patterns (tier-dependent) · 4 hardcoded values · 5 scope · 6 API contract drift (missing operation / status / required field / type mismatch ⇒ BLOCKING; undeclared response field ⇒ ADVISORY) · 7 migration plan phase state (drop or rename inside an Expand story ⇒ BLOCKING; `## Status` not updated ⇒ ADVISORY) · 8 flag default recorded (none or disagreeing ⇒ BLOCKING) · 9 no PII in new log statements (any hit ⇒ BLOCKING) · 10 tracking events present in `design/product/tracking-plan.md` (missing ⇒ ADVISORY) · 11 design reference drift — retained captures compared with the record's `design/handoff/<slug>/screens/` (divergence ⇒ ADVISORY; never BLOCKING unless an acceptance criterion names the look; record missing, `LINK ONLY` / `NOT ASSESSED` or no captures ⇒ `Design reference: NOT CHECKED — <reason>`, verdict unchanged). Checks 6–11 run at every tier whenever the story's field names something (check 11: a `claude-design` or `figma` design reference); check 9 always runs.
 
 ## Outputs Produced
 
@@ -85,7 +87,7 @@ Bootstrap `--keys` (exact): `review_mode,automation,workflow,story_granularity,q
 - Session state always records the final verdict and the next recommended story path
 
 ## Immutability Rules
-- READS but does NOT modify: `docs/architecture/tr-registry.yaml`, ADRs (`## Decision` + `## Consequences` only), PRDs, `docs/architecture/control-manifest.md`, `docs/architecture/tech-radar.md`, the API contract, migration plans, `design/product/tracking-plan.md`, source files under the code roots (Grep only), test files (run via `commands.test` when set; never edited), evidence files
+- READS but does NOT modify: `docs/architecture/tr-registry.yaml`, ADRs (`## Decision` + `## Consequences` only), PRDs, `docs/architecture/control-manifest.md`, `docs/architecture/tech-radar.md`, the API contract, migration plans, `design/product/tracking-plan.md`, design handoff records and screens under `design/handoff/` (local only; never fetched remotely), source files under the code roots (Grep only), test files (run via `commands.test` when set; never edited), evidence files
 - MODIFIES: the story file (status, last-updated, completion notes), `production/sprint-status.yaml` (the story's entry), `production/session-state/active.md` (append), `docs/tech-debt-register.md` (append, only with approval)
 - Does NOT write to the code roots, tests or `production/qa/evidence/` under any circumstances
 
@@ -94,6 +96,7 @@ Bootstrap `--keys` (exact): `review_mode,automation,workflow,story_granularity,q
 - Never marks a Logic, Integration, UI or E2E story Complete on missing evidence when its resolved gate level is BLOCKING — BLOCKING by default and whenever `testing.strict.<key>` is `true`; ADVISORY only under an explicit `false`. A written description of a visual check is not a substitute for the capture
 - Never marks a story with `**Migration**` ≠ `None` Complete without `migration-dry-run.log` unless the user explicitly overrides a BLOCKED verdict — the floor does not consult `qa.level` or `testing.strict.config`
 - Never counts evidence under `production/session-logs/`
+- Never counts a design reference image (anything under `design/handoff/`) as evidence, and never makes design reference drift BLOCKING unless an acceptance criterion names the look
 - Never reads the gate definition files in the parent session; passes only the path and the `Pass:` items
 - Never auto-fixes failing acceptance criteria — reports them and asks
 - Never proceeds automatically to Phase 7 when the verdict is BLOCKED or NOT ASSESSED; an explicit user request routes there and still prompts

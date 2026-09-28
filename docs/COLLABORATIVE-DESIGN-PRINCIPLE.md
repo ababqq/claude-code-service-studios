@@ -512,8 +512,38 @@ agent carries the same paragraph for that case, unchanged:
 
 > **Bounded exception — orchestrated runs.** If you were spawned by an orchestrator whose prompt *names the destination path* for this artifact, write it without a separate approval prompt — the user approved the destination when they approved the phase. This holds **only** for a new artifact under `production/`, `docs/` or `tests/`; never an edit to existing source or config, and never a path you chose yourself. If you were invoked directly, or no path was named for you, ask as above.
 
-`design/` is deliberately outside the exception: product briefs, PRDs, UX specs
-and the design language always get their own "May I write" approval.
+`design/` is deliberately outside the exception: product briefs, PRDs, UX specs,
+the design language and imported designs under `design/handoff/` always get their
+own "May I write" approval.
+
+### External Writes — Figma, Claude Design, Design Artifacts
+
+Some writes never touch the repository but change shared external state that
+other people see:
+
+- writing to Figma through the Figma MCP server (`use_figma`, `create_new_file`,
+  Code Connect writes, asset uploads);
+- uploading the repo's design system to Claude Design with the bundled
+  `/design-sync` skill;
+- publishing or updating a Design artifact with the bundled `/design` skill.
+
+Each one is proposed and explicitly approved like a file write — what will
+change, where, and for whom — at **every** automation mode, `autonomous`
+included. The orchestrated bounded exception above never covers them: approving
+a phase is not approving a change to a shared Figma file or Claude Design
+project.
+
+```
+Agent: "Pushing the Moa tokens to Figma would update the shared variable
+        collection 'Moa / Semantic' in https://www.figma.com/design/<fileKey>/Moa
+        (14 color variables, 6 spacing variables). Everyone on that file sees it.
+        This is an external write — should I propose it through Figma's own
+        skill, or leave Figma unchanged?"
+```
+
+CCSS skills themselves never write to Figma or Claude Design: they read
+external designs into `design/handoff/<slug>/` with `/design-handoff`, and name
+the user-run bundled or plugin skill when a write back is wanted.
 
 ### Incremental Section Writing (Design Documents)
 

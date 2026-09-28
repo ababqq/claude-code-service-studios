@@ -274,8 +274,8 @@ Schema validation: ERRORS
    form) and print its output verbatim under the heading `What skills receive:`.
    It is exactly the block every skill's bootstrap resolves, including the derived
    lines no single leaf shows — the `stack` line with its specialist routing, the
-   `surfaces`, `compliance`, `accessibility` and `release.distribution` lines with
-   their "unset -- ask" forms — and its `notes:` line names every value resolution
+   `surfaces`, `compliance`, `accessibility`, `design` and `release.distribution`
+   lines with their "unset -- ask" forms — and its `notes:` line names every value resolution
    rejected or dropped. That line is never silent: `notes: none` when nothing was
    rejected.
 

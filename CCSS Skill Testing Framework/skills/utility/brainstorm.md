@@ -202,7 +202,7 @@ These should pass before any behavioral testing:
 
 **Expected behavior:**
 1. Phase 5 spawns `product-director` for **PD-PRINCIPLES** with `Pass: brief path (draft) · drafted principles & anti-goals text · target users & JTBD summary · named alternatives`; the prompt tells the agent to read `.claude/docs/director-gates/pd-principles.md` first
-2. Phase 6 spawns `design-director` for **DD-BRAND-DIRECTION** with ``Pass: brief path · product principles text · target users · resolved `surfaces` line``; on `OPTIONS` the user picks via `AskUserQuestion` (one option per direction, `Combine elements across directions`, `Describe my own direction`)
+2. Phase 6 spawns `design-director` for **DD-BRAND-DIRECTION** with ``Pass: brief path · product principles text · target users · resolved `surfaces` line``; on `OPTIONS` the user picks via `AskUserQuestion` (one option per direction, `Combine elements across directions`, `Describe my own direction`); before choosing, the user visualises the directions in a Claude Design project and pastes `https://claude.ai/design/p/moa-brand`, which is written as `- **Visual reference**: https://claude.ai/design/p/moa-brand` in `## Brand Direction Anchor` (`"none"` when nothing was visualised)
 3. Phase 9 spawns **TD-FEASIBILITY** (``Pass: one-line concept "<category> service on <surfaces> using <stack>" · riskiest assumptions list · resolved `stack` line (or "unset") · resolved `compliance` line``) and **DM-SCOPE** (``Pass: MVP scope text (brief, one-pager or feature map path) · resolved `team.size` · target milestone/date (or "none given")``) in parallel
 4. `[DM-SCOPE]: CONCERNS` is surfaced via `AskUserQuestion`: `Revise flagged items` / `Accept and proceed` / `Discuss further`
 5. Each outcome is recorded, e.g. `> **Product Director Review (PD-PRINCIPLES)**: APPROVED 2026-10-02`, or `CONCERNS (accepted)` / `REVISED`
@@ -212,6 +212,7 @@ These should pass before any behavioral testing:
 - [ ] The parent never reads a gate file itself
 - [ ] A CONCERNS-class verdict is surfaced via AskUserQuestion (revise / accept / discuss)
 - [ ] The skill does not auto-advance past a CONCERNS-class or REJECT-class verdict
+- [ ] Only the visual-reference URL is recorded — the skill writes no snapshot files and nothing under `design/handoff/`; the bundled `/design` skill is named only conditionally, as a tool the user runs
 
 **Case Verdict**: PASS / FAIL / PARTIAL
 

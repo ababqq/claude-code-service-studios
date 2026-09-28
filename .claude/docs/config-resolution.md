@@ -118,6 +118,7 @@ platform.surfaces: web, ios, android, api (project.yaml)
 release.distribution: web+stores (project.yaml)
 compliance: regions=kr handles_pii=true (project.yaml)
 accessibility.target: wcag-aa (project.yaml)
+design.tool: figma file_url=https://www.figma.com/design/<fileKey>/Moa (project.yaml)
 notes: none
 Values above are fully resolved (local -> yaml -> rigor -> default). Use as-is.
 An inline --review flag, if passed, overrides review_mode.
@@ -170,6 +171,7 @@ does not exist must not silently run on defaults.
 | `distribution` (also accepted: `release.distribution`) | `release.distribution: <v> (project.yaml)` or `release.distribution: (unset -- ask how this release ships)` | chain; not locally overridable; no default |
 | `compliance` | `compliance: regions=kr,eu handles_pii=true (project.yaml)`; `regions=none` for `[]`; each unset part prints `(unset -- ask)` | array-element enum + chain for `privacy.handles_pii` |
 | `accessibility` | `accessibility.target: <v> (project.yaml)` or `accessibility.target: (unset -- ask; unset is not none)` | chain; no default |
+| `design` | exactly one line: `design.tool: claude-design project_url=<url\|unset> (project.yaml)`, `design.tool: figma file_url=<url\|unset> (project.yaml)`, `design.tool: none (project.yaml)` or `design.tool: (unset -- ask; unset is not none)` | chain for `design.tool`; not locally overridable; no default; only the chosen tool's URL is printed, read from `project.yaml` |
 
 ### `stack` line
 
@@ -352,17 +354,19 @@ table in `.claude/docs/coding-standards.md`. `resolve_config` therefore reports
 only the *configured state* (`unset` where absent) and each skill applies its own
 default. The script resolves **sources**; the skill owns **policy**.
 
-**Unset means "ask" for five keys.** `platform.surfaces`,
-`release.distribution`, `compliance.regions`, `privacy.handles_pii` and
-`accessibility.target` have no default anywhere, and their labels say so in the
-line itself (`(unset -- ask …)`). Obligation 2 of
+**Unset means "ask" for six keys.** `platform.surfaces`,
+`release.distribution`, `compliance.regions`, `privacy.handles_pii`,
+`accessibility.target` and `design.tool` have no default anywhere, and their
+labels say so in the line itself (`(unset -- ask …)`). Obligation 2 of
 `.claude/rules/skill-authoring.md` — absence is not a permissive default — is
 why: a default of `web`, `[]`, `false` or `none` would make the question
-unaskable, and `unset` is not `false` (PII) and not `none` (accessibility).
+unaskable, and `unset` is not `false` (PII) and not `none` (accessibility, design
+tool).
 
-**The stack is `project.yaml` only.** `stack`, `code_roots`, `surfaces` and
-`compliance` never read `project.local.yaml` — the stack, the surfaces and the
-regulatory scope are project facts that every developer shares.
+**The stack is `project.yaml` only.** `stack`, `code_roots`, `surfaces`,
+`compliance` and `design` never read `project.local.yaml` — the stack, the
+surfaces, the regulatory scope and the design tool are project facts that every
+developer shares.
 
 Keys that have **no** label — `performance.*` budgets, `testing.patterns`,
 `testing.framework`, `naming.*`, `commands.*`, `localization.locales`,
@@ -462,6 +466,10 @@ directory. The properties worth re-checking after any edit:
   `compliance.regions: []` prints `regions=none`; `release.distribution: steam`
   prints the unset form with a note; `release.distribution` in
   `project.local.yaml` only is ignored with a "not locally overridable" note.
+- `design.tool: sketch` prints `design.tool: (unset -- ask; unset is not none)`
+  and names `sketch` on `notes:`; `design.tool` in `project.local.yaml` only is
+  ignored with a "not locally overridable" note; `design.tool: figma` without
+  `design.figma.file_url` prints `file_url=unset`.
 - The expansion stays *reachable* (`/start` asks about `rigor`) and *legible*
   (`/settings` reports derived values rather than "(not set)"). A correct
   expansion nobody is asked about and no view displays would be worth nothing.

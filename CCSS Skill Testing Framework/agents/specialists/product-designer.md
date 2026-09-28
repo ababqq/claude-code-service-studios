@@ -55,6 +55,7 @@ director gate — design-director reviews its specs through DD-UI-CONSISTENCY.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; brand and design-language decisions (design-director), implementation code (frontend-engineer, mobile-engineer, design-engineer), final copy (ux-writer), business rules and PRD scope (product-manager, business-analyst) and the API contract (tech-lead) are stated as outside it
 - [ ] Escalation path documented: design conflicts to design-director; region-rule conflicts flagged to product-manager
+- [ ] `### Design tools` in `## UX Design Standards`: with `design.tool` `claude-design` or `figma`, hi-fi visuals live in the tool and the UX spec stays the behavioural contract; the spec records `> **Design Source**:` and a frame or screen per state; a state missing in the design is a design gap, not an implementation choice; the agent cannot call MCP, connector or Artifact tools, records the links it is given, and asks before every write under `design/`
 - [ ] Does not make decisions outside its domain
 
 ---

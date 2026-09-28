@@ -44,6 +44,8 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] Verdict keywords `COMPLETE`, `BLOCKED` and the run-level `NOT ASSESSED`; the could-not-assess value `NOT ASSESSED (no VERSION.md risk rating)` present
 - [ ] The story template reproduces the story header contract line for line: `# Story NNN: [title]`, `> **Epic**:`, `> **Status**: Ready`, `> **Layer**:`, `> **Type**: [Logic | Integration | UI | E2E | Config]`, `> **Surface**: [web | ios | android | mobile | api | admin | infra | analytics] (comma list allowed; first = primary)`, `> **Estimate**:`, `> **Manifest Version**:`, `> **Last Updated**:`, then `**PRD**:`, `**Requirement**:`, `**ADR Governing Implementation**:`, `**ADR Decision Summary**:`, `**ADR Version**:`, `**Stack**: … | **Risk**:`, `**Stack Notes**:`, `**API Contract**:`, `**Migration**:`, `**Feature Flag**:`, `**Analytics Events**:`, `**ML**:`
 - [ ] Body sections `## Acceptance Criteria`, `## Implementation Notes`, `## Out of Scope`, `## QA Test Cases`, `## Test Evidence`, `## Dependencies` present
+- [ ] `## Implementation Notes` has the `- UX spec:` bullet followed directly by `` - Design reference: [none — markdown spec only | claude-design — <locator> · record `design/handoff/<slug>/HANDOFF.md` | figma — <node URL> · record `design/handoff/<slug>/HANDOFF.md`] — [the frames / screens for the states this story implements] *(UI and E2E stories; write "N/A — no user-facing surface" otherwise)* ``; no `**Design …**` bold header field is added
+- [ ] Step 2's `design/ux/*.md` read names the `> **Design Source**:` header line; the fallback `Design reference: NOT CHECKED — <spec> has no Design Source line (run /ux-design <slug>)` is present
 - [ ] `## Test Evidence` names the five `testing.strict` keys `logic`, `integration`, `ui`, `e2e`, `config` and the migration floor `production/qa/evidence/[story-slug]/migration-dry-run.log` "required at every `qa.level` and regardless of `testing.strict.config`"
 - [ ] Write prompts present: "May I write these [N] stories to `production/epics/<epic-slug>/`?", "May I write this to `production/epics/<epic-slug>/EPIC.md`?", "May I write this to `production/epics/index.md`?", "May I write this to `production/epics/<epic-slug>/story-NNN-<slug>.md`?" (gate results)
 - [ ] QL-STORY-READY review-mode check carries the lean suffix sentence; the spawn has `` Pass: story path · PRD path · resolved `testing.strict` line ``; replies are parsed as `[QL-STORY-READY]: TOKEN`
@@ -143,6 +145,7 @@ entity `savings_goal` with `docs/data/migrations/0003-savings-goal.md`, flag
 - [ ] Risk is `NOT ASSESSED (no VERSION.md risk rating)` — no level is guessed (downstream treats it as HIGH)
 - [ ] With the one-pager absent it reports "No `design/product/one-pager.md` — run `/brainstorm` first" and stops with Verdict NOT ASSESSED
 - [ ] A successful minimal run ends COMPLETE (the Risk field's NOT ASSESSED is input-level)
+- [ ] A UI story with no backing UX spec in `design/ux/` carries `Design reference: NOT CHECKED — <reason>`, never `none`
 
 ---
 
@@ -226,6 +229,28 @@ entity `savings_goal` with `docs/data/migrations/0003-savings-goal.md`, flag
 
 ---
 
+### Case 9: Design Tool — a Figma-designed UI story
+
+**Fixture:**
+- Case 1 fixture; `design/ux/goal-detail.md` carries
+  ``> **Design Source**: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md` ``
+- `design/ux/goal-list.md` predates the header and has no `> **Design Source**:` line
+
+**Input:** `/create-stories goals-core`
+
+**Expected behavior:**
+1. Step 2 reads each relevant UX spec's `> **Design Source**:` line
+2. The goal-detail UI story's `## Implementation Notes` has the `- UX spec:` bullet naming `design/ux/goal-detail.md` and directly below it
+   ``- Design reference: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md` — [frames for the states this story implements]``
+3. The goal-list story gets `Design reference: NOT CHECKED — design/ux/goal-list.md has no Design Source line (run /ux-design goal-list)`
+
+**Assertions:**
+- [ ] The first token and the record path are copied unchanged from the UX spec; no handoff-prompt text is copied
+- [ ] The story header is unchanged — no new bold field; the Integration and Logic stories write `Design reference: N/A — no user-facing surface`
+- [ ] A spec with no Design Source line never yields `none — markdown spec only`
+
+---
+
 ## Protocol Compliance
 
 - [ ] All inputs load before the story list is shown; the full list is shown before any write
@@ -245,6 +270,9 @@ entity `savings_goal` with `docs/data/migrations/0003-savings-goal.md`, flag
   per-file approvals for EPIC.md, the index and gate results — Cases 1, 6; the skill's
   "ask once" rule for the story set is intentional and is what this spec asserts), P4
   (QL-STORY-READY per review mode — Cases 6–8), P5 (inputs read before writing — Case 1).
+- The `Design reference:` line (copied from the UX spec's `> **Design Source**:` line) is
+  exercised for `figma` and for a spec without the line (Case 9); `claude-design` and `none`
+  follow the same copy rule and are not fixture-tested.
 - The "prefer an existing QA plan" branch (`## Automated Tests Required` of the latest
   `production/qa/qa-plan-*.md`) is not fixture-tested.
 - `story_granularity` targets (5–10 / 2–4 / 1 AC per story) are exercised only at

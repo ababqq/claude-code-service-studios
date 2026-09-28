@@ -54,6 +54,7 @@ choices, Play publishing, server logic and product decisions are outside it.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; mobile architecture decisions (mobile-specialist), billing-program and store-policy decisions, Play publishing and staged rollout, server logic and the API contract, and product, UX and copy decisions are stated as outside it
 - [ ] Escalation path documented: escalates to mobile-specialist
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — layout and visual reference only, rebuilt with Compose/Material 3 components and semantic tokens — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never publishes to Play tracks or commits keystores and signing passwords
 
 ---

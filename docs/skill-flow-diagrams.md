@@ -204,8 +204,11 @@ flowchart TD
     inv["/ui-inventory (선택)"] -.-> invd[("design/inventory/screen-inventory.md")]
     dl["/design-language<br/>DD-BRAND-DIRECTION · DD-DESIGN-LANGUAGE"] --> dld[("design/brand/design-language.md")]
     dld --> ux["/ux-design shell · patterns · 핵심 화면"]
+    dh["/design-handoff (선택)<br/>Claude Design 핸드오프 · zip 번들<br/>/design 아티팩트 · Figma 노드"] -.-> dhd[("design/handoff/slug/HANDOFF.md<br/>bundle/ · screens/")]
+    dhd -.->|"Design Source 줄"| ux
     ux --> uxd[("design/ux/app-shell.md · interaction-patterns.md<br/>design/ux/*.md")]
     uxd --> uxr["/ux-review<br/>DD-UI-CONSISTENCY"]
+    dhd -.->|"Design Source Parity"| uxr
     uxr --> uxv{"판정"}
     uxv -->|"NEEDS REVISION · MAJOR REVISION NEEDED"| ux
     uxv -->|"APPROVED"| rec["/api-design reconcile<br/>(full 필수 · 백엔드와 UI)"]
@@ -335,9 +338,12 @@ flowchart TD
 flowchart TD
     prd[("PRD의 UI Requirements")] --> ux["/ux-design [화면]"]
     dl[("design/brand/design-language.md")] --> ux
+    dh["/design-handoff (선택)<br/>Claude Design · /design · Figma"] -.-> dhd[("design/handoff/slug/HANDOFF.md<br/>screens/")]
+    dhd -.-> ux
     ux --> uxd[("design/ux/*.md<br/>상태 · 브레이크포인트 · API Data · 이벤트")]
     uxd --> uxr["/ux-review"]
     uxr -->|"APPROVED"| tui["/team-ui feature"]
+    dhd -.->|"로컬 경로로 브리프"| tui
     tui --> pd["product-designer<br/>명세 확인 · 보완"]
     pd --> de["design-engineer<br/>토큰 · 컴포넌트"]
     de --> fe["frontend-engineer · mobile-engineer<br/>구현"]
@@ -347,7 +353,9 @@ flowchart TD
 ```
 
 `/team-ui`의 참여 인원은 `team.size`에 따라 달라집니다(위 그림은 `small` 기준). 화면을 새로 만들거나 바꿀 때는 구현
-전에 `/ux-design`으로 명세부터 씁니다.
+전에 `/ux-design`으로 명세부터 씁니다. Claude Design이나 Figma로 그린 화면은 `/design-handoff`로 먼저 가져옵니다.
+외부 도구는 메인 세션이 읽고, 에이전트에게는 `design/handoff/<slug>/`의 로컬 경로만 넘깁니다. 디자인 산출물은
+참고이며, UX 명세와 디자인 언어가 우선합니다.
 
 ---
 
@@ -555,6 +563,7 @@ flowchart TD
 | 아키텍처 단계 | `/create-architecture` → `/architecture-decision` → `/api-design new` → `/data-model` |
 | 테스트 기반 세팅 | `/test-setup` → `/test-helpers` |
 | UX 설계 시작 | `/design-language` → `/ux-design shell` → `/ux-design <화면>` |
+| Claude Design·Figma로 화면을 그림 | `/design-handoff <핸드오프 프롬프트 · 번들 · URL> --for <화면>` → `/ux-design <화면>` → `/ux-review <명세>` |
 | Sprint 0 | `/walking-skeleton` → `/gate-check build` |
 | 스토리가 있고 개발을 시작 | `/story-readiness <story>` → `/dev-story <story>` |
 | 스토리 구현을 마침 | `/story-done <story>` |

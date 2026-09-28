@@ -17,7 +17,9 @@ tests, applies the per-type evidence gate (`testing.strict.logic`, `.integration
 `.e2e`, `.config`, relaxed by `qa.level`), and always enforces the **migration floor** and
 the **run result**. Deviation checks cover PRD rules, manifest staleness, ADR constraints,
 hardcoded values, scope, API contract drift, migration phase state, flag default, PII in
-new log statements and tracking events. Code review never disappears: **TL-CODE-REVIEW**
+new log statements, tracking events and — ADVISORY only — design reference drift (captures
+compared with the story's `design/handoff/<slug>/screens/`; reference images never count as
+evidence). Code review never disappears: **TL-CODE-REVIEW**
 at `full`, otherwise an inline `/code-review` checklist; **QL-TEST-COVERAGE** reviews
 coverage at `full`. With approval it sets `> **Status**: Complete`, appends
 `## Completion Notes`, sets the story's `production/sprint-status.yaml` entry to
@@ -42,6 +44,9 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] Verdict line `### Verdict: COMPLETE / COMPLETE WITH NOTES / NOT ASSESSED / BLOCKED` and the precedence BLOCKED, then NOT ASSESSED, then COMPLETE WITH NOTES, then COMPLETE
 - [ ] The evidence table has the five types `Logic`, `Integration`, `UI`, `E2E`, `Config` with keys `testing.strict.logic` … `testing.strict.config`; Config's default is ADVISORY with the `/smoke-check` BLOCKING exception kept
 - [ ] The migration floor names `production/qa/evidence/<story-slug>/migration-dry-run.log`, "at every `qa.level` and regardless of `testing.strict.config`", absent ⇒ BLOCKING
+- [ ] The UI evidence check states that files under `design/handoff/` are design references and never count as evidence
+- [ ] Phase 4 has check 11 **Design reference drift** — ADVISORY, never BLOCKING unless an acceptance criterion names the look, `Design reference: NOT CHECKED — <reason>` when it cannot run — and the tier sentence reads "Checks 6–11 run at every tier whenever the story's field names something (a contract, a migration, a flag, events, a design reference); check 9 always runs."
+- [ ] The report's `### Contract, Migration, Flag, Privacy, Events` block has a `- Design reference:` line
 - [ ] The run-result check reads the `Run result:` line (`OBSERVED | NOT VERIFIED | N/A`) and is not waived at `qa.level: minimal`
 - [ ] The inline code-review line is exactly `Code review: inline checklist (TL-CODE-REVIEW skipped — <Mode> mode)`, and `NOT CHECKED — code review` caps the verdict at COMPLETE WITH NOTES
 - [ ] Code scans report `NOT CHECKED — no code root resolved (set stack.layers.<layer>.root via /setup-stack)` when `code_roots` is unresolved
@@ -94,7 +99,7 @@ Fixtures use the Moa example story `production/epics/goals-core/story-001-create
 **Expected behavior:**
 1. Reads the story, greps `id: TR-goals-001` for the current requirement text, bounded-reads ADR-0006 `## Decision` and `## Consequences`
 2. Verifies each criterion (runs the story's tests through `commands.test`), builds the traceability table, applies the Integration evidence gate, the migration floor and the run-result check
-3. Runs deviation checks 1–10 — all clean; runs QL-TEST-COVERAGE then TL-CODE-REVIEW
+3. Runs deviation checks 1–11 — all clean (check 11 N/A: no design reference on an `api` story); runs QL-TEST-COVERAGE then TL-CODE-REVIEW
 4. Presents the full `## Story Done:` report with Verdict **COMPLETE**
 5. Asks the Phase 7 question ("Verification complete. How do you want to proceed?") and, on `Close the story — update the story file and production/sprint-status.yaml, log notes (Recommended)`, updates both files
 6. Suggests a commit and surfaces the next ready story
@@ -102,7 +107,7 @@ Fixtures use the Moa example story `production/epics/goals-core/story-001-create
 **Assertions:**
 - [ ] Requirement text comes from `docs/architecture/tr-registry.yaml`, not the story's quoted text
 - [ ] Criteria are listed with pass / FAILS / DEFERRED status and a traceability table (COVERED / UNTESTED)
-- [ ] The report's `### Contract, Migration, Flag, Privacy, Events` block shows each of the five checks
+- [ ] The report's `### Contract, Migration, Flag, Privacy, Events` block shows each of the six lines (the design reference line reads `N/A — none or no user-facing surface`)
 - [ ] `## Completion Notes` carries `**Verdict**: COMPLETE`, `**Migration Dry-Run**:`, `**Run Result**:` and `**Code Review**: TL-CODE-REVIEW: APPROVE`
 - [ ] `production/sprint-status.yaml` entry becomes `status: done` with `completed:` and the top-level `updated:` — hyphenated status values only
 - [ ] No file is edited before the Phase 7 answer
@@ -239,6 +244,30 @@ Fixtures use the Moa example story `production/epics/goals-core/story-001-create
 
 ---
 
+### Case 9: Design Tool — reference images and design drift
+
+**Fixture:**
+- Story `production/epics/goals-core/story-004-goal-detail-web.md`: Type UI, Surface `web`, no acceptance criterion names the look; its `## Implementation Notes` has
+  ``- Design reference: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md` — empty, filled, error``
+- `design/handoff/goal-detail/HANDOFF.md` with `> **Verdict**: RETAINED` and `screens/01-empty.png`, `02-filled.png`, `03-error.png`
+- (9a) `production/qa/evidence/story-004-goal-detail-web/` holds real captures `01-empty-desktop.png` … `03-error-mobile.png`; the error capture places the retry button below the fold where the reference shows it inline
+- (9b) the evidence directory holds only copies of the three reference screens
+- (9c) as 9a, but the record's verdict is `> **Verdict**: NOT ASSESSED` (no `screens/`)
+
+**Input:** `/story-done production/epics/goals-core/story-004-goal-detail-web.md`
+
+**Expected behavior:**
+1. (9a) The UI gate is satisfied by the captures; check 11 lists the retry-button position as **ADVISORY** drift → at most COMPLETE WITH NOTES, never BLOCKED on that ground
+2. (9b) The reference copies are not captures: "Reference image `[path]` found in the evidence directory; it is a design reference, not a capture of the running product." — flagged at the UI gate level (BLOCKING by default) → **BLOCKED**
+3. (9c) Check 11 prints `Design reference: NOT CHECKED — <reason>`; the verdict is unchanged by it
+
+**Assertions:**
+- [ ] No file under `design/handoff/` ever counts as UI evidence
+- [ ] Design drift never becomes BLOCKING while no acceptance criterion names the look
+- [ ] No remote design URL is fetched; the record and screens are read as local files
+
+---
+
 ## Protocol Compliance
 
 - [ ] Presents the full report (criteria, traceability, evidence, deviations, code review, scope) before asking anything that writes
@@ -252,8 +281,8 @@ Fixtures use the Moa example story `production/epics/goals-core/story-001-create
 
 ## Coverage Notes
 
-- Readiness rubric mapping: RD1 (criteria, evidence, ten deviation checks, code review —
-  Cases 1–3), RD2 (four verdicts and precedence — Cases 1–4), RD3 (BLOCKED for contract,
+- Readiness rubric mapping: RD1 (criteria, evidence, eleven deviation checks, code review —
+  Cases 1–3, 9), RD2 (four verdicts and precedence — Cases 1–4), RD3 (BLOCKED for contract,
   PRD and migration-floor breaks — Cases 2, 4), RD4 (TL-CODE-REVIEW and QL-TEST-COVERAGE
   per review mode — Cases 6–8), RD5 (next-story surfacing — Case 1).
 - The UI evidence sub-checks (captures beside `evidence.md`, pending sign-off rows) and the

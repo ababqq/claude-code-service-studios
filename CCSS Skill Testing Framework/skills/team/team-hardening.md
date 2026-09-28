@@ -43,6 +43,7 @@ These should pass before any behavioral testing:
 - [ ] Contains verbatim: "Team skills spawn only the gates `.claude/docs/director-gates.md` § Gate Index lists this skill under (Spawned by column), after the review-mode check (lean suffix rule); team-size scoping never removes a director gate."
 - [ ] States that for `/team-hardening` that column is empty — no director gate runs at any review mode — and that `review_mode` decides only whether the adversarial review pass runs (`full` → it runs; `lean` or `solo` → `Adversarial review skipped — <Mode> mode`)
 - [ ] Active set per `team.size` is given as a table (`individual`: `performance-engineer`; `small`: `performance-engineer` ∥ `sre-engineer` ∥ `security-engineer` ∥ `accessibility-specialist` → `qa-engineer`; `studio`: + `design-engineer`, routed stack leads, adversarial review) and announced before Phase 1; the same line goes into the report header
+- [ ] The design-engineer `## UI Consistency` block also compares specs whose `> **Design Source**:` names `claude-design` or `figma` with their record `design/handoff/<slug>/HANDOFF.md` screens, and a missing, unreadable, `NOT ASSESSED` or unretained record yields `NOT CHECKED — external design not retained (<url>)`; no agent calls a design tool and `--keys` is unchanged
 - [ ] Without an argument, outputs "Usage: `/team-hardening [feature, area or release]` — …" directly (no `AskUserQuestion`) and exits without spawning agents
 - [ ] Has an Error Recovery Protocol section (a report path that is not on disk after the write is a failed phase) and a File Write Protocol section
 - [ ] No `!` injection other than the bootstrap line; no `file:line` citations of other files
@@ -242,6 +243,29 @@ of `SKILL.md`; at run time the model renders them in the user's conversation lan
 - [ ] Bug numbers continue from the highest existing four-digit number
 - [ ] Drafts are written only after the combined "May I write" approval
 - [ ] The unresolved S2 is a Condition that must close before launch; an unresolved S1 would be a Blocker
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
+### Case 8: External design source in UI Consistency
+
+**Fixture:**
+- As Case 4 variant B (`team.size: studio`)
+- `design/ux/goal-detail.md` has `> **Design Source**: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md``; that record is `RETAINED` with `screens/default-sm.png`; the implemented empty state uses a different illustration from the record screen
+- `design/ux/goal-create.md` has `> **Design Source**: claude-design — https://claude.ai/design/p/<PROJECT_ID>?file=GoalCreate.dc.html · record `design/handoff/goal-create/HANDOFF.md``; that record is `NOT ASSESSED`
+
+**Input:** `/team-hardening release 1.0.0`
+
+**Expected behavior:**
+1. `design-engineer` receives the record and `screens/` paths (it calls no design tool) and lists the goal-detail deviation as a Note or Condition, not a Blocker on its own
+2. For goal-create, `## UI Consistency` carries `NOT CHECKED — external design not retained (https://claude.ai/design/p/<PROJECT_ID>?file=GoalCreate.dc.html)` under `Not checked:`, never a match
+3. Variant `team.size: small`: the comparison is listed under `Not checked` with `design-engineer` named
+
+**Assertions:**
+- [ ] The NOT CHECKED line is exact and appears in the report
+- [ ] A `NOT ASSESSED` record is never reported as matching the implementation
+- [ ] The deviation alone does not make the verdict NOT READY
 
 **Case Verdict**: PASS / FAIL / PARTIAL
 

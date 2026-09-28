@@ -145,7 +145,9 @@ For `standard`/`full` (a `/create-epics` epic exists), read in full (these are s
 - `design/product/tracking-plan.md` — the `## Events` rows whose Owner PRD is this
   epic's PRD
 - `design/ux/*.md` — the UX specs of the screens and flows this epic's UI work
-  implements (Glob, then read the relevant ones' states and `## API Data`)
+  implements (Glob, then read the relevant ones' states, `## API Data` and
+  `> **Design Source**:` header line — the story's `Design reference:` line is
+  copied from it)
 - `docs/stack-reference/VERSION.md` — pinned components and Knowledge Risk (the
   story's `**Stack**` and `**Risk**` when the ADR is silent)
 - `project.yaml` — `testing.patterns` (read with Read; it has no `resolve_config`
@@ -340,6 +342,7 @@ from the highest existing `story-NNN` in the directory + 1 — never reuse a num
 > - **Migration** → the plan path when `docs/data/migrations/` has one for this item, else `None`
 > - **Feature Flag** → the flag key when the one-pager names one, else `None`
 > - **Analytics Events** → the event the one-pager's `## Success Signal` names, else `None`
+> - **UX spec** and **Design reference** (`## Implementation Notes`) → filled exactly as at every other tier: the UX spec in `design/ux/` that backs this item and the reference copied from its `> **Design Source**:` line; with no such UX spec, or a spec without that line, write `Design reference: NOT CHECKED — <reason>` — never `none`, which is a recorded choice, not a default
 > - The Acceptance-Criteria source line → "From `design/product/one-pager.md` (the **`## Core User Journey`** and **`## Success Signal`** sections + the Build Order item this story implements), scoped to this story" — derive concrete, testable ACs from what the user wrote there rather than inventing them from a bare Build Order line
 > - The **`## QA Test Cases`** section → on any run where the QL-STORY-READY / qa-lead gate is skipped (`lean`/`solo` review mode — the `minimal` rigor default resolves to `solo`) no qa-lead specs are authored; write the skip note as its first line and "*N/A — no qa-lead specs at this tier; implement against the Acceptance Criteria above*" rather than improvising test cases.
 > - Any **Test Evidence / DoD** line is governed by `qa.level`, not this template — at `qa.level: minimal` it is **waived** (advisory, never "must exist and pass"). The migration floor is the exception: it applies at every `qa.level`.
@@ -399,6 +402,7 @@ from the highest existing `story-NNN` in the directory + 1 — never reuse a num
 change meaning. This is what the engineer reads instead of the ADR.]
 
 - UX spec: `design/ux/[screen-or-flow].md` — [the states this story implements] *(UI and E2E stories; write "N/A — no user-facing surface" otherwise)*
+- Design reference: [none — markdown spec only | claude-design — <locator> · record `design/handoff/<slug>/HANDOFF.md` | figma — <node URL> · record `design/handoff/<slug>/HANDOFF.md`] — [the frames / screens for the states this story implements] *(UI and E2E stories; write "N/A — no user-facing surface" otherwise)*
 
 ---
 
@@ -464,6 +468,16 @@ replace it with the recorded outcome and the specs.
 `[story-slug]` in the evidence paths is the story file name without `.md`
 (`story-001-create-goal`) — the `<story-slug>` of `.claude/docs/coding-standards.md`;
 write the concrete path into each story.
+
+The `Design reference:` line is copied from the `> **Design Source**:` line of the
+UX spec named on the `UX spec:` line — its first token (`none`, `claude-design` or
+`figma`) and its record path unchanged — then narrowed to the frames or screens of
+the states this story implements. Copy the locator and the record path only, never
+the text of a pasted handoff prompt. When the UX spec has no `> **Design Source**:`
+line, write
+`Design reference: NOT CHECKED — <spec> has no Design Source line (run /ux-design <slug>)`
+— never `none`: `none` is a recorded choice, and an unrecorded source is not one.
+The line is a bullet, not a header field; the story header contract is unchanged.
 
 Omit the `**ML**:` line for every story that does not implement an ML/LLM
 capability. Test file names follow the convention `testing.patterns` records

@@ -502,6 +502,7 @@ team.size::individual|small|studio
 performance.enforce::warn|block|off
 release.distribution::web|stores|web+stores|enterprise|internal
 accessibility.target::none|wcag-a|wcag-aa|wcag-aaa
+design.tool::claude-design|figma|none
 project.stage::Discovery|Definition|Architecture|Validation|Build|Hardening|Launch
 testing.strict.logic::true|false
 testing.strict.integration::true|false
@@ -1220,7 +1221,7 @@ EOF
 #   whose default legitimately differs between skills (testing.strict.*) is
 #   reported as configured-or-unset and left to the skill to default, and
 #   anything whose unset state means "ask the user" (surfaces, distribution,
-#   compliance, accessibility) is reported as unset, never defaulted.
+#   compliance, accessibility, design) is reported as unset, never defaulted.
 # =============================================================================
 
 # Terminal defaults. ONLY knobs whose default is uniform across every consumer.
@@ -1230,10 +1231,10 @@ EOF
 # Emitting one value here would silently pick a winner between them.
 #
 # release.distribution, platform.surfaces, compliance.regions,
-# privacy.handles_pii and accessibility.target are ABSENT for a different
-# reason: their unset state means "ask" (obligation 2 of skill-authoring.md --
-# absence is not a permissive default). A default of `web`, `[]`, `false` or
-# `none` would make the question unaskable.
+# privacy.handles_pii, accessibility.target and design.tool are ABSENT for a
+# different reason: their unset state means "ask" (obligation 2 of
+# skill-authoring.md -- absence is not a permissive default). A default of
+# `web`, `[]`, `false` or `none` would make the question unaskable.
 #
 # The six knobs `rigor` fronts (modes.workflow, docs.density, qa.level,
 # modes.story_granularity, modes.review_mode, team.size) are ALSO absent: their
@@ -2033,7 +2034,7 @@ PYEOF
 #   qa.level, team.size, project.stage, automation_always_ask, testing.strict,
 #   performance.enforce, feature_overrides, stack, code_roots, surfaces,
 #   distribution (also accepted as release.distribution), compliance,
-#   accessibility.
+#   accessibility, design.
 # An unknown label prints nothing and is named on `notes:` -- a skill asking for
 # a label that does not exist must not silently run on defaults.
 #
@@ -2097,7 +2098,7 @@ resolve_config() {
       case "$lbl" in
         rigor|review_mode|automation|workflow|docs.density|story_granularity|qa.level|team.size|project.stage) ;;
         automation_always_ask|testing.strict|performance.enforce|feature_overrides) ;;
-        stack|code_roots|surfaces|distribution|release.distribution|compliance|accessibility) ;;
+        stack|code_roots|surfaces|distribution|release.distribution|compliance|accessibility|design) ;;
         *) unknown="${unknown:+$unknown, }$lbl" ;;
       esac
     done
@@ -2393,6 +2394,29 @@ EOF
     else
       echo "accessibility.target: (unset -- ask; unset is not none)"
     fi
+  fi
+
+  # design: the external design tool, a scalar enum through resolve_setting,
+  # plus the chosen tool's project-level URL read from project.yaml. Locked to
+  # project.yaml (it decides which design artifacts exist on disk), so a value
+  # in project.local.yaml is ignored and named on `notes:` by
+  # validate_local_scope. NO DEFAULT: unset is not `none` -- it means ask.
+  if _rc_want design; then
+    local dt_url
+    v=$(resolve_setting design.tool)
+    s="${v#*$tab}"; v="${v%%$tab*}"
+    case "$v" in
+      claude-design)
+        dt_url=$(_yaml_helper_lv_scalar "$lv" design.claude_design.project_url)
+        echo "design.tool: $v project_url=${dt_url:-unset} ($s)" ;;
+      figma)
+        dt_url=$(_yaml_helper_lv_scalar "$lv" design.figma.file_url)
+        echo "design.tool: $v file_url=${dt_url:-unset} ($s)" ;;
+      none)
+        echo "design.tool: none ($s)" ;;
+      *)
+        echo "design.tool: (unset -- ask; unset is not none)" ;;
+    esac
   fi
 
   _YH_LV_ON=0; _YH_LV_CACHE=""; _YH_LVL_CACHE=""

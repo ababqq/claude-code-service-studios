@@ -265,6 +265,13 @@ diff is an issue.
 For E2E stories: require the retained trace or screenshots of the run, plus a
 walkthrough sequence (step-by-step interaction log) for any surface walked manually.
 
+**Design reference images are never evidence.** Images under `design/handoff/`
+(a handoff record's `screens/` or `bundle/`) show what was designed, not what was
+built: they never count toward either rule above. An image in the evidence directory
+that is a copy of a file under `design/handoff/` is not a capture either — the state
+it stands for is treated as having no retained image, and the report says
+`Reference image <path> is a design reference, not a capture`.
+
 ### Accessibility results
 
 When an `NN-<state>-axe.json` is present, read it: violations of impact `serious` or

@@ -3,7 +3,7 @@
   <p align="center">
     웹·모바일·API 서비스 개발을 실제 제품 조직처럼 운영하는 Claude Code 템플릿입니다.
     <br />
-    에이전트 46개, 스킬 76개, 하나로 조율되는 AI 제품 팀.
+    에이전트 46개, 스킬 77개, 하나로 조율되는 AI 제품 팀.
   </p>
 </p>
 
@@ -11,10 +11,10 @@
   <a href="CHANGELOG.md"><img src="https://img.shields.io/badge/version-0.1.0-informational" alt="Version 0.1.0"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT License"></a>
   <a href=".claude/agents"><img src="https://img.shields.io/badge/agents-46-blueviolet" alt="46 Agents"></a>
-  <a href=".claude/skills"><img src="https://img.shields.io/badge/skills-76-green" alt="76 Skills"></a>
+  <a href=".claude/skills"><img src="https://img.shields.io/badge/skills-77-green" alt="77 Skills"></a>
   <a href=".claude/hooks"><img src="https://img.shields.io/badge/hooks-12-orange" alt="12 Hooks"></a>
-  <a href=".claude/rules"><img src="https://img.shields.io/badge/rules-16-red" alt="16 Rules"></a>
-  <a href=".claude/docs/templates"><img src="https://img.shields.io/badge/templates-56-lightgrey" alt="56 Templates"></a>
+  <a href=".claude/rules"><img src="https://img.shields.io/badge/rules-17-red" alt="17 Rules"></a>
+  <a href=".claude/docs/templates"><img src="https://img.shields.io/badge/templates-57-lightgrey" alt="57 Templates"></a>
   <a href=".claude/docs/director-gates"><img src="https://img.shields.io/badge/director%20gates-29-yellow" alt="29 Director Gates"></a>
   <a href="https://docs.anthropic.com/en/docs/claude-code"><img src="https://img.shields.io/badge/built%20for-Claude%20Code-f5f5f5?logo=anthropic" alt="Built for Claude Code"></a>
 </p>
@@ -62,11 +62,11 @@ AI와 함께 서비스를 만드는 일은 강력하지만, 채팅 세션 하나
 | 구분 | 개수 | 설명 |
 |------|------|------|
 | **에이전트** | 46 | 제품, 디자인, 엔지니어링, 품질, 운영, 기술 스택 영역의 전문 서브에이전트 (`.claude/agents/`) |
-| **스킬** | 76 | 단계별 슬래시 명령 (`/start`, `/brainstorm`, `/write-prd`, `/api-design`, `/dev-story`, `/rollout-plan`, `/incident` 등) |
+| **스킬** | 77 | 단계별 슬래시 명령 (`/start`, `/brainstorm`, `/write-prd`, `/api-design`, `/dev-story`, `/rollout-plan`, `/incident` 등) |
 | **훅** | 12개 등록 (파일 14개) | 커밋·푸시 검증, 데이터 파일 파싱, 세션 수명주기, 에이전트 감사 로그, 공백 탐지. 파일 14개 중 나머지 둘은 설정 해석 라이브러리 `yaml-helper.sh`와 선택형 진단 훅 `log-instructions.sh`입니다 |
 | **스크립트** | 8 | 관측 결과만 출력하고 판정은 하지 않는 보조 스크립트 (`.claude/scripts/`) |
-| **규칙** | 16 | 파일 경로에 따라 자동 적용되는 코딩 표준 (API, 도메인 로직, UI, 모바일, 마이그레이션, 인프라 등) |
-| **템플릿** | 56 | PRD, ADR, API 가이드라인, 데이터 모델, 위협 모델, SLO, 런북, 롤아웃 계획, 포스트모템 등 문서 템플릿 |
+| **규칙** | 17 | 파일 경로에 따라 자동 적용되는 코딩 표준 (API, 도메인 로직, UI, 모바일, 마이그레이션, 인프라 등) |
+| **템플릿** | 57 | PRD, ADR, API 가이드라인, 데이터 모델, 위협 모델, SLO, 런북, 롤아웃 계획, 포스트모템 등 문서 템플릿 |
 | **디렉터 게이트** | 29 | 디렉터·리드·보안·SRE가 주요 산출물을 검토하는 게이트 정의 (`.claude/docs/director-gates/`) |
 
 ## 7단계 파이프라인
@@ -187,7 +187,8 @@ Definition → Architecture 전환을 점검합니다. `Launch`는 종착 단계
 
 저장소 루트의 `project.yaml`이 프로젝트 설정의 유일한 원본입니다. `/start`가 단계와 프로세스 강도·자동화 모드를,
 `/setup-stack`이 스택과 배포 채널·규제 지역·로케일을 씁니다. 그 밖의 키는 해당 스킬이 묻고 씁니다(`/brainstorm`은
-`project.name`, `/ux-design accessibility`는 `accessibility.target`, `/test-setup`은 `testing.*`·`commands.*` 등).
+`project.name`, `/ux-design accessibility`는 `accessibility.target`, `/setup-stack`·`/design-handoff`는
+`design.tool`(`claude-design`, `figma`, `none` — 설정하지 않으면 묻습니다), `/test-setup`은 `testing.*`·`commands.*` 등).
 값을 직접 바꿀 때는 `/settings`를 씁니다. 파일을 손으로 편집할 일은 거의 없습니다.
 
 ### 프로세스 강도: `modes.rigor`
@@ -358,6 +359,13 @@ Bash·쓰기 호출에서 실행되지만, 관련 없는 명령이나 경로면 
 제출)과 인증서·키 파일 읽기는 차단합니다. 에이전트는 운영 환경을 바꾸는 명령을 스스로 실행하지 않고, 사람이 실행할
 정확한 명령과 영향 범위, 롤백 명령을 제안합니다.
 
+Figma MCP 서버 도구, Claude Design 커넥터, `Artifact` 도구처럼 설치나 호스트에 따라 있을 수도 없을 수도 있는 도구는
+공유 `settings.json`에 넣지 않습니다. MCP 도구 이름은 설치마다 다르기 때문입니다. 이 도구를 부르면 기본 권한
+모드에서 매번 확인을 묻습니다. 읽기 전용 Figma 도구처럼 자주 쓰는 호출을 미리 허용하고 싶다면 개인별
+`.claude/settings.local.json`(gitignore 대상)에 자기 설치의 도구 이름으로 적으세요. `settings.json`에는 적지 않습니다.
+Figma에 쓰기, `/design-sync`로 Claude Design에 올리기, `/design`으로 디자인 아티팩트 게시하기 같은 외부 쓰기는
+자동화 모드와 관계없이 항상 명시적으로 승인받습니다.
+
 ## 경로별 코딩 규칙
 
 파일 위치에 따라 코딩 표준이 자동으로 적용됩니다. 규칙은 `src/` 기반 구조와 Next.js·Expo·NestJS식 모노레포
@@ -368,16 +376,17 @@ Bash·쓰기 호출에서 실행되지만, 관련 없는 명령이나 경로면 
 | `api-code.md` | `docs/api/**`, `apps/api/**`, `services/**`, 라우트·컨트롤러·GraphQL | 계약 우선, 모든 오퍼레이션의 인가, 경계에서의 검증, 버전 관리와 지원 중단, problem+json 오류, 페이지네이션, 멱등성 키, 타임아웃·재시도 |
 | `domain-logic.md` | `**/src/domain/**`, `**/src/modules/**`, `**/src/features/**`, `services/*/src/**` 등 | 비즈니스 값은 설정·플래그에서, 멱등성, 경계에서의 인가, 테스트 가능한 순수 로직 |
 | `platform-code.md` | `packages/**`, 공용 라이브러리 | 핫 패스의 블로킹 I/O 금지, 안정된 공개 API, 의존성 주입, 관측성 훅 |
-| `ui-code.md` | 컴포넌트·화면·페이지 | 디자인 언어 컴포넌트만 사용, 로딩·빈 상태·오류·오프라인 상태, 접근성, i18n, 뷰에 비즈니스 로직 금지 |
-| `styles-code.md` | CSS·SCSS·스타일·토큰·테마 | 토큰만 사용, 반응형 브레이크포인트, 다크 모드, 대비, 모션 줄이기 |
+| `ui-code.md` | 컴포넌트·화면·페이지 | 디자인 언어 컴포넌트만 사용, 로딩·빈 상태·오류·오프라인 상태, 접근성, i18n, 뷰에 비즈니스 로직 금지, 디자인 도구에서 내보낸 코드는 붙여 넣지 않고 라이브러리 컴포넌트로 다시 구현 |
+| `styles-code.md` | CSS·SCSS·스타일·토큰·테마 | 토큰만 사용, 반응형 브레이크포인트, 다크 모드, 대비, 모션 줄이기, 목업의 토큰 없는 값은 `design-engineer`에게 토큰 요청 |
 | `mobile-code.md` | `apps/mobile/**`, `ios/**`, `android/**`, Swift·Kotlin·Dart | 권한 사용 근거, 백그라운드 작업 제한, 딥링크 검증, 오프라인 동기화 충돌, 스토어 정책, 강제 업데이트 경로 |
 | `migrations.md` | 마이그레이션 디렉터리 | expand/contract만, 되돌릴 수 있게, 배치 백필, 잠금 예산, 계획 문서 연결, 드라이런 증거 |
 | `infra-code.md` | `infra/**`, Terraform, k8s, Helm, Dockerfile, CI 워크플로 | 시크릿 금지, 최소 권한, apply 전 plan, 에이전트는 apply하지 않음, 리소스 태그, 비용 메모 |
 | `ai-integration.md` | AI·LLM·ML 코드 | 모델·프롬프트 버전 고정, 평가 세트를 테스트로, 타임아웃과 폴백, 토큰·비용 예산, 프롬프트·로그에 개인정보 금지, 출력 검증 |
 | `data-files.md` | 설정, 시드, 픽스처, 로케일 | 유효한 JSON/YAML, 파일별 스키마, 키 표기 규칙, 시크릿 금지 |
-| `content-copy.md` | 콘텐츠, 보이스 앤 톤, 문자열 리소스 | 보이스 앤 톤, 용어집, ICU 복수형, 문자열 이어 붙이기 금지, 길이 제한, 마케팅 수신 동의 |
+| `content-copy.md` | 콘텐츠, 보이스 앤 톤, 문자열 리소스 | 보이스 앤 톤, 용어집, ICU 복수형, 문자열 이어 붙이기 금지, 길이 제한, 마케팅 수신 동의, 목업 속 문구는 초안이고 카피 덱이 최종 |
 | `prd-docs.md` | `design/prd/**`, `design/product/**` | PRD 섹션 계약과 티어 규칙, 비즈니스 규칙, 레지스트리와 트래킹 플랜 갱신 |
 | `test-standards.md` | `tests/**`, `*.test.*`, `*.spec.*`, `e2e/**` | 결정성, 격리, 단위 테스트에서 네트워크 금지, E2E에서 고정 sleep 금지·안정적인 셀렉터·시드 데이터 |
+| `design-handoff.md` | `design/handoff/**` | 가져온 외부 디자인(Claude Design 번들, Figma·`/design` 스크린샷)은 원본 그대로의 스냅숏 — 고치지 않음, 토큰·컴포넌트 규칙은 구현에 적용, 참고 자료일 뿐 원본이 아님 |
 | `prototype-code.md` | `prototypes/**` | 완화된 표준, `REPORT.md`(컨셉) 또는 `SPIKE-NOTE.md`(스파이크) 필수, 실제 개인정보·운영 키 금지 |
 | `skill-authoring.md` | `.claude/skills/**`, `.claude/agents/**` | 스킬·게이트 작성의 다섯 가지 의무, 번호 붙은 스킬 파일 규칙 16개, 에이전트 파일 골격 |
 | `agent-memory.md` | `.claude/agent-memory/**` | 에이전트 메모리 작성 규칙 |
@@ -392,18 +401,18 @@ project.yaml                     # 프로젝트 설정의 원본 — 스택, 모
 .claude/
   settings.json                  # 훅 등록, 권한, 안전 규칙
   agents/                        # 에이전트 정의 46개
-  skills/                        # 스킬 76개 (스킬마다 디렉터리 하나)
+  skills/                        # 스킬 77개 (스킬마다 디렉터리 하나)
   hooks/                         # 훅 파일 14개 (등록 12 + yaml-helper.sh + 선택형 log-instructions.sh)
   scripts/                       # 관측 전용 스크립트 8개
-  rules/                         # 경로별 코딩 규칙 16개
+  rules/                         # 경로별 코딩 규칙 17개
   statusline.sh                  # 상태 줄 (컨텍스트%, 모델, 단계 · rigor, 에픽 > 기능 > 태스크)
   docs/
     workflow-catalog.yaml        # 7단계 파이프라인 정의 (/help, /gate-check가 읽음)
     director-gates/              # 디렉터 게이트 정의 29개
     compliance/                  # 지역별 규제 체크리스트 (kr, eu, us)
-    templates/                   # 문서 템플릿 56개
+    templates/                   # 문서 템플릿 57개
 <code roots>/                    # 레이어별로 선언 (예: apps/web, apps/mobile, apps/api, services/worker, packages, infra)
-design/                          # product/(브리프·기능 맵·저니·트래킹 플랜), prd/, ux/, brand/, content/, inventory/
+design/                          # product/(브리프·기능 맵·저니·트래킹 플랜), prd/, ux/, handoff/(가져온 외부 디자인), brand/, content/, inventory/
 docs/                            # architecture/, api/, data/, security/, ops/(SLO·런북), stack-reference/
 tests/                           # unit/, integration/, contract/, e2e/, load/, helpers/
 prototypes/                      # <name>-concept/, <name>-spike-YYYY-MM-DD/

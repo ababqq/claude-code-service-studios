@@ -65,6 +65,7 @@ rollout, payment-method policy, the API contract and product/UX decisions sit ou
 - [ ] Every agent named in `Agent(...)`, `Delegates to:` or `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; product, UX and monetization decisions, store-policy and payment-compliance calls, store submission and rollout (release-manager), and the API contract are stated as outside it
 - [ ] Escalation path documented: escalates to technical-director
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — layout and visual reference only on native and cross-platform stacks; `## 8. Platform Adaptation` wins — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never submits builds, changes rollout percentages or prints signing credentials
 
 ---

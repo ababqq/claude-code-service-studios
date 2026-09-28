@@ -8,7 +8,7 @@
 > **Version**: [1.0]
 > **Surfaces**: [From `platform.surfaces` — `web` | `ios` | `android`]
 > **UI Frameworks**: [Per surface, from `stack.layers` in `project.yaml` — e.g., web: Next.js + the component library; iOS: SwiftUI; Android: Jetpack Compose; or one cross-platform framework]
-> **Component Library**: [Where the components live and their names — e.g., `packages/ui`, Storybook URL]
+> **Component Library**: [Where the components live and their names — e.g., `packages/ui`, Storybook URL — plus, with an external design tool, the Figma library or Claude Design design-system link and the Code Connect mapping (Figma component → repo component), from `design/handoff/design-system/HANDOFF.md`]
 > **Related Documents**:
 > - `design/brand/design-language.md` — tokens, components and states, typography, iconography, motion
 > - `design/accessibility-requirements.md` — the accessibility target and requirement matrix

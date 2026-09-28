@@ -40,6 +40,12 @@ conforms to the design language and the interaction pattern library.
 >    the glossary.
 > 7. **Spec versus implementation** (from `/team-ui`) — what was built matches the
 >    approved spec; deviations are listed with their screenshots.
+> 8. **Spec and implementation versus the external design** (optional — only when the
+>    spec's `> **Design Source**:` names `claude-design` or `figma` and the screen
+>    list includes its record's screens under `design/handoff/<slug>/screens/`) — the
+>    spec and the implementation match those reference screens, or each deviation is
+>    listed with its screen path and justified by the design language or the spec,
+>    which win over the external design.
 >
 > Return APPROVE, CONCERNS [specific adjustments], or REJECT [consistency or
 > accessibility violations that must be resolved before this UI proceeds]."
@@ -53,6 +59,10 @@ from the line above; the spawning skill parses it. Findings follow the first lin
 - If the pattern library does not exist yet, review against the design language
   alone, report `NOT CHECKED — pattern library absent (run /ux-design patterns)`, and
   cap the verdict at CONCERNS.
+- If the spec declares an external design source but its reference screens are missing
+  or cannot be read, report `NOT CHECKED — design source unreadable` and cap the
+  verdict at CONCERNS. The agent reads only the paths given; it never calls a design
+  tool.
 - An unset accessibility target is undecided, not `none`: check the basics (names,
   focus order, contrast at the `wcag-aa` level as a reference) and flag the unset
   target.

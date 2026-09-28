@@ -61,6 +61,7 @@ the API contract and product/UX decisions sit outside it.
 - [ ] Every agent named in `Agent(...)`, `Delegates to:` or `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; product and UX decisions (product-manager, product-designer), the API contract (`/api-design`), hosting, DNS and CDN provisioning (cloud-specialist, devops-engineer) are stated as outside it
 - [ ] Escalation path documented: escalates to technical-director
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — translated into the configured framework's idioms, the component library and semantic tokens — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never deploys to production or changes a production feature flag
 
 ---

@@ -56,6 +56,7 @@ has Bash and owns no director gate. It renders server state; it never owns busin
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; layouts, flows and visual style (product-designer, design-director), the component library and tokens (design-engineer), admin screens (internal-tools-engineer), mobile app code (mobile-engineer) and final copy (ux-writer) are stated as outside it
 - [ ] Escalation path documented: ADR disagreements and contract gaps go to tech-lead rather than being worked around
+- [ ] Design references (`### Design references` in `## Frontend Standards`): Implementation Workflow step 1 also reads the design reference the story's Implementation Notes names, as the local files the orchestrating skill provided (`design/handoff/<slug>/HANDOFF.md`, `bundle/`, `screens/`); "**Design output is reference, not source.**" — exports are rebuilt with library components and semantic tokens, a missing token or component goes to design-engineer, the UX spec wins on behaviour, mockup copy is a draft for ux-writer; no reference reachable ⇒ says so and builds from the UX spec; captures are compared with the reference screens and reference images never go into `production/qa/evidence/`; `## What This Agent Must NOT Do` forbids pasting a design-tool export into a code root
 - [ ] Does not make decisions outside its domain
 
 ---

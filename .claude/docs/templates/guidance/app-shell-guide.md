@@ -140,6 +140,26 @@ sm (< 640 px) — operators occasionally check on a phone
 └───────────────────────────────┘
 ```
 
+**Worked example — regions from an external Design Source** (consumer app). The
+header's `> **Design Source**:` line reads
+`` figma — https://www.figma.com/design/<fileKey>/Moa?node-id=3-120 · record `design/handoff/app-shell/HANDOFF.md` ``
+(for a screen spec the same form names its own record, e.g.
+`` figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-345 · record `design/handoff/goal-detail/HANDOFF.md` ``;
+with no external tool it reads `none — markdown spec only`). Cite the retained
+screen per breakpoint instead of drawing it, and keep the region table above as the
+text description:
+
+```
+external: see Design Source — screens listed from the handoff record
+- mobile compact: design/handoff/app-shell/screens/shell-compact.png
+- web lg:         design/handoff/app-shell/screens/shell-lg.png
+- web sm, web md, mobile regular: no frame — open questions for the designer (check 8)
+```
+
+The Figma file's 1440 px desktop frame maps to `lg`; it does not add a breakpoint the
+design language lacks. The record is reference, not source — the design language
+wins on visuals, this document on behaviour.
+
 **Safe areas** — state them per surface: iOS status bar, Dynamic Island and home
 indicator; Android edge-to-edge drawing behind system bars with insets applied to
 the navigation bar and content; on the mobile web

@@ -19,9 +19,13 @@ the `[routing: …]` list on the `stack` line picks the stack sub-specialist (th
 lead when the story's Risk is HIGH). Specialists consult without writing; engineers write
 code and tests in the resolved root(s). Always-ask categories (`db_migrations`,
 `schema_changes`, `billing_changes`, `secrets_access`, `pii_data_access`,
-`infra_changes`, `file_deletions`, `scope_changes`) prompt whatever the automation mode
+`infra_changes`, `file_deletions`, `scope_changes`, `external_calls`) prompt whatever the automation mode
 when the resolved `automation_always_ask` list contains them; production deploys never
-happen here. Phase 6 verifies the agents finished, runs
+happen here. For UI and E2E stories Phase 2 resolves the story's `Design reference:` line
+from its local record `design/handoff/<slug>/HANDOFF.md` (live design tools only
+conditionally, in the main session), brief item 12 hands the engineer the local reference
+paths and the precedence paragraph, and Phase 6 compares captures with the reference
+screens as ADVISORY observations. Phase 6 verifies the agents finished, runs
 typecheck/lint/tests, runs the product and looks at it per surface
 (`.claude/docs/run-and-observe.md`), dry-runs any migration on a disposable database, and
 retains evidence under `production/qa/evidence/<story-slug>/`. It spawns no director
@@ -46,6 +50,9 @@ These should pass before any behavioral testing:
 - [ ] Automation prelude (the block beginning "**Automation mode**: Resolve `modes.automation`") present verbatim right after that line
 - [ ] `allowed-tools` is exactly: `Read, Glob, Grep, Write, Edit, Bash, Agent, AskUserQuestion` plus the grant — no MCP tool name
 - [ ] ≥2 phase headings (`## Phase 0: Resolve Configuration` … `## Phase 8: Next Steps`)
+- [ ] Phase 2 has `### Design reference` directly after `### Contract, migration, flag and events`; it reads the record's `> **Verdict**:` (`RETAINED` / `LINK ONLY` / `NOT ASSESSED`), names the Figma MCP server, the Claude Design connector and the Artifact tool only conditionally ("if its tools are present in the session"), and carries `Design reference: NOT CHECKED — <reason>` and "**Never save reference images under `production/qa/evidence/`**"
+- [ ] The Phase 4 brief keeps items 1–11 numbered as before and appends item 12 **Design reference** carrying the paragraph beginning "Design output is reference, not source."; the always-ask table has the `external_calls` row for live design reads
+- [ ] Phase 6 step 4 compares captures with the reference screens under `design/handoff/<slug>/screens/` as ADVISORY observations; the summary template has `**Design reference**:` and `**Design deviations** (ADVISORY):` lines
 - [ ] Outcome keywords present exactly: `Implementation Complete`, `INCOMPLETE`, `BLOCKED`, and the three `Run result:` tokens `OBSERVED`, `NOT VERIFIED`, `N/A`; the could-not-assess lines `NOT CHECKED — no code root resolved (set stack.layers.<layer>.root via /setup-stack)`, `NOT CHECKED — <layer> layer not configured (run /setup-stack)` and `Run result: NOT VERIFIED — no capture script (run /test-setup)` present
 - [ ] "May I write this to `<path>`?" before each write: "May I write this to `production/sprint-status.yaml` and `[story-path]`?", "May I write this to `[config path]`?", "May I write this to `production/qa/evidence/<story-slug>/migration-dry-run.log`?", "May I write this to `production/qa/evidence/<story-slug>/evidence.md`?"; engineers ask "May I write this to [path]?" for each file
 - [ ] Outputs at the exact paths: code and tests in the resolved code roots; `production/qa/evidence/<story-slug>/…`; `production/sprint-status.yaml` with `status: in-progress` (hyphenated — the enum is `backlog | ready-for-dev | in-progress | review | done | blocked`); `evidence.md` carries `> **Verdict**: <OBSERVED | NOT VERIFIED | N/A>` directly under its H1
@@ -226,10 +233,54 @@ Fixtures use the Moa example: story `production/epics/goals-core/story-001-creat
 
 ---
 
+### Case 8: Design Tool — a Figma-designed UI story with a retained snapshot
+
+**Fixture:**
+- Story `story-004-goal-detail-web.md`: Type UI, Surface `web`; its `## Implementation Notes` has
+  ``- Design reference: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-34 · record `design/handoff/goal-detail/HANDOFF.md` — empty, filled, error``
+- `design/handoff/goal-detail/HANDOFF.md` with `> **Verdict**: RETAINED`; `screens/01-empty.png`, `02-filled.png`, `03-error.png`
+- `tests/e2e/capture.spec.ts` exists; the rendered error state places the retry button below the fold where the reference shows it inline
+
+**Expected behavior:**
+1. Phase 2 reads the record and globs `design/handoff/goal-detail/screens/*`; it does not call any Figma tool (the snapshot is RETAINED)
+2. The `frontend-engineer` brief carries item 12 with the three screen paths and the precedence paragraph verbatim; items 1–11 are unchanged
+3. Phase 6 captures `NN-<state>-desktop.png` / `-mobile.png` into `production/qa/evidence/story-004-goal-detail-web/` and compares each with its reference screen
+4. The summary prints `**Design reference**: figma — … · record verdict RETAINED` and lists the retry-button position under `**Design deviations** (ADVISORY)`; `Run result: OBSERVED — …`
+
+**Assertions:**
+- [ ] No reference image is copied into `production/qa/evidence/`; nothing is written under `design/`
+- [ ] The deviation is ADVISORY and does not change the `Run result:` token (no acceptance criterion names the look)
+- [ ] `allowed-tools` is unchanged — no MCP tool name, no `Artifact`
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
+### Case 9: Design Tool — an unreachable reference
+
+**Fixture:**
+- Case 8 story, but the record's verdict is `> **Verdict**: NOT ASSESSED` (no `screens/`), and no Figma MCP tools are present in the session
+- (9b) the record `design/handoff/goal-detail/HANDOFF.md` does not exist
+
+**Expected behavior:**
+1. Prints `NOT CHECKED — Figma MCP tools not present in this session` and `Design reference: NOT CHECKED — <reason>`
+2. (9b) Prints `Design reference: NOT CHECKED — record design/handoff/goal-detail/HANDOFF.md not found (run /design-handoff --for goal-detail)`
+3. Brief item 12 tells the engineer no design reference is available and to implement from the UX spec and the design language
+4. The summary carries the `Design reference: NOT CHECKED — …` line verbatim and recommends `/design-handoff refresh goal-detail`
+
+**Assertions:**
+- [ ] The build is never presented as design-faithful; the NOT CHECKED line is in the summary
+- [ ] No design URL is fetched with WebFetch; no image is saved anywhere
+- [ ] Implementation proceeds from the UX spec — the missing reference does not block the story
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
 ## Protocol Compliance
 
 - [ ] Uses "May I write this to `<path>`?" before every file the skill writes (status fields, Config-story configuration, evidence); engineers ask for their own files
-- [ ] Loads the context before any code: story, TR entry, ADR summary, manifest layer, tech radar, contract, migration plan, stack routing
+- [ ] Loads the context before any code: story, TR entry, ADR summary, manifest layer, tech radar, contract, migration plan, design reference, stack routing
 - [ ] Never runs a command that changes production, shared infrastructure, a shared database or secrets; production deploys and production flag changes go to `/rollout-plan` and a human
 - [ ] Only `/story-done` writes `Complete`; this skill writes `in-progress`
 - [ ] Writes no evidence under `production/session-logs/`; never writes `modes.review_mode` or any other knob `modes.rigor` fronts
@@ -248,6 +299,9 @@ Fixtures use the Moa example: story `production/epics/goals-core/story-001-creat
 - The ADR-version mismatch widget ("Story was written against ADR v[story-date]. The ADR
   is now v[current-date]. …") and the manifest-version mismatch widget are not
   fixture-tested; both are mechanically similar to Case 1's freshness check.
+- Design references are fixture-tested for `figma` RETAINED (Case 8) and NOT ASSESSED /
+  missing record (Case 9); a `claude-design` handoff URL read through the connector on
+  the web and a LINK ONLY record read live are not covered.
 - Mobile run-and-observe (`xcrun simctl`, `adb`, Maestro/ARTEMIS flows) and the
   `analytics`, `infra` and `admin` routing rows need a live device or configured layers
   and are not covered here.

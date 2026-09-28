@@ -66,3 +66,12 @@ from the line above; the spawning skill parses it. Findings follow the first lin
   unset; decide it with /ux-design accessibility)` and cap the verdict at CONCERNS.
 - Check only the surfaces the `surfaces` line lists; an unset line means ask — do not
   assume web only.
+- Read the document's `> **Design Source**:` header line. When its first token is
+  `figma` or `claude-design`, drift between that source — the Figma variables or the
+  Claude Design design system recorded in `design/handoff/design-system/HANDOFF.md` —
+  and the document's tokens is a finding (name the token, both values and the
+  section). The document remains authoritative: the fix is to reconcile the source
+  to the document, or to revise the document first, never to adopt the source's
+  value silently. A `NOT CHECKED — …` item for the design source in the
+  `> **Not Checked**:` line is carried into the findings as not checked, never read
+  as a match. `none` means there is no external source — no finding.

@@ -10,7 +10,10 @@ at `design/ux/<slug>.md`; `shell` → `design/ux/app-shell.md` (`app-shell.md` t
 `design/product/user-journey.md`. The skill follows the skeleton-first pattern: it creates the file with every heading
 of the mode's template (each body `[To be designed]`), then fills each section through discussion and writes it after
 approval. Every screen spec carries `## API Data` (read by `/api-design reconcile`) and `## Analytics Events`, and must
-say what happens on loading, empty, error, offline and session expiry.
+say what happens on loading, empty, error, offline and session expiry. Screen, flow and shell specs carry a
+`> **Design Source**:` header line (`none — markdown spec only`, or `claude-design` / `figma` with the handoff record
+`design/handoff/<slug>/HANDOFF.md` that `/design-handoff` writes); the skill reads that record and its retained screens
+with Read and never writes under `design/handoff/`.
 
 The skill has no director gates — `/ux-review` is the separate review step. Each section write is preceded by
 "May I write the [section name] section to `[filepath]`?". If the output file exists, the skill retrofits only empty
@@ -31,12 +34,16 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] `name: ux-design` equals the directory name (`.claude/skills/ux-design/`) and this spec's basename
 - [ ] `argument-hint` is `"[screen/flow name] | shell | patterns | accessibility | journey"`
 - [ ] The first body line is exactly
-      `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys automation,workflow,docs.density,stack,surfaces,accessibility,compliance` ``
-      — the `--keys` value is exactly `automation,workflow,docs.density,stack,surfaces,accessibility,compliance`
+      `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys automation,workflow,docs.density,stack,surfaces,accessibility,compliance,design` ``
+      — the `--keys` value is exactly `automation,workflow,docs.density,stack,surfaces,accessibility,compliance,design`
 - [ ] `allowed-tools` contains the grant naming this skill's own directory:
       `Bash(bash "*/.claude/skills/ux-design/../../hooks/yaml-helper.sh" resolve_config *)`
 - [ ] `allowed-tools` is exactly the set Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion plus that grant — no
-      plain `Bash`, no MCP tool names
+      plain `Bash`, no MCP tool names, no `Artifact` or `Skill` (live design tools are named conditionally, rule 15)
+- [ ] The screen, flow and app-shell skeletons carry a `> **Design Source**:` header line, right after
+      `> **Accessibility Target**:` (screen, flow) or `> **Design Language**:` (shell), mirroring the templates
+- [ ] Contains the Phase 2i step `### 2i: Design Source` before `### 2j: Present Context Summary`, and cross-reference
+      check `**8. Design source parity**`
 - [ ] The line after the bootstrap block is exactly: ``Resolved above — use as-is. No block → defaults in `.claude/docs/config-resolution.md`.``
       (the variant without `--review` — `review_mode` is not among the keys)
 - [ ] The automation prelude block — from `**Automation mode**: Resolve` to `categories always prompt).` — follows
@@ -74,7 +81,7 @@ consultations that return analysis; this session owns every write.
 **Fixture:**
 - Moa; the config block prints `workflow: standard (rigor:standard)`, `docs.density: balanced (rigor:standard)`,
   `platform.surfaces: web, ios, android, api (project.yaml)`, `accessibility.target: wcag-aa (project.yaml)`,
-  `compliance: regions=kr handles_pii=true (project.yaml)`
+  `compliance: regions=kr handles_pii=true (project.yaml)`, `design.tool: none (project.yaml)`
 - `design/product/product-brief.md`, `design/product/feature-map.md`, `design/prd/goals.md` (with `## UI Requirements`)
   and `design/accessibility-requirements.md` (`> **Target**: wcag-aa`) exist; `docs/api/openapi.yaml` exists
 - No `design/ux/goal-detail.md`; the user converses in Korean
@@ -86,15 +93,16 @@ consultations that return analysis; this session owns every write.
 2. Phase 2 reads the brief, feature map, journey (if any), the PRD's `## UI Requirements`, existing specs, the pattern
    catalog index only, the design language's components/layout/platform sections, the accessibility target, and
    derives input methods and breakpoints from the surfaces line (web: `sm`/`md`/`lg`; mobile: compact/regular)
-3. The context summary is presented; the user confirms
+3. Phase 2i reads `design.tool: none` — the header's Design Source is `none — markdown spec only`; the context summary
+   (with its `Design source` bullet) is presented; the user confirms
 4. "May I create the skeleton file at `design/ux/goal-detail.md`?" — the skeleton mirrors the template's headings
    (`## Purpose & User Need` … `## Open Questions`, with `### Wireframe`, `### Breakpoints`, `### Component Inventory`,
    `### Navigation Inputs`, `### Action Inputs`, `### State-Specific Behaviors`), each body `[To be designed]`
 5. Each section follows Context → Questions → Options → Decision → Draft → Approval → Write; "May I write the
    [section name] section to `design/ux/goal-detail.md`?" before each Edit; `production/session-state/active.md` is
    updated after each write
-6. Phase 5 runs the seven cross-reference checks (PRD coverage, pattern alignment, navigation, accessibility, states,
-   API Data, analytics)
+6. Phase 5 runs the cross-reference checks (PRD coverage, pattern alignment, navigation, accessibility, states,
+   API Data, analytics); check 8, design source parity, is `N/A — none` for a `none` source
 7. The handoff states that the spec must be validated with `/ux-review`; verdict `COMPLETE`
 
 **Assertions:**
@@ -257,8 +265,53 @@ consultations that return analysis; this session owns every write.
 **Assertions:**
 - [ ] A PRD without a UI Requirements section is never silently treated as having no UI needs
 - [ ] The shell skeleton's headings are byte-identical to `.claude/docs/templates/app-shell.md`
-- [ ] The shell runs cross-reference checks 1, 3, 4 and 5; a check that did not run is listed as
+- [ ] The shell runs cross-reference checks 1, 3, 4, 5 and 8; a check that did not run is listed as
       `NOT CHECKED — <reason>`
+
+---
+
+### Case 9: Design Source — Figma record retained, then missing, unreadable or undecided
+
+**Fixture:**
+- As Case 1, but the config block prints
+  `design.tool: figma file_url=https://www.figma.com/design/<fileKey>/Moa (project.yaml)`
+- `design/handoff/goal-detail/HANDOFF.md` exists with `> **Verdict**: RETAINED`, `> **Tool**: figma`,
+  `> **Source URL**: https://www.figma.com/design/<fileKey>/Moa?node-id=12-345`; its `## Screens & States` lists
+  loading, populated and error screens for mobile compact and web `lg`, each retained under
+  `design/handoff/goal-detail/screens/`; its `## Tokens & Components` lists one raw color with no design-language token
+- Variant A: no `design/handoff/goal-detail/HANDOFF.md`
+- Variant B: the record exists with `> **Verdict**: NOT ASSESSED`
+- Variant C: the config block prints `design.tool: (unset -- ask; unset is not none)`
+
+**Input:** `/ux-design goal-detail`
+
+**Expected behavior:**
+1. Phase 2i Globs and Reads the record and its screens with Read; no agent is asked to open the Figma URL, and no live
+   Figma read is made for a RETAINED record (in Variants A and B only if the Figma MCP server's tools are present and
+   the user wants to look now — else `NOT CHECKED — Figma MCP tools not present in this session`)
+2. The skeleton's header line reads
+   `` > **Design Source**: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-345 · record `design/handoff/goal-detail/HANDOFF.md` ``
+3. Layout Specification Step 4 offers to cite the record's screens per breakpoint ("external: see Design Source —
+   screens listed from the handoff record") and keeps a text hierarchy description; breakpoints are mapped to the
+   design language, never copied from frame widths
+4. States & Variants maps each state to a screen and lists the states the design lacks (empty, offline) as open
+   questions — they are still specified in the spec
+5. Check 8 reports the missing states and web `sm` / `md` frames in both directions, and the raw color as a value
+   without a token for the `design-engineer`
+6. Variant A: the skill offers `/design-handoff --for goal-detail` first; if the user continues, the Design Source line
+   stays `[To be designed]` and check 8 prints `NOT CHECKED — external design not retained (<url>)`
+7. Variant B: the record is treated as unverified — check 8 prints
+   `NOT CHECKED — external design not retained (<url>)`, never a match, and the wireframe is drawn rather than cited
+8. Variant C: the skill asks "Is this [screen / flow / app shell] designed in an external design tool?" with "Claude
+   Design", "Figma", "None — markdown spec only", "Decide later"; it never treats unset as `none` and never writes
+   `design:` to `project.yaml` (it offers `/design-handoff`, `/setup-stack` or `/settings`)
+
+**Assertions:**
+- [ ] The record and screens are read by this session with Read; agents receive file paths, never a design-tool URL
+- [ ] No file is written under `design/handoff/` and `project.yaml` is not changed by this skill
+- [ ] A missing or `NOT ASSESSED` record yields a named `NOT CHECKED — …` line for check 8, never a parity match
+- [ ] Unset `design.tool` is asked, not defaulted to `none`
+- [ ] Verdict `COMPLETE` in every variant once the sections are written
 
 ---
 
@@ -270,7 +323,8 @@ consultations that return analysis; this session owns every write.
 - [ ] Asks "May I write the [section name] section to `[filepath]`?" after each section is approved
 - [ ] Detects an existing document and offers the retrofit path
 - [ ] Ends with the handoff (`/ux-review`, or the mode-specific next steps)
-- [ ] Never assumes an accessibility target, a surface list or a region list the configuration leaves unset
+- [ ] Never assumes an accessibility target, a surface list, a region list or a design tool the configuration leaves
+      unset
 - [ ] Agents never write files — this session owns every write; never commits
 
 **Authoring rubric** (`CCSS Skill Testing Framework/quality-rubric.md` § `authoring`):
@@ -294,4 +348,7 @@ consultations that return analysis; this session owns every write.
   comes from the resolved `stack` line (a layer under `unset=` leaves it `To be designed`), never from a Read of
   `project.yaml`.
 - `journey` mode's lifecycle stages and metrics-per-stage content are not fixture-tested beyond Case 6.
-- Wireframe descriptions are text-only; image references may be added manually by a designer after the fact.
+- Wireframes are ASCII or cite the retained screens of a handoff record (claude-design or figma), always with a text
+  hierarchy description; the skill never imports or snapshots a design itself — `/design-handoff` does.
+- Claude Design and `/design`-artifact sources follow the same Phase 2i path as Figma (Case 9); only the Figma variant is
+  fixture-tested.

@@ -23,6 +23,10 @@ Before writing any code:
 1. **Read the design document:**
    - `design/brand/design-language.md` (color system, typography, components & states, motion, platform
      adaptation), the relevant UX spec under `design/ux/`, and `design/brand/tokens.json` when it exists
+   - The handoff record the orchestrating skill names (`design/handoff/<slug>/HANDOFF.md`, its `bundle/` and
+     `screens/`; `design/handoff/design-system/HANDOFF.md` for Figma variables or a Claude Design
+     design-system project) — you cannot call Figma, Claude Design or Artifact tools yourself; read the files
+     you are given
    - Identify what's specified vs. what's ambiguous
    - Note any deviations from standard patterns
    - Flag potential implementation challenges
@@ -71,7 +75,9 @@ Before writing any code:
 1. **Token pipeline**: Own the path from the design source (Figma variables or `design/brand/tokens.json`) to
    every platform output — CSS custom properties and the Tailwind theme for web, Swift constants and asset
    catalogs for iOS, Compose theme objects for Android, and theme objects for React Native or Flutter. One
-   source, generated outputs, no hand edits downstream.
+   source, generated outputs, no hand edits downstream. The source is named once: Figma variables exported
+   into the W3C token source, or `design/brand/tokens.json` — never both hand-maintained (see
+   `### Design-tool sync`).
 2. **Component library**: Build and maintain the shared UI components the design language defines, with a
    stable, typed API, every state implemented, accessible names and roles, and localization-safe layout.
    Components live in a shared package (for example `packages/ui`) unless a component is used by exactly one
@@ -96,9 +102,10 @@ Skills that call you:
 
 | Skill | Your part |
 |---|---|
+| `/design-handoff` | At `full`/`lean`, map the handoff record's observed values (colors, type, spacing, radii) to design-language tokens and components; a value with no token is recorded as `NO TOKEN` — a finding, never a new literal |
 | `/design-language` | Check the drafted sections as a buildable token architecture (tiers, naming, light/dark), font loading and subsetting against the route budget, motion/haptics/notification-sound implementation; draft the optional `design/brand/tokens.json` |
 | `/ui-inventory` | Component coverage per screen; media specs (formats, sizes, density variants) in `design/inventory/media-manifest.md` |
-| `/team-ui` | Tokens and components ready before the frontend-engineer or mobile-engineer builds the screen |
+| `/team-ui` | Tokens and components ready before the frontend-engineer or mobile-engineer builds the screen; when a design reference exists, map its elements and raw values (Figma variables, bundle CSS) to tokens and components instead of re-deriving the visual treatment, and compare captures with its screens in review |
 | `/team-hardening` | Findings for the `## UI Consistency` section of the single hardening report |
 
 ## Design Engineering Standards
@@ -123,6 +130,27 @@ Skills that call you:
   ratio — report the ratios as information. A failing pair fails the build. APCA scores are informative only —
   they are not a WCAG 2.2 conformance measure. Target unset ⇒ say `NOT ASSESSED — accessibility.target unset`
   and ask; never assume a level.
+
+### Design-tool sync
+
+When the project designs in Claude Design or Figma (`design.tool`), the orchestrating skill (main session) reads
+the external tool and saves what it gets under `design/handoff/<slug>/`; you work from those files only.
+
+- **One token source.** Either Figma variables — read by the orchestrating skill through the Figma MCP server
+  and recorded in `design/handoff/design-system/HANDOFF.md` — exported into the W3C token source, or
+  `design/brand/tokens.json`. Never both hand-maintained; the design-director records which one.
+- **Mapping observed values.** In `/design-handoff`, `/team-ui` and `/design-language`, map each value a
+  handoff record observed (bundle CSS, Figma variables, screen colors) to a semantic token and each element to
+  a library component. A value with no token is marked `NO TOKEN` and reported as a finding — a request to
+  add a token or change the design, never a literal in code.
+- **Code Connect.** Mappings that link library components to Figma components are written by the main
+  session or the user, as an approved external write; propose them, never assume they exist.
+- **Claude Design design system.** A Claude Design design-system project is synced from the repo's React
+  component library by the bundled `/design-sync` (with `/design-login` when the session has no claude.ai
+  login), which the user runs. Propose it after a library change; the library in the repo stays the source of
+  truth.
+- A design-tool frame that conflicts with the design language or the contrast target is escalated to the
+  design-director, never matched in code.
 
 ### Component contract
 

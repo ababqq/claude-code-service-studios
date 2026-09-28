@@ -17,8 +17,9 @@ screenshot, OG image and notification asset with a sequential project-wide `ASSE
 ID, a spec and a production brief.
 
 Both are derived from the design documents — feature map, PRD UI sections (by section
-grep), one-pager, user journey, app shell and design language — and confirmed with the
-user before anything is written. Arguments: `[surface:<web|ios|android> | feature:<name> | media] [--review full|lean|solo]`.
+grep), one-pager, user journey, app shell, design language and the retained design
+handoff records (`design/handoff/*/HANDOFF.md`, their `## Screens & States`) — and
+confirmed with the user before anything is written. Arguments: `[surface:<web|ios|android> | feature:<name> | media] [--review full|lean|solo]`.
 `review_mode` scales the **specialists** it consults (`product-designer`,
 `design-engineer`); it spawns no director gate. Every platform- or store-mandated value
 carries `Source: <url>, retrieved YYYY-MM-DD` or `NOT SOURCEABLE — <reason>`. Neither
@@ -200,12 +201,39 @@ Fixtures use the canonical product Moa (web + iOS + Android + API) with the feat
 
 ---
 
+### Case 7: Edge Case — Screens from design handoff records
+
+**Fixture**:
+- Case 1 state, plus `design/handoff/goal-detail/HANDOFF.md` (`> **Verdict**: RETAINED`, `> **Tool**: figma`,
+  `> **Backs**: design/ux/goal-detail.md`) whose `## Screens & States` lists `goal-detail` (default, empty, error) and
+  a `goal-share-card` frame that no PRD, shell destination or journey stage names
+- `design/handoff/design-system/HANDOFF.md` exists (tokens and components only)
+- `design/handoff/goal-create-flow/HANDOFF.md` has `> **Verdict**: NOT ASSESSED`
+
+**Input**: `/ui-inventory`
+
+**Expected behavior**:
+1. Phase 1 globs `design/handoff/*/HANDOFF.md`, reads each record's `> **Verdict**:`, `> **Tool**:`, `> **Backs**:`
+   lines and `## Screens & States`, skips the `design-system` record, and the context summary counts the records read
+2. `goal-detail` is confirmed by the record (record path noted); `goal-share-card` is asked about, never added by default
+3. The `goal-create-flow` screens are listed as unverified, never as confirmed
+4. The `> **Sources**:` line names the design handoff records read
+
+**Assertions**:
+- [ ] No frame the documents do not imply is added without the user's confirmation
+- [ ] No Figma MCP tool, Claude Design connector or `Artifact` call is made; `allowed-tools` and `--keys` are unchanged
+- [ ] No image generator is called
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
 ## Protocol Compliance
 
 - [ ] Uses "May I write this to `<path>`?" before every write to the two inventory files
 - [ ] Presents the grouped list (and each asset spec) before requesting approval
 - [ ] Ends with the closing `AskUserQuestion` offering only the steps that apply
-- [ ] Does not auto-create files without user approval; never calls an image generator or other external service
+- [ ] Does not auto-create files without user approval; never calls an image generator or other external service — reading the retained `design/handoff/*/HANDOFF.md` records is a local read, and the skill never fetches a Figma or Claude Design link itself
 - [ ] Writes no evidence, reports or plans under `production/session-logs/`
 - [ ] Never writes `modes.review_mode` or any other knob that `modes.rigor` fronts
 - [ ] Surfaces every specialist disagreement instead of picking one silently; a blocked specialist is named and a partial result is kept

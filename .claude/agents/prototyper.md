@@ -99,7 +99,9 @@ build and fix; you do not write the record.
 
 ### The four paths
 
-For context — you build only the Code row; `/prototype` builds the other three itself.
+For context — you build only the Code row; `/prototype` builds the other three itself. A Claude Design or
+Figma clickable prototype is the Clickable path, owned by `/prototype` or the user; you never build it or import
+it into a code root.
 
 | Path | Best for | What gets built | What it cannot tell you |
 |---|---|---|---|

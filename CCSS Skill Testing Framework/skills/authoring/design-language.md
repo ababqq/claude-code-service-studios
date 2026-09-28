@@ -18,7 +18,11 @@ approved and written one section at a time. It optionally writes `design/brand/t
 and closes with the DD-DESIGN-LANGUAGE sign-off, spawned as `design-director`. Tier: `full` = all nine sections;
 `standard` = sections 1–5 when a UI surface exists; `workflow_overrides.design_language_strict: true` forces all
 nine. Verdict tokens: `COMPLETE` / `PARTIAL — SECTIONS <n>-<m>` / `NOT ASSESSED`, precedence
-PARTIAL > NOT ASSESSED > COMPLETE, carried on the document's verdict line.
+PARTIAL > NOT ASSESSED > COMPLETE, carried on the document's verdict line. The resolved `design` line names the design
+source (`claude-design` / `figma` / `none`; unset ⇒ asked in Phase 2, never read as `none`), recorded in the header's
+`> **Design Source**:` line; for `claude-design` or `figma` the tokens and components in
+`design/handoff/design-system/HANDOFF.md` are passed to the specialists as existing values to adopt or reconcile, and
+the document stays the source of intent.
 
 Assertions quote the canonical English text of `.claude/skills/design-language/SKILL.md`; prompts are rendered in the
 user's conversation language at run time (`.claude/docs/coding-standards.md` § Language Policy) and this spec never
@@ -34,8 +38,8 @@ These should pass before any behavioral testing:
 - [ ] `name: design-language` equals the directory name (`.claude/skills/design-language/`) and this spec's basename
 - [ ] `argument-hint` is `"[--review full|lean|solo]"`
 - [ ] The first body line is exactly
-      `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,docs.density,surfaces,accessibility` ``
-      — the `--keys` value is exactly `review_mode,automation,workflow,docs.density,surfaces,accessibility`
+      `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,docs.density,surfaces,accessibility,design` ``
+      — the `--keys` value is exactly `review_mode,automation,workflow,docs.density,surfaces,accessibility,design`
 - [ ] `allowed-tools` contains the grant naming this skill's own directory:
       `Bash(bash "*/.claude/skills/design-language/../../hooks/yaml-helper.sh" resolve_config *)`
 - [ ] `allowed-tools` is exactly the set Read, Glob, Grep, Write, Edit, Agent, AskUserQuestion plus that grant — no
@@ -49,6 +53,14 @@ These should pass before any behavioral testing:
 - [ ] The verdict tokens are spelled exactly: `COMPLETE`, `PARTIAL — SECTIONS <n>-<m>`, `NOT ASSESSED`
 - [ ] The nine section headings are listed exactly as the template spells them
 - [ ] Both outputs are named: `design/brand/design-language.md` and `design/brand/tokens.json`
+- [ ] Phase 5 offers exactly `Generate design/brand/tokens.json from sections 2–4`, `Reconcile with Figma variables`
+      (only for a `figma` source whose design-system record lists variables) and
+      `Skip — tokens live in Figma variables or code`
+- [ ] "What this skill never does" lists writing `design.*` or anything under `design/handoff/` (`/design-handoff`,
+      `/setup-stack` and `/settings` write it) and writing to Figma or Claude Design
+- [ ] The bundled `/design`, `/design-sync`, `/design-login` and Figma's plugin skills are named only conditionally
+      ("if … present in the session") and never appear in the Phase 7 next-step list; no Figma MCP tool, `Artifact`
+      or `Skill` in `allowed-tools`
 - [ ] "May I write this to `<path>`?" appears before every write to `design/brand/design-language.md` and
       `design/brand/tokens.json`
 - [ ] The DD-BRAND-DIRECTION spawn carries this `Pass:` line verbatim:
@@ -90,7 +102,7 @@ The director's sign-off is recorded separately and never changes the completenes
 **Fixture** (assumed project state):
 - Moa; the config block prints `review_mode: full (project.yaml)`, `workflow: full (rigor:full)`,
   `docs.density: thorough (rigor:full)`, `platform.surfaces: web, ios, android, api (project.yaml)`,
-  `accessibility.target: wcag-aa (project.yaml)`
+  `accessibility.target: wcag-aa (project.yaml)`, `design.tool: none (project.yaml)`
 - `design/product/product-brief.md` has `## Brand Direction Anchor` ("Calm confidence — money feels in control");
   `design/accessibility-requirements.md` has `> **Target**: wcag-aa` and lists KWCAG 2.2 for `kr`
 - `project.yaml` sets `localization.locales: [ko-KR, en-US]` and `performance.bundle_kb: 170`
@@ -302,7 +314,84 @@ The director's sign-off is recorded separately and never changes the completenes
 **Assertions:**
 - [ ] No gate agent is spawned; the notes read exactly as above
 - [ ] Specialist drafting and checks still run (they are authoring, not gates)
-- [ ] The skill never writes `modes.review_mode`, `accessibility.target`, `platform.surfaces` or any `modes.*` key
+- [ ] The skill never writes `modes.review_mode`, `accessibility.target`, `platform.surfaces`, `design.*` or any
+      `modes.*` key
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
+### Case 9: Design Source — Figma library and Claude Design design system with a retained record
+
+**Fixture:**
+- Case 1 state, except the config block prints
+  `design.tool: figma file_url=https://www.figma.com/design/AbC123/Moa (project.yaml)`
+- `design/handoff/design-system/HANDOFF.md` exists with `> **Verdict**: RETAINED`, `> **Tool**: figma` and a
+  `## Tokens & Components` section listing Figma variables (`color/green/500 = #1FA66B`, `space/4 = 16`, light and dark
+  modes) and library components (`Button`, `TextField`, `AmountInput`)
+- Variant: the config block prints `design.tool: claude-design project_url=https://claude.ai/design/p/moa-ds (project.yaml)`,
+  the record has `> **Tool**: claude-design` and its tokens come from retained bundle CSS under
+  `design/handoff/design-system/bundle/`; the repo has a React component library in `packages/ui`
+
+**Input:** `/design-language`
+
+**Expected behavior:**
+1. Phase 0 reads the resolved `design` line and the record's `> **Verdict**:`, `> **Retrieved**:` and
+   `> **Not Checked**:` lines; Phase 2 shows the design source in the session context and does not ask for it
+2. Before the sections 2–5 draft, the main session reads the record's `## Tokens & Components` with Read and passes
+   the values and the record path to `product-designer` as existing values to adopt or reconcile — no agent is asked
+   to call the Figma MCP server, the Claude Design connector or the Artifact tool
+3. The `design-engineer` check flags every variable or token that cannot map into the primitive → semantic →
+   component tiers and lists each existing value the draft changed; a departure is shown to the user with
+   `AskUserQuestion`, never resolved silently
+4. The header's `> **Design Source**:` line starts with `figma — ` (variant: `claude-design — `) and names
+   `design/handoff/design-system/HANDOFF.md`
+5. Phase 5 offers `Reconcile with Figma variables`; `design-engineer` reports drift counts per family (in the
+   document only, in Figma only, same name with a different value or mode); the document wins; pushing tokens to Figma
+   variables is named as an external write through Figma's own skill, approved by the user, never done by this skill
+6. Variant: `Reconcile with Figma variables` is not offered; the skill says the user may run the bundled
+   `/design-sync` (with `/design-login`), if present in the session, to push `packages/ui` to Claude Design — as an
+   external write the user runs, not a next step
+
+**Assertions:**
+- [ ] The document stays the source of intent — no Figma or Claude Design value is adopted without the user seeing it
+- [ ] The first token of the `> **Design Source**:` line is exactly `figma` or `claude-design`
+- [ ] The skill never writes `design.*`, anything under `design/handoff/`, or to Figma or Claude Design
+- [ ] The DD-DESIGN-LANGUAGE `Pass:` line is unchanged — the gate reads the Design Source line from the document
+
+**Case Verdict**: PASS / FAIL / PARTIAL
+
+---
+
+### Case 10: NOT CHECKED — declared design source with no retained record
+
+**Fixture:**
+- Case 9 state (`design.tool: figma …`), except `design/handoff/design-system/HANDOFF.md` does not exist
+- The user answers `Continue without it` to the import offer
+- Variant A: the config block prints `design.tool: none (project.yaml)`
+- Variant B: the config block prints `design.tool: (unset -- ask; unset is not none)`
+
+**Input:** `/design-language`
+
+**Expected behavior:**
+1. Before the sections 2–5 draft the skill offers
+   `Import the design system first — /design-handoff --for design-system, then rerun /design-language (Recommended)` /
+   `Continue without it`
+2. On continue, the header's `> **Not Checked**:` line carries
+   `NOT CHECKED — external design not retained (https://www.figma.com/design/AbC123/Moa)` and the same line stands on
+   its own at the end of section 2
+3. With all nine sections written, the verdict is `NOT ASSESSED` — never `COMPLETE`; Phase 7 reports the design source
+   as not checked and offers `/design-handoff --for design-system`
+4. Variant A: no import offer, no reconcile step and no design-source `NOT CHECKED` line; the header reads
+   `> **Design Source**: none — markdown spec only …`; the verdict can be `COMPLETE`
+5. Variant B: Phase 2 adds the `Design source` tab (`Claude Design — a design-system project` /
+   `Figma — a library file` / `None — this document and tokens.json only`); the answer applies to this run only and
+   the skill names `/design-handoff`, `/setup-stack` or `/settings` as the place that records it
+
+**Assertions:**
+- [ ] The line is spelled exactly `NOT CHECKED — external design not retained (<url>)`
+- [ ] A declared source that could not be read never reads as a match, and caps the verdict below `COMPLETE`
+- [ ] `none` writes no design-source `NOT CHECKED` line; unset is asked, never treated as `none`
 
 **Case Verdict**: PASS / FAIL / PARTIAL
 
@@ -316,6 +405,8 @@ The director's sign-off is recorded separately and never changes the completenes
       `accessibility-specialist` to the user; never resolves a conflict silently
 - [ ] Ends with a recommended next step (Phase 7) and always includes `Stop here`
 - [ ] Announces every skip — a skipped gate, a specialist that did not run (`NOT CHECKED — <agent> did not run: <reason>`)
+- [ ] Writes to Figma and uploads to Claude Design are external writes, always proposed and approved by the user,
+      never made by this skill
 - [ ] Never commits
 
 **Authoring rubric** (`CCSS Skill Testing Framework/quality-rubric.md` § `authoring`):

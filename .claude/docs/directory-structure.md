@@ -17,6 +17,8 @@
 │   ├── quick-specs/              # <kebab-title>-YYYY-MM-DD.md
 │   ├── ux/                       # UX specs <slug>.md, app-shell.md, interaction-patterns.md
 │   │   └── reviews/              # <spec-stem>-ux-review-YYYY-MM-DD.md
+│   ├── handoff/                  # <slug>/HANDOFF.md + bundle/ (verbatim export) + screens/ — imported external designs
+│   │                             # (Claude Design, /design artifacts, Figma) via /design-handoff; never counted as UX specs
 │   ├── brand/                    # design-language.md, tokens.json, voice-and-tone.md
 │   ├── content/                  # copy decks <area>.md, help-center/<slug>.md
 │   ├── inventory/                # screen-inventory.md, media-manifest.md

@@ -161,7 +161,12 @@ it from there, never from memory or from another skill that may have drifted.
    `modes.story_granularity`, `modes.review_mode`, `team.size`); only
    `/settings`, on the user's explicit request, changes them.
 10. **Hand-offs name real skills.** Every "next step" names a skill that exists
-    under `.claude/skills/` — check the directory.
+    under `.claude/skills/` — check the directory. Claude Code's bundled skills
+    (`/design`, `/design-sync`, `/design-login`) and plugin skills (Figma's) are
+    never a next step: a skill names them only conditionally, as a tool the user
+    runs or approves ("if the bundled `/design` skill is present in the
+    session"), and no skill takes a bundled skill's name — a project skill of
+    the same name would shadow it.
 11. **No `file:line` citations.** Line numbers go stale with the next edit to
     the cited file. Cite the file and its heading instead
     (`.claude/docs/director-gates.md` § Context to Pass), never `<file>:<line>`.
@@ -184,7 +189,16 @@ it from there, never from memory or from another skill that may have drifted.
 15. **`allowed-tools` is exact.** It lists the tools the skill uses — no more,
     no fewer — and never an MCP tool name, which varies per install. A skill
     that may use Context7 says "use Context7 if its tools are present in the
-    session, else WebSearch/WebFetch".
+    session, else WebSearch/WebFetch". Every tool whose presence depends on the
+    host is handled the same way — MCP servers (Context7, Figma, the Claude
+    Design connector) and the host-conditional built-ins `Artifact` and
+    `Skill`: never listed, named conditionally ("use the Figma MCP server if
+    its tools are present in the session, else …"), and, when absent, a named
+    `NOT CHECKED — <tool> … not present in this session` line in the output
+    (obligation 3). No skill calls `DesignSync`; only the bundled
+    `/design-sync` does. Agents cannot reach any of these tools — their
+    `tools:` lists are allowlists — so the orchestrating skill reads the
+    external source and briefs agents with file paths.
 16. **Model.** New skills declare `model: sonnet` unless there is a stated
     reason; existing values are kept. The field is declared but not applied
     (`.claude/docs/model-tiers.md`).

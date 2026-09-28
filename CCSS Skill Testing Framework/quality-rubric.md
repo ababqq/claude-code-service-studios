@@ -194,8 +194,8 @@ obligation is production safety.
 **Skills**: start, help, brainstorm, onboard, adopt, prototype, localize,
 launch-checklist, release-checklist, smoke-check, load-test, test-setup, test-helpers,
 regression-suite, qa-plan, bug-triage, bug-report, usability-report, ui-inventory,
-reverse-document, project-stage-detect, setup-stack, settings, skill-test, skill-improve,
-and any other skills not in categories above
+design-handoff, reverse-document, project-stage-detect, setup-stack, settings, skill-test,
+skill-improve, and any other skills not in categories above
 
 Utility skills pass the 7 standard static checks. If they happen to spawn director
 gates, the gate mode logic must also be correct.

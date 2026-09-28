@@ -57,6 +57,9 @@
 #   4. any production/epics/*/EPIC.md, production/sprints/sprint-*.md,
 #      production/walking-skeleton/report-*.md, or >= 1 design/ux/*.md
 #                                                                   -> Validation
+#      (design/handoff/ is deliberately not a rung: an imported external
+#      design can be made in Discovery -- a brand exploration -- and proves
+#      nothing about Validation; only design/ux/*.md specs count.)
 #   5. docs/architecture/architecture.md, any docs/architecture/adr-*.md,
 #      docs/data/data-model.md, or a file matching any API contract glob of
 #      the catalog's architecture/api-design step                   -> Architecture

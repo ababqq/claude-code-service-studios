@@ -53,6 +53,7 @@ belongs to the API service, the contract, and rendering-strategy changes are out
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; the rendering/caching strategy (web-specialist), backend logic that belongs to the API service, the API contract, and product, UX and copy decisions are stated as outside it
 - [ ] Escalation path documented: escalates to web-specialist
+- [ ] Implementation Workflow step 1 treats design-tool exports (Figma design-context React + Tailwind, Claude Design HTML/CSS/JS) under `design/handoff/<slug>/` as reference, not source — translated into Vue/Nuxt idioms, the component library and semantic tokens — never pasted into a code root
 - [ ] Does not make decisions outside its domain; never deploys or changes a production feature flag
 
 ---

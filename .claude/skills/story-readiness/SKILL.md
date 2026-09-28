@@ -7,7 +7,7 @@ allowed-tools: Read, Glob, Grep, AskUserQuestion, Agent, Bash(bash "*/.claude/sk
 model: sonnet
 ---
 
-!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,qa.level,testing.strict,feature_overrides`
+!`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,workflow,qa.level,testing.strict,feature_overrides,design`
 
 Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`.
 
@@ -75,6 +75,21 @@ auto-passes (no requirement validated); at `standard`, validate the per-type tes
 requirement (strictness from `testing.strict`); at `full`, also validate a
 coverage target. Distinct axis from `workflow`. The migration floor ignores
 `qa.level` — see Definition of Done.
+
+**`design`**: the `design.tool` line decides the design-reference half of the
+**Design link present** item (Section 3). `claude-design` or `figma` → UI and E2E
+stories also need a `Design reference:` line backed by a local handoff record.
+`none` → the UX spec link alone passes
+(`Design reference: none — markdown spec only` is the expected line).
+**Unset is not `none`**: when the line reads
+`design.tool: (unset -- ask; unset is not none)` and a UI or E2E story is in
+scope, ask once per run with `AskUserQuestion` — "Which design tool does this
+project use?" — options `claude-design` / `figma` / `none` / `Not decided`. The answer applies to this run
+only (this skill writes nothing; the report says `design.tool unset — treated as
+<answer> for this run; record it with /settings`). `Not decided`, or no answer,
+leaves the sub-check unrun: print
+`Design reference: NOT CHECKED — design.tool unset (record it with /settings)` on
+each UI and E2E story, which then cannot be READY (it is at best NOT ASSESSED).
 
 ---
 
@@ -159,6 +174,12 @@ Before checking any stories, load reference documents once (not per-story):
 - `design/product/tracking-plan.md` — the `## Events` table, once (if the file
   exists).
 - `design/ux/*.md` — Glob once, to resolve the UX spec links of UI and E2E stories.
+- `design/handoff/*/HANDOFF.md` — Glob once, to resolve the design-reference records
+  UI and E2E stories name; per story, read only the record its `Design reference:`
+  line names, and only its `> **Verdict**:` line
+  (`Grep pattern="^> \*\*Verdict\*\*:" path="design/handoff/<slug>/HANDOFF.md" output_mode="content"`).
+  Records are local files; a remote design URL (Figma, Claude Design, an artifact)
+  is never fetched by this skill.
 - `docs/stack-reference/VERSION.md` — the Knowledge Risk of each pinned
   component, to judge the Stack notes item.
 - The current sprint file (if scope is `sprint`) — to identify Must Have /
@@ -219,6 +240,24 @@ items pass or are explicitly marked N/A with a stated reason.
   spec it implements (`design/ux/<slug>.md`, in Implementation Notes or the
   acceptance criteria) and that file exists. Missing link or missing file →
   NEEDS WORK. Fix: add the `UX spec:` line, or run `/ux-design [screen]` first.
+  **Design reference** (same stories), by the `design.tool` resolved in Phase 0:
+  - `claude-design` or `figma` → the story's `## Implementation Notes` also has a
+    `Design reference:` line whose first token is `claude-design` or `figma` and
+    which names a record `design/handoff/<slug>/HANDOFF.md` that exists, with
+    `> **Verdict**: RETAINED` or `> **Verdict**: LINK ONLY`. Missing line, a line
+    reading `none — …` or `NOT CHECKED — …`, a missing record, or a record whose
+    verdict is `NOT ASSESSED` (or does not parse) → NEEDS WORK: an unverified
+    design is never a match. Fix: `/design-handoff --for <slug>` when no record
+    exists (then copy the UX spec's `> **Design Source**:` line into the story),
+    `/design-handoff refresh <slug>` when the record is `NOT ASSESSED`.
+  - `none` → the UX spec link alone passes;
+    `Design reference: none — markdown spec only` is the expected line, and its
+    absence on an older story is not a gap.
+  - unset → as Phase 0 says: ask; never treat it as `none`. Unanswered →
+    `Design reference: NOT CHECKED — design.tool unset (record it with /settings)`,
+    and the story cannot be READY.
+  Whatever `design.tool` says, a `Design reference:` line that names a record is
+  checked the same way — a named record that is missing is a broken link.
 - [ ] **Analytics events listed**: The `**Analytics Events**` field is present —
   event names or `None`. Each named event appears in
   `design/product/tracking-plan.md` `## Events`. An event missing from the plan,
@@ -404,8 +443,10 @@ criterion or rule) has no owner. The story cannot be assigned until the blocker 
 resolved. Note: a story that is BLOCKED may also have NEEDS WORK items — list both.
 
 **NOT ASSESSED** — The story could not be evaluated: the file is unreadable or
-unparseable, or its PRD cannot be located, so the checklist could not run. Name
-which input was missing. (`**PRD**: None — quick spec` with a `Source spec:` line
+unparseable, or its PRD cannot be located, so the checklist could not run — or,
+for a UI or E2E story, `design.tool` is unset and was not answered, so the
+design-reference check could not run. Name which input was missing.
+(`**PRD**: None — quick spec` with a `Source spec:` line
 is not a missing PRD — the quick spec is its source.)
 
 In `full` review mode the QL-STORY-READY gate (Phase 8) runs on every READY or

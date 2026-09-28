@@ -82,7 +82,12 @@ Claude Code Service Studios(CCSS)는 Claude Code로 웹·모바일·API 서비�
   알아 두세요(`.claude/docs/model-tiers.md`).
 - **`allowed-tools`는 정확하게** — 실제로 쓰는 도구와 정확히 일치해야 합니다. MCP 도구 이름은 설치마다 다르므로
   절대 적지 않습니다. Context7을 쓸 수 있는 스킬은 "use Context7 if its tools are present in the session, else
-  WebSearch/WebFetch"라고 씁니다.
+  WebSearch/WebFetch"라고 씁니다. 다른 MCP 서버(Figma MCP 서버, Claude Design 커넥터)와 호스트에 따라 있거나 없는
+  내장 도구(`Artifact`, `Skill`)도 같습니다. `allowed-tools`나 에이전트의 `tools:`에 적지 않고, 본문에서 "use the
+  Figma MCP server if its tools are present in the session, else …"처럼 서버나 도구를 조건부로 부릅니다. 없으면
+  조용히 넘어가지 말고 이름 붙은 `NOT CHECKED` 줄(예: `NOT CHECKED — Figma MCP tools not present in this session`)을
+  출력합니다. 서브에이전트는 이런 도구에 닿을 수 없으므로 메인 세션이 읽어서 파일로 남기고 에이전트에게는 경로를
+  넘깁니다. `DesignSync`는 번들 `/design-sync`만 쓰고 CCSS 스킬은 부르지 않습니다.
 - **설정 부트스트랩** — 설정이 필요한 스킬은 본문 첫 줄에 아래 한 줄을 두고,
 
   ```text
@@ -121,7 +126,11 @@ Claude Code Service Studios(CCSS)는 Claude Code로 웹·모바일·API 서비�
 - **그 밖의 금지 사항** — 증거·보고서·계획을 gitignore된 `production/session-logs/`에 쓰지 않습니다.
   `modes.rigor`가 대신 정하는 여섯 설정(`modes.review_mode`, `modes.workflow`, `docs.density`, `qa.level`,
   `modes.story_granularity`, `team.size`)을 쓰거나 `project.yaml`에 심지 않습니다(사용자가 요청한 `/settings`만
-  예외). "다음 단계" 안내에는 실제로 존재하는 스킬 이름만 씁니다.
+  예외). "다음 단계" 안내에는 `.claude/skills/`에 실제로 존재하는 스킬 이름만 씁니다. Claude Code 번들 스킬
+  (`/design`, `/design-sync`, `/design-login`)과 Figma 플러그인 스킬은 다음 단계로 안내하지 않고, 사용자가 실행하거나
+  승인하는 도구로서 조건부로만 언급합니다("if the bundled `/design` skill is present in the session"). 번들 스킬과
+  같은 이름의 CCSS 스킬(`design`, `design-sync`, `design-login`)은 만들지 않습니다. 프로젝트 스킬이 번들 스킬을
+  가립니다.
 - **워크플로 카탈로그** — 새 스킬이 단계의 스텝이라면 `.claude/docs/workflow-catalog.yaml`에 스텝을 추가합니다.
   이 파일은 `artifact-check.sh`의 손으로 쓴 파서가 읽으므로 들여쓰기 계약을 지키고, YAML 포매터를 절대 돌리지
   마세요. 스텝의 `command:`는 실제 스킬이어야 하고, glob은 스킬이 실제로 쓰는 경로와 정확히 맞아야 합니다.

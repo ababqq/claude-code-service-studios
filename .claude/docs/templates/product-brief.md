@@ -239,6 +239,7 @@ absent, it runs DD-BRAND-DIRECTION itself before writing the design language.
 - **Platform stance**: [brand-forward custom components, or platform conventions
   (Human Interface Guidelines, Material) on each surface — and the maintenance cost]
 - **Rejected directions**: [the other directions offered, and why they lost]
+- **Visual reference**: [Claude Design / Figma / Design artifact URL for the explored directions, or "none"]
 
 ---
 

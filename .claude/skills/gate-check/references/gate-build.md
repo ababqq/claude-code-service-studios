@@ -18,7 +18,10 @@
 - [ ] Design language `design/brand/design-language.md` is complete: all 9 sections
       (`## 1. Brand Principles` … `## 9. Content & Voice`) (only if *UI*)
 - [ ] UX specs exist in `design/ux/` for the key screens: sign-up/sign-in, onboarding,
-      the core flow, and settings/account (only if *UI*)
+      the core flow, and settings/account (only if *UI*). An external design (Claude
+      Design, Figma, a `/design` artifact) never substitutes for the spec file; a spec
+      whose `### Wireframe` cites its `> **Design Source**:` record instead of ASCII
+      counts
 - [ ] App shell spec `design/ux/app-shell.md` and interaction pattern library
       `design/ux/interaction-patterns.md` exist (only if *UI*)
 - [ ] Every key-screen UX spec has a `/ux-review` record in `design/ux/reviews/`
@@ -50,6 +53,13 @@
       the contract under `docs/api/` (only if *Backend* and *UI*)
 - [ ] DD-DESIGN-LANGUAGE outcome recorded in `design/brand/design-language.md` — the
       gate-outcome rule below (only if *UI*)
+- [ ] External design sources retained and reviewed — every key UX spec whose
+      `> **Design Source**:` first token is `claude-design` or `figma` has its record
+      `design/handoff/<slug>/HANDOFF.md` with `> **Verdict**:` `RETAINED` or `LINK ONLY`,
+      and the record's `> **Retrieved**:` date is not newer than the date in the file
+      name of the spec's latest `/ux-review` record that satisfies the UX review item
+      above (`<spec-stem>-ux-review-YYYY-MM-DD.md`) — the external-design rule below
+      (only if *UI*; only for specs declaring `claude-design` or `figma`)
 - [ ] Manual validation confirms PRDs + architecture + API contract + epics are
       coherent (run `/review-all-prds` and `/architecture-review` if not done recently)
 
@@ -84,6 +94,18 @@ when the resolved `review_mode` skips that gate, by the literal skip note
 **not** score the item — review mode is an explicit user choice, and the skip note is
 the evidence it was applied. Neither line present ⇒ the item is unmet.
 
+**External-design rule** (the external design sources item): a record retrieved after
+that review date means the design changed after the review, so the review is stale —
+the item is unmet for that spec (re-run `/ux-review [file]`). A missing record, or one
+whose verdict is `NOT ASSESSED`, prints
+`NOT CHECKED — external design not retained (<url>)` with the spec's Design Source
+locator, and the item is never PASS — where the tier requires the item, that is a
+required check that could not run (NOT ASSESSED); where it is recommended, it is listed
+under Recommendations. `/gate-check` reads only these files — it never
+calls a Figma MCP tool, the Claude Design connector or the `Artifact` tool to decide
+the verdict. No key spec declaring `claude-design` or `figma` ⇒
+`N/A — no external design source declared`.
+
 **Conditions** (resolved by `/gate-check` Phase 1):
 - *UI* = `platform.surfaces` ∩ {web, ios, android} ≠ ∅. Unset ⇒ MANUAL CHECK NEEDED
   (ask), never "no UI".
@@ -109,8 +131,10 @@ only thing that adds one.
   **Conditional** (required when the condition holds): the 9-section design
   language, key-screen UX specs, app shell and interaction patterns, UX reviews,
   UX coverage of PRD UI requirements and the accessibility target, and the
-  DD-DESIGN-LANGUAGE outcome (*UI*); the API reconciliation record and every
-  `## API Data` operation in the contract (*Backend* and *UI*).
+  DD-DESIGN-LANGUAGE outcome (*UI*); the external design sources retained and
+  reviewed (*UI*, only for specs declaring `claude-design` or `figma`); the API
+  reconciliation record and every `## API Data` operation in the contract (*Backend*
+  and *UI*).
   **Recommended**: at least one usability session. **Dropped**: the one-pager's
   `## Build Order` (the sprint plan is the plan at this tier). The Walking Skeleton
   Validation binds as written above.
@@ -124,7 +148,8 @@ only thing that adds one.
   requirements and the accessibility target, and the DD-DESIGN-LANGUAGE outcome.
   **Recommended**: control manifest; at least one usability session; the API
   reconciliation record and every `## API Data` operation in the contract (both
-  conditional on *Backend* and *UI*). **Dropped**: the one-pager's `## Build Order`.
+  conditional on *Backend* and *UI*); the external design sources retained and
+  reviewed (conditional on *UI* and a spec declaring `claude-design` or `figma`). **Dropped**: the one-pager's `## Build Order`.
   The Walking Skeleton Validation binds as written above.
 - **`minimal`** — only **the one-pager's `## Build Order` section lists at least one
   item** is required (`design/product/one-pager.md` — the one-pager is the plan; no
@@ -132,6 +157,7 @@ only thing that adds one.
   `Accepted`; control manifest; design language; key-screen UX specs; app shell and
   interaction patterns; UX reviews; walking skeleton report; usability session; API
   reconciliation record; UX coverage; story path and field checks; `## API Data`
-  operations in the contract; DD-DESIGN-LANGUAGE outcome; the coherence validation.
+  operations in the contract; DD-DESIGN-LANGUAGE outcome; external design sources
+  retained and reviewed; the coherence validation.
   **If a walking skeleton was built anyway**, its validation items 1–4 still bind
   (item 5 is `N/A` at this tier) — a built skeleton that fails one is FAIL.

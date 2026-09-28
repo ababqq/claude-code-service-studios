@@ -28,8 +28,8 @@ No other key and no other file. In particular:
 > `modes.workflow`, `docs.density`, `qa.level`, `modes.story_granularity`, `team.size`.
 > Writing one explicitly pins it and shadows the rigor expansion, so the Phase 5
 > question would stop changing it — the same rule stated in the header comment of
-> `project.yaml`. The stack (`stack.*`, surfaces, distribution, regions, locales) is
-> written by `/setup-stack`; `project.name` and `project.category` by `/brainstorm`;
+> `project.yaml`. The stack (`stack.*`, surfaces, distribution, regions, locales) and
+> the design tool (`design.*`) are written by `/setup-stack`; `project.name` and `project.category` by `/brainstorm`;
 > everything else by `/settings`.
 
 **Always collaborative.** `/start` runs before any configuration exists, so it
@@ -359,7 +359,9 @@ with `workflow_overrides.feature_overrides.<feature>` instead of the whole proje
   `/architecture-review` → `/test-setup` → `/setup-stack refresh` (records the data
   and cloud layers once their ADRs are Accepted) → `/gate-check validation`
 - **Validation**: with a UI, `/design-language` → `/ux-design shell` →
-  `/ux-design patterns` → `/ux-design` for the key screens → `/ux-review`; with a
+  `/ux-design patterns` → `/ux-design` for the key screens (with `/design-handoff`
+  importing each Claude Design or Figma screen when the project designs in one) →
+  `/ux-review`; with a
   backend and a UI, `/api-design reconcile` (recommended); then `/create-epics` →
   `/create-stories` → `/sprint-plan` → `/walking-skeleton` on staging →
   `/gate-check build`

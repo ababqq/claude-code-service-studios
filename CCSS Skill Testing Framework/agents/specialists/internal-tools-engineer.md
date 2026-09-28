@@ -56,6 +56,7 @@ never runs them against production or a shared database.
 - [ ] Every agent named in `Coordinates with:` exists under `.claude/agents/`
 - [ ] Domain clearly stated; consumer-facing product behaviour (backend-engineer, frontend-engineer, mobile-engineer), product analytics dashboards (analytics-engineer) and SLO dashboards (sre-engineer) are stated as outside it
 - [ ] Escalation path documented: build-vs-buy is an ADR decision (follow the Accepted ADR and raise disagreements); authentication and audit logging are never weakened for convenience — such conflicts go to tech-lead, its `Reports to:` line
+- [ ] Design references: step 1 reads the story's design reference as local files under `design/handoff/<slug>/`; `### Tool UX` states "**Design output is reference, not source.**" (rebuild with library components and tokens, missing token → design-engineer, UX spec wins on behaviour, mockup copy is a draft); captures are compared with the reference screens, never copied into `production/qa/evidence/`; pasting a design-tool export into a code root is forbidden
 - [ ] Does not make decisions outside its domain
 
 ---

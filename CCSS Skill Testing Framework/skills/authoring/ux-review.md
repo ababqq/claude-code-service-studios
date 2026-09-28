@@ -4,9 +4,11 @@
 
 `/ux-review` validates a UX design document before it enters the implementation pipeline: a screen spec
 (`# UX Spec:`), a flow spec (`# User Flow:`), the app shell (`# App Shell:`) or the interaction pattern library
-(`# Interaction Pattern Library:`). It checks four review dimensions — **Completeness**, **PRD Alignment**,
+(`# Interaction Pattern Library:`). It checks five review dimensions — **Completeness**, **PRD Alignment**,
 **Accessibility** (against the committed `accessibility.target` and the `> **Target**:` line of
-`design/accessibility-requirements.md`) and **Pattern Library** — plus the `## API Data` operations against the
+`design/accessibility-requirements.md`), **Pattern Library** and **Design Source Parity** (the document's
+`> **Design Source**:` line against its handoff record `design/handoff/<slug>/HANDOFF.md` and retained screens:
+`MATCHES | DRIFT FOUND | NOT ASSESSED | N/A — none`) — plus the `## API Data` operations against the
 contract under `docs/api/` and the analytics events against the tracking plan. Input methods and breakpoints come from
 the resolved `platform.surfaces` line. After the checklists it spawns the DD-UI-CONSISTENCY gate (`design-director`)
 under the review-mode rules, then writes one review record per document to
@@ -15,7 +17,8 @@ the document it reviews.
 
 Verdicts: `APPROVED` / `NEEDS REVISION` / `MAJOR REVISION NEEDED` / `NOT ASSESSED`. `NOT ASSESSED` ranks above
 APPROVED and below the two revision verdicts: it is emitted when the spec cannot be read, when a dimension has no
-criterion to check against, or when the accessibility target is uncommitted. A NEEDS REVISION the user accepts is
+criterion to check against, when the accessibility target is uncommitted, or when a declared claude-design or figma
+source has no readable record. A NEEDS REVISION the user accepts is
 recorded with a `> **Risk Accepted**:` line — the explicit acceptance the Validation → Build gate looks for.
 
 Assertions quote the canonical English text of `.claude/skills/ux-review/SKILL.md`; prompts are rendered in the user's
@@ -32,12 +35,15 @@ Verified automatically by `/skill-test static` — no fixture needed.
 - [ ] `name: ux-review` equals the directory name (`.claude/skills/ux-review/`) and this spec's basename
 - [ ] `argument-hint` is `"[file-path | all | shell | patterns] [--review full|lean|solo]"`
 - [ ] The first body line is exactly
-      `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,accessibility,surfaces` ``
-      — the `--keys` value is exactly `review_mode,automation,accessibility,surfaces`
+      `` !`bash "${CLAUDE_SKILL_DIR}/../../hooks/yaml-helper.sh" resolve_config --keys review_mode,automation,accessibility,surfaces,design` ``
+      — the `--keys` value is exactly `review_mode,automation,accessibility,surfaces,design`
 - [ ] `allowed-tools` contains the grant naming this skill's own directory:
       `Bash(bash "*/.claude/skills/ux-review/../../hooks/yaml-helper.sh" resolve_config *)`
 - [ ] `allowed-tools` is exactly the set Read, Glob, Grep, Write, Agent, AskUserQuestion plus that grant — no `Edit`
-      (the reviewed document is never edited), no plain `Bash`, no MCP tool names
+      (the reviewed document is never edited), no plain `Bash`, no MCP tool names, no `Artifact` or `Skill` (live
+      design tools are named conditionally, rule 15)
+- [ ] Contains the sentence starting `The five review dimensions are **Completeness**, **PRD Alignment**,` and the
+      dimension values `MATCHES`, `DRIFT FOUND`, `NOT ASSESSED`, `N/A — none` for **Design Source Parity**
 - [ ] The line after the bootstrap block is exactly: ``Resolved above — use as-is; `--review` overrides `review_mode`. No block → defaults in `.claude/docs/config-resolution.md`.``
 - [ ] The automation prelude block — from `**Automation mode**: Resolve` to `categories always prompt).` — follows
       that line verbatim
@@ -79,8 +85,9 @@ issues (verdict at most NEEDS REVISION); REJECT → BLOCKING issues, never APPRO
 
 **Fixture:**
 - Moa; the config block prints `review_mode: full (project.yaml)`, `accessibility.target: wcag-aa (project.yaml)`,
-  `platform.surfaces: web, ios, android, api (project.yaml)`
-- `design/ux/goal-detail.md` (`# UX Spec: Goal Detail`) has every template section populated: loading, empty,
+  `platform.surfaces: web, ios, android, api (project.yaml)`, `design.tool: none (project.yaml)`
+- `design/ux/goal-detail.md` (`# UX Spec: Goal Detail`, `> **Design Source**: none — markdown spec only`) has every
+  template section populated: loading, empty,
   populated, error and offline states; keyboard, pointer, touch and screen-reader coverage; contrast specified for both
   themes; `## API Data` rows `in contract` that exist in `docs/api/openapi.yaml`; ≥5 testable acceptance criteria
 - `design/accessibility-requirements.md` (`> **Target**: wcag-aa`), `design/ux/interaction-patterns.md` and
@@ -101,7 +108,7 @@ issues (verdict at most NEEDS REVISION); REJECT → BLOCKING issues, never APPRO
    `> **Design Director Review (DD-UI-CONSISTENCY)**: APPROVED [date]`; the handoff suggests `/team-ui`
 
 **Assertions:**
-- [ ] All four dimensions are checked and reported with a per-dimension status
+- [ ] All five dimensions are checked and reported with a per-dimension status; Design Source Parity is `N/A — none`
 - [ ] The verdict line sits directly under the H1 and one blank line, with exactly one token
 - [ ] The reviewed spec is not modified
 - [ ] Verdict is `APPROVED`
@@ -274,7 +281,7 @@ issues (verdict at most NEEDS REVISION); REJECT → BLOCKING issues, never APPRO
 
 **Expected behavior:**
 1. Phase 4a skips all gates: `[DD-UI-CONSISTENCY] skipped — Solo mode`, written in the record header
-2. The verdict comes from the four dimensions alone
+2. The verdict comes from the five dimensions alone
 
 **Assertions:**
 - [ ] No gate agent is spawned in solo mode
@@ -283,9 +290,52 @@ issues (verdict at most NEEDS REVISION); REJECT → BLOCKING issues, never APPRO
 
 ---
 
+### Case 10: Design Source Parity — Figma record: MATCHES, DRIFT FOUND, NOT ASSESSED, stale review
+
+**Fixture:**
+- As Case 1, but the config block prints
+  `design.tool: figma file_url=https://www.figma.com/design/<fileKey>/Moa (project.yaml)` and the spec's header reads
+  `` > **Design Source**: figma — https://www.figma.com/design/<fileKey>/Moa?node-id=12-345 · record `design/handoff/goal-detail/HANDOFF.md` ``
+- `design/handoff/goal-detail/HANDOFF.md` has `> **Verdict**: RETAINED` and `> **Retrieved**: 2026-10-12`; its
+  `## Screens & States` has a retained screen for every state and breakpoint of the spec; `### Wireframe` reads
+  "external: see Design Source — screens listed from the handoff record" with a text hierarchy description
+- `design/ux/reviews/goal-detail-ux-review-2026-10-05.md` exists (an earlier APPROVED review)
+- Variant A: the record has no screen for the offline state, and a screen for a "promo banner" state the spec lacks
+- Variant B: the record has `> **Verdict**: NOT ASSESSED`, and the Figma MCP server's tools are not present in the
+  session; every other dimension passes
+- Variant C: as Variant B, but the Accessibility section is empty (a BLOCKING Completeness gap)
+
+**Input:** `/ux-review design/ux/goal-detail.md`
+
+**Expected behavior:**
+1. Phase 2 loads the Design Source line and Reads the record and its retained screens; the header-completeness item
+   requires Design Source (the `design` line is figma); the external wireframe is accepted because the record is
+   RETAINED and a text hierarchy description is kept
+2. The record reports `## Design Source Parity: MATCHES`; its header carries
+   `> **Design Source**:` with the record's verdict and retrieved date; the earlier 2026-10-05 review is named as stale
+   (the record was retrieved after it)
+3. Variant A: `DRIFT FOUND` — the missing offline screen and the unmatched promo-banner screen are BLOCKING issues;
+   verdict `NEEDS REVISION` at most
+4. Variant B: `Design Source Parity: NOT ASSESSED — external design not retained (<url>)` plus
+   `NOT CHECKED — Figma MCP tools not present in this session`; the verdict is `NOT ASSESSED`, never APPROVED; the
+   external wireframe does not satisfy the Layout Specification item; `/design-handoff --for goal-detail` (or
+   `refresh goal-detail`) is recommended
+5. Variant C: the Completeness gap yields `NEEDS REVISION`, which outranks the parity `NOT ASSESSED`
+
+**Assertions:**
+- [ ] The Figma file is never fetched by an agent; the skill reads the record with Read and names any live tool only
+      conditionally
+- [ ] `NOT ASSESSED` parity never reads as `MATCHES`, and blocks APPROVED
+- [ ] `DRIFT FOUND` caps the verdict at NEEDS REVISION
+- [ ] The stale-review comparison uses the review record's file-name date against the handoff record's
+      `> **Retrieved**:` date
+- [ ] The reviewed spec is not modified
+
+---
+
 ## Protocol Compliance
 
-- [ ] Checks the four dimensions and reports each separately, with a per-section checklist before the verdict
+- [ ] Checks the five dimensions and reports each separately, with a per-section checklist before the verdict
 - [ ] Checks states (loading, empty, error, offline) and input methods for every covered surface
 - [ ] Never edits or writes the document it reviews; its only writes are review records, each after "May I write"
 - [ ] Issues specific, actionable feedback when the verdict is not APPROVED
@@ -299,8 +349,9 @@ review-shaped member):
       assembled, shown and approved once per document (or once per `all` changeset)
 - [ ] A4 — DD-UI-CONSISTENCY runs in `full`, is skipped with a named note in `lean` and `solo`
 - [ ] A5 — The record's fixed shape is kept exactly: `# UX Review: [Document Name]`, the `> **Verdict**:` line
-      directly under it, the header labels, and the `## Completeness`, `## Quality Issues`, `## PRD Alignment`,
-      `## Accessibility`, `## Pattern Library`, `## API Data Check` and `## Summary` headings (the skill has no template
+      directly under it, the header labels (including `> **Design Source**:`), and the `## Completeness`,
+      `## Quality Issues`, `## PRD Alignment`, `## Accessibility`, `## Pattern Library`, `## Design Source Parity`,
+      `## API Data Check` and `## Summary` headings (the skill has no template
       file under `.claude/docs/templates/`; the format block in Phase 4b is the template)
 
 ---
@@ -313,5 +364,7 @@ review-shaped member):
   case.
 - The design-language consistency check (component, token and breakpoint names) depends on the gate agent's reading
   and is not fixture-tested beyond Case 7.
+- An unset `design` line with no Design Source line in the document (the skill asks once per run; "None" ⇒
+  `N/A — none`) is not fixture-tested. Claude Design sources follow the same path as Figma in Case 10.
 - When `platform.surfaces` is unset, input coverage is checked against the spec's own `> **Surfaces**:` header and the
   record says so — not fixture-tested.

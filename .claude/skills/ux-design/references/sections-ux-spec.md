@@ -123,8 +123,15 @@ conversation, not a template heading):
   an open question; never invent pixel values.
 - For each breakpoint, propose what changes: columns, what moves, what collapses
   into a menu or sheet, what becomes sticky.
+- With an external design source (Phase 2i — `claude-design` or `figma` with a
+  handoff record), derive the breakpoints the design covers from the record's
+  frames or screens, and map each to a design-language breakpoint. A frame width
+  the design language does not define stays `[from the design language — TBD]`
+  with an open question — never copy a frame's pixel width in as a new breakpoint.
+  A covered breakpoint with no frame is listed for check 8.
 - Offer 2–3 arrangements for the smallest and the widest breakpoint, with rationale
-  tied to the information hierarchy. Use `AskUserQuestion`:
+  tied to the information hierarchy (with an external source, the arrangement the
+  design shows is the first option). Use `AskUserQuestion`:
   - "Which arrangement fits best?"
   - Options: [the 2–3 named arrangements you just presented] + "None — build a custom arrangement"
 - Record reflow at 320 CSS px and behaviour at 200 % text size, and the safe areas
@@ -139,15 +146,39 @@ conversation, not a template heading):
   - The component-library component or pattern it reuses (reference by name from
     `design/ux/interaction-patterns.md`)
   - Whether it introduces a new pattern (flag it for the pattern library)
+- With an external design source, start the inventory from the handoff record's
+  `## Tokens & Components`: a component with a Code Connect mapping (Figma component
+  → repo component) fills "Reuses Existing Component or Pattern?" with that repo
+  component; a design component with no mapping and no pattern-library match is
+  flagged as new; a raw
+  value (color, spacing, radius) with no design-language token is listed as a
+  request to the `design-engineer`, never written into the spec as a value.
 - Name the element that receives focus on open, including on deep-link entry and in
   the empty state.
 
-**Step 4 — Wireframe** (fills `### Wireframe`):
-- Offer to generate an ASCII wireframe for the smallest and the widest breakpoint.
-- Use `AskUserQuestion`: "Want an ASCII wireframe as part of this spec?"
-  - Options: "Yes, include one", "No, I'll link a design file instead"
-- If yes, produce the wireframe in conversation first. Ask for feedback before
-  writing it to file. If a design file exists (Figma or similar), record its link.
+**Step 4 — Wireframe** (fills `### Wireframe`). Branch on the Design Source
+resolved in Phase 2i:
+- **`none — markdown spec only`** (or the source is still undecided) — offer an
+  ASCII wireframe for the smallest and the widest breakpoint. Use
+  `AskUserQuestion`: "Want an ASCII wireframe as part of this spec?"
+  - Options: "Yes, include one", "No — a text hierarchy description is enough"
+  If yes, produce the wireframe in conversation first and ask for feedback before
+  writing it to file.
+- **`claude-design` or `figma` with a handoff record** — cite the record's retained
+  screens instead of drawing: one line per breakpoint naming the screen file under
+  `design/handoff/<slug>/screens/` (or, for a `LINK ONLY` record, the frame or node
+  locator), written as "external: see Design Source — screens listed from the
+  handoff record". Use `AskUserQuestion`: "Cite the handoff record's screens, or
+  draw an ASCII wireframe as well?"
+  - Options: "Cite the screens (Recommended)", "Cite the screens and add an ASCII wireframe"
+- **`claude-design` or `figma` without a usable record** (none yet, or `NOT
+  ASSESSED`) — draw the ASCII wireframe as for `none`, and add an open question
+  "Design Source declared but not retained — run `/design-handoff --for <slug>`".
+  Never cite screens that were neither retained nor read.
+
+In every branch, keep a short text description of the hierarchy (the Step 1
+ranking, region by region) under the wireframe or the screen list, so a reader
+without the image, the design tool or its account can still review the layout.
 
 ---
 
@@ -195,6 +226,15 @@ Guide the user beyond the happy path.
 
 Present the collected states as the template table for approval. Every state needs
 a trigger that QA can reproduce; the table is also the test matrix.
+
+With an external design source, map each state to its screen in the handoff
+record's `## Screens & States` (the screen file or frame locator in the state's
+row, in the Notes column), and list the states the design lacks — commonly
+offline, partial data, session expired and the not-found state — as open
+questions for the designer. A state the design lacks is still specified here: the
+spec wins on behaviour. A screen the record has that maps to no state here is
+raised with the user (a missing state, or an obsolete screen). Check 8 re-runs this
+comparison.
 
 ---
 
@@ -431,6 +471,10 @@ per `.claude/docs/compliance/<region>.md` for the regions in `compliance.regions
 #### Flow Section 2: Critical Path
 
 - Agree the shortest successful route first; draw it as a Mermaid flowchart.
+- With an external design source (a flow handoff record,
+  `design/handoff/<flow-slug>/HANDOFF.md`), name each step's screen from the
+  record's `## Screens & States` next to its spec path; list steps the design has
+  no screen for, and screens that map to no step, for check 8.
 - For each step: the screen (and its spec path, or "inline" for trivial steps),
   what the user does, what the system does, the operation(s) called, and an effort
   budget (inputs, taps, seconds).
