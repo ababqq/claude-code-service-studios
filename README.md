@@ -157,7 +157,7 @@ Definition → Architecture 전환을 점검합니다. `Launch`는 종착 단계
 
 1. **이 저장소를 클론하거나 템플릿으로 새 저장소를 만듭니다.**
    ```bash
-   git clone <이 저장소의 URL> my-service
+   git clone https://github.com/ababqq/claude-code-service-studios my-service
    cd my-service
    ```
 
